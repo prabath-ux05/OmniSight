@@ -1,4 +1,4 @@
-# OmniSight — Multimodal UI Self-Healing & RPA Agent
+# OmniSight - Multimodal UI Self-Healing & RPA Agent
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. By combining vision-language models, browser automation, and automated Git workflows, OmniSight dynamically detects UI changes, diagnoses broken selectors/flows, repairs test scripts, and automatically submits self-healing pull requests.
 
