@@ -1,158 +1,184 @@
 
 # OmniSight Vision Engine
 
-## 1. Purpose
+The Vision Engine is the OmniSight module responsible for representing UI inspection inputs, validating evidence-file paths, and producing structured defect findings.
 
-The Vision Engine is responsible for analyzing website screenshots and
-available DOM evidence to identify potential user-interface (UI) defects.
+The current implementation uses a deterministic mock detector. Real screenshot and DOM analysis using a vision-language model is planned but has not yet been implemented.
 
-The initial implementation will use a deterministic mock detector.
-Real Vision-Language Model (VLM) integration will be added in a later phase.
+## 🎯 Responsibilities
 
-## 2. Responsibilities
+- Represent the evidence supplied for a UI inspection run.
+- Validate supplied screenshot and DOM snapshot files.
+- Produce structured findings using a predictable mock detector.
+- Keep finding categories, severity, confidence, and evidence references consistent.
+- Provide tests for valid inputs, invalid evidence, and mock behavior.
+- Prepare for future integration with an approved vision-language model.
 
-- Define a clear input and output interface for the Vision Engine.
-- Validate incoming screenshot and DOM evidence.
-- Implement a deterministic mock detector for initial development.
-- Identify potential UI defects using the agreed defect categories.
-- Return structured findings with severity, confidence, descriptions,
-  and evidence references.
-- Validate finding data and handle invalid inputs or errors.
-- Write automated tests for successful and failure cases.
-- Prepare the interface for future VLM integration.
-- Coordinate interface requirements with the Browser Agent and Backend teams.
+## 📁 Module Structure
 
-## 3. Planned Defect Categories
+```text
+vision_engine/
+├── detection/
+│   └── mock_detector.py
+├── tests/
+│   ├── test_evidence_validator.py
+│   └── test_mock_detector.py
+├── models.py
+├── evidence_validator.py
+└── README.md
+```
 
-The following are initial examples and must be confirmed against the
-team's agreed schema:
+## 🧩 Current Components
 
-- Layout overflow.
-- Missing visible elements.
-- Broken images.
-- Overlapping elements.
-- Misaligned elements.
-- Clipped or hidden content.
-- Incorrect spacing.
+### 1. Input and finding models
 
-The final category names must match the shared team contract.
+File: `models.py`
 
-## 4. Input Evidence
+`VisionInput` represents the data supplied for an inspection run:
 
-The engine is expected to receive:
+- `run_id`: Identifier for the inspection run.
+- `url`: URL of the page being inspected.
+- `screenshot_path`: Optional path to screenshot evidence.
+- `dom_snapshot_path`: Optional path to DOM snapshot evidence.
 
-- Website screenshots captured by the Browser Agent.
-- DOM evidence or snapshots, when available and agreed upon.
-- Relevant evidence paths and metadata provided by the existing interface.
+At least one evidence path must be provided.
 
-The implementation must use the actual Browser Agent output format.
-It must not assume that unavailable evidence exists.
+`VisionFinding` represents a potential UI defect and includes:
 
-## 5. Structured Findings
+- `finding_id`
+- `category`
+- `severity`
+- `confidence`
+- `description`
+- `selector` (optional)
+- `evidence`
+- `source`
 
-Each finding should follow the team's agreed schema and may include:
+The current supported categories are:
 
-- Finding ID.
-- Defect category.
-- Severity.
-- Confidence score.
-- Defect description.
-- Optional affected-element selector.
-- Evidence references.
-- Additional fields only when agreed upon by the team.
+- `layout_overflow`
+- `missing_visible_element`
+- `broken_image`
 
-Field names, allowed categories, and validation rules must remain
-consistent with the shared interface.
+Severity values currently include `low`, `medium`, `high`, and `critical`. Confidence is constrained to the range from `0.0` to `1.0`.
 
-## 6. Development Plan
+These interfaces are the current implementation and should be coordinated with the team before being treated as the final shared contract.
 
-### Week 1: Foundation and Mock Detection
+### 2. Evidence validation
 
-- Inspect the existing repository and interfaces.
-- Establish the Vision Engine input and output contract.
-- Implement a deterministic mock detector.
-- Add initial automated tests.
-- Verify that the module imports and returns structured mock findings.
+File: `evidence_validator.py`
 
-### Week 2: Validation and VLM Preparation
+The `validate_evidence()` function checks supplied evidence paths.
 
-- Refine defect categories and output validation.
-- Prepare a minimal VLM provider interface.
-- Develop prompts and response parsing.
-- Test malformed inputs and failure cases.
+It checks whether each supplied path:
 
-### Week 3: VLM Integration and Pipeline Testing
+1. Exists.
+2. Points to a file rather than a directory.
+3. Can be opened for reading.
 
-- Integrate the team-approved VLM provider if access is available.
-- Test using controlled website screenshots.
-- Evaluate false positives, missed defects, and limitations.
-- Keep the mock implementation usable for testing.
+The validator returns a list of error messages. An empty list indicates that the supplied evidence passed these file-level checks.
 
-### Week 4: Reliability and Handover
+If one evidence file is invalid but another is usable, the validator can accept the available evidence while reporting the invalid path.
 
-- Run relevant automated and integration tests.
-- Confirm compatibility with the Browser Agent and Backend.
-- Document setup, configuration, limitations, and test results.
-- Prepare the changes for team review and integration.
+**Limitation:** This validation does not confirm that a screenshot contains valid image data or that a DOM snapshot contains valid HTML.
 
-## 7. Directory Structure
+### 3. Mock detector
 
-- detection/: Defect detection implementation.
-- prompting/: Prompts and VLM response-processing logic.
-- tests/: Vision Engine automated tests.
-- __init__.py: Python package initialization.
+File: `detection/mock_detector.py`
 
+The `detect_mock()` function:
 
-## 8. Current Development Status
+1. Receives a `VisionInput`.
+2. Validates its evidence paths.
+3. Raises a `ValueError` if evidence validation fails.
+4. Returns predictable sample findings when validation succeeds.
 
-### Implemented
+The current mock findings illustrate `layout_overflow` and `broken_image` categories.
 
-- Initial Vision Engine README created.
-- Python development environment and project dependencies installed.
-- Initial Pydantic input and finding models implemented.
-- Basic input validation requires a run ID, URL, and at least one evidence path.
-- Deterministic mock detector implemented.
-- Mock findings include categories, severity, confidence, descriptions, and evidence references.
-- Mock findings are explicitly labeled with source `mock`.
-- Automated tests cover predictable findings, evidence-path preservation, missing evidence, empty run IDs, and deterministic output.
-- Latest full pytest run: 6 tests passed.
+**Important:** These are sample findings, not verified defects. The mock detector does not inspect image pixels, parse DOM content, or perform actual AI inference.
 
-### Limitations and Pending Work
+### 4. Tests
 
-- The mock detector does not inspect screenshot pixels or DOM content and does not detect real UI defects.
-- Evidence paths are not yet checked for file existence or readability.
-- Real VLM integration and response parsing are not implemented or tested.
-- Integration with the Browser Agent, backend, and other project components has not been verified.
-- Bounding-box requirements and coordinates remain unconfirmed by the team.
-- Additional validation, integration tests, and team review are pending.
+Directory: `tests/`
 
-## 9. Team Integration
+The existing tests cover:
 
-### Browser Agent
+- Valid screenshot evidence.
+- Valid DOM snapshot evidence.
+- Missing evidence files.
+- Directories supplied instead of files.
+- Partial acceptance when one evidence file remains usable.
+- Predictable mock findings.
+- Evidence-reference preservation.
+- Input validation.
+- Deterministic mock output.
+- Evidence validation failures.
 
-- Agree on the screenshot and DOM evidence format.
-- Confirm how evidence paths and relevant metadata are passed.
-- Test against actual browser-captured evidence when available.
+Run the tests to verify the current implementation rather than relying on a previously reported test count.
 
-### Backend
+## ⚙️ Setup and Testing
 
-- Agree on the structured finding schema.
-- Confirm the engine's invocation interface.
-- Keep field names, categories, confidence, and evidence references consistent.
+Run these commands from the repository root with the project's virtual environment activated.
 
-### Team Lead
+### Run all project tests
 
-- Confirm shared contracts and defect categories.
-- Confirm the VLM provider before real model integration.
-- Request approval before shared-schema changes.
+```powershell
+python -m pytest -v
+```
 
-## 10. Development Rules
+### Run only Vision Engine tests
 
-- Work only on the assigned feature/vision-engine branch.
-- Inspect existing code before modifying interfaces.
-- Make small, testable changes.
-- Run relevant tests and report actual results.
-- Do not commit credentials or secrets.
-- Do not claim mock or real-model functionality works until verified.
-- Keep mock behavior clearly distinguishable from real model output.
-- Submit changes for review; do not merge into main independently.
+```powershell
+python -m pytest vision_engine/tests -v
+```
+
+### Check working-tree changes
+
+```powershell
+git status
+git diff --check
+git diff
+```
+
+## 📌 Current Development Status
+
+- [x] Initial input and finding models.
+- [x] Deterministic mock detector.
+- [x] Evidence-file validation.
+- [x] Evidence validation integrated into mock detection.
+- [x] Initial tests for evidence handling and mock behavior.
+- [ ] Clean-page mock scenario with zero findings.
+- [ ] Additional tests for malformed inputs and unsupported categories.
+- [ ] Final agreement on shared input/output contracts.
+- [ ] Vision-language model provider interface.
+- [ ] Prompt design and structured response parsing.
+- [ ] Real screenshot and DOM content analysis.
+- [ ] Tests for malformed model responses, provider failures, and timeouts.
+- [ ] Integration with the Browser Agent and Backend.
+
+## 🗺️ Next Steps
+
+1. Verify the current tests and document the actual results.
+2. Coordinate the clean-page mock scenario with the team.
+3. Add tests for the agreed clean and defect scenarios.
+4. Improve error handling and structured-output validation.
+5. Confirm the approved model provider and credential availability.
+6. Implement real VLM inference only when the required access is authorized.
+7. Test against controlled examples and document false positives and missed defects.
+8. Coordinate integration and submit the feature branch for team review.
+
+## 🔒 Development Guidelines
+
+- Do not redefine shared schemas without team agreement.
+- Keep mock findings clearly distinguishable from VLM-generated findings.
+- Do not claim that mock output represents actual visual detection.
+- Never commit credentials or API keys.
+- Test changes before committing.
+- Work on the assigned feature branch and follow the team's pull request process.
+- Do not merge into `main` without approval.
+
+## ⚠️ Limitations
+
+The current implementation validates evidence-file accessibility and returns mock findings. It does not yet detect real UI defects, localize elements with bounding boxes, generate repairs, or execute repaired scripts.
+
+Any future model integration must validate model output, handle provider errors, and preserve the agreed finding schema.
