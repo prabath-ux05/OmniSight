@@ -1,4 +1,7 @@
+
 """Deterministic mock detector for the OmniSight Vision Engine."""
+
+from typing import Literal
 
 from vision_engine.evidence_validator import validate_evidence
 from vision_engine.models import (
@@ -8,23 +11,41 @@ from vision_engine.models import (
 )
 
 
-def detect_mock(input_data: VisionInput) -> list[VisionFinding]:
+MockScenario = Literal["defect", "clean"]
+
+
+def detect_mock(
+    input_data: VisionInput,
+    *,
+    scenario: MockScenario = "defect",
+) -> list[VisionFinding]:
     """
-    Return predictable sample findings when evidence paths are valid.
+    Return predictable mock findings for a configured scenario.
 
     This is mock behavior only. It does not inspect screenshot pixels,
     analyze DOM content, or detect real UI defects.
 
-    Raises:
-        ValueError: If the supplied evidence files are invalid.
-    """
+    Args:
+        input_data: Inspection input containing evidence paths.
+        scenario: "defect" returns sample findings; "clean" returns none.
 
+    Raises:
+        ValueError: If evidence validation fails.
+    """
     errors = validate_evidence(input_data)
 
     if errors:
         raise ValueError(
             "Evidence validation failed: " + "; ".join(errors)
         )
+
+    if scenario == "clean":
+        return []
+
+    evidence = EvidenceReferences(
+        screenshot_path=input_data.screenshot_path,
+        dom_snapshot_path=input_data.dom_snapshot_path,
+    )
 
     return [
         VisionFinding(
@@ -37,10 +58,7 @@ def detect_mock(input_data: VisionInput) -> list[VisionFinding]:
                 "This is sample output, not a verified defect."
             ),
             selector=None,
-            evidence=EvidenceReferences(
-                screenshot_path=input_data.screenshot_path,
-                dom_snapshot_path=input_data.dom_snapshot_path,
-            ),
+            evidence=evidence,
             source="mock",
         ),
         VisionFinding(
@@ -53,10 +71,7 @@ def detect_mock(input_data: VisionInput) -> list[VisionFinding]:
                 "This is sample output, not a verified defect."
             ),
             selector=None,
-            evidence=EvidenceReferences(
-                screenshot_path=input_data.screenshot_path,
-                dom_snapshot_path=input_data.dom_snapshot_path,
-            ),
+            evidence=evidence,
             source="mock",
         ),
     ]

@@ -81,6 +81,7 @@ def test_mock_detector_is_deterministic(tmp_path):
     second_dump = [finding.model_dump() for finding in second_result]
 
     assert first_dump == second_dump
+
 def test_mock_detector_does_not_claim_real_detection(tmp_path):
     screenshot = tmp_path / "missing.png"
 
@@ -92,3 +93,28 @@ def test_mock_detector_does_not_claim_real_detection(tmp_path):
 
     with pytest.raises(ValueError, match="Evidence validation failed"):
         detect_mock(input_data)
+
+def test_mock_detector_clean_scenario_returns_no_findings(tmp_path):
+    screenshot = tmp_path / "clean_page.png"
+    screenshot.write_bytes(b"mock screenshot data")
+
+    input_data = VisionInput(
+        run_id="clean-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
+    )
+
+    findings = detect_mock(input_data, scenario="clean")
+
+    assert findings == []
+
+
+def test_mock_detector_clean_scenario_still_validates_evidence():
+    input_data = VisionInput(
+        run_id="invalid-clean-test",
+        url="https://example.com",
+        screenshot_path="missing_screenshot.png",
+    )
+
+    with pytest.raises(ValueError, match="Evidence validation failed"):
+        detect_mock(input_data, scenario="clean")
