@@ -93,3 +93,34 @@ def test_mock_detector_still_returns_findings(tmp_path):
 
     assert len(findings) == 2
     assert all(finding.source == "mock" for finding in findings)
+
+def test_both_evidence_files_missing_are_reported(tmp_path):
+    input_data = VisionInput(
+        run_id="test-007",
+        url="https://example.com",
+        screenshot_path=str(tmp_path / "missing.png"),
+        dom_snapshot_path=str(tmp_path / "missing.html"),
+    )
+
+    errors = validate_evidence(input_data)
+
+    assert any("screenshot file does not exist" in error for error in errors)
+    assert any("DOM snapshot file does not exist" in error for error in errors)
+    assert any("No usable evidence files" in error for error in errors)
+
+
+def test_valid_screenshot_with_missing_dom_passes_partially(tmp_path):
+    screenshot = tmp_path / "screenshot.png"
+    screenshot.write_bytes(b"fake image data")
+
+    input_data = VisionInput(
+        run_id="test-008",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
+        dom_snapshot_path=str(tmp_path / "missing.html"),
+    )
+
+    errors = validate_evidence(input_data)
+
+    assert len(errors) == 1
+    assert "DOM snapshot file does not exist" in errors[0]
