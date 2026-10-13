@@ -1,17 +1,32 @@
 """Deterministic mock detector for the OmniSight Vision Engine."""
 
-from vision_engine.models import VisionFinding, VisionInput, EvidenceReferences
+from vision_engine.evidence_validator import validate_evidence
+from vision_engine.models import (
+    EvidenceReferences,
+    VisionFinding,
+    VisionInput,
+)
 
 
 def detect_mock(input_data: VisionInput) -> list[VisionFinding]:
     """
-    Return predictable sample findings for testing.
+    Return predictable sample findings when evidence paths are valid.
 
     This is mock behavior only. It does not inspect screenshot pixels,
     analyze DOM content, or detect real UI defects.
+
+    Raises:
+        ValueError: If the supplied evidence files are invalid.
     """
 
-    findings = [
+    errors = validate_evidence(input_data)
+
+    if errors:
+        raise ValueError(
+            "Evidence validation failed: " + "; ".join(errors)
+        )
+
+    return [
         VisionFinding(
             finding_id=f"{input_data.run_id}-mock-001",
             category="layout_overflow",
@@ -45,5 +60,3 @@ def detect_mock(input_data: VisionInput) -> list[VisionFinding]:
             source="mock",
         ),
     ]
-
-    return findings

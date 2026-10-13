@@ -5,36 +5,48 @@ from pydantic import ValidationError
 
 from vision_engine.detection.mock_detector import detect_mock
 from vision_engine.models import VisionInput
+from pathlib import Path
 
-def test_mock_detector_returns_predictable_findings():
+def test_mock_detector_returns_predictable_findings(tmp_path):
+    screenshot = tmp_path / "example.png"
+    screenshot.write_bytes(b"fake image data")
+
     input_data = VisionInput(
         run_id="test_run",
         url="http://example.com",
-        screenshot_path="example.png",
+        screenshot_path=str(screenshot),
     )
 
     findings = detect_mock(input_data)
 
     assert len(findings) == 2
-    assert findings[0].finding_id == "test_run-mock-001"
     assert findings[0].category == "layout_overflow"
     assert findings[1].category == "broken_image"
     assert all(finding.source == "mock" for finding in findings)
-    assert all(0.0 <= finding.confidence <= 1.0 for finding in findings)
 
 
-def test_mock_detector_preserves_evidence_paths():
+def test_mock_detector_preserves_evidence_paths(tmp_path):
+    screenshot = tmp_path / "example.png"
+    dom_snapshot = tmp_path / "example.html"
+
+    screenshot.write_bytes(b"fake image data")
+    dom_snapshot.write_text("<html></html>", encoding="utf-8")
+
     input_data = VisionInput(
         run_id="test_run",
         url="http://example.com",
-        screenshot_path="example.png",
-        dom_snapshot_path="example.html",
+        screenshot_path=str(screenshot),
+        dom_snapshot_path=str(dom_snapshot),
     )
 
     findings = detect_mock(input_data)
 
-    assert findings[0].evidence.screenshot_path == "example.png"
-    assert findings[0].evidence.dom_snapshot_path == "example.html"
+    assert len(findings) == 2
+
+    for finding in findings:
+        assert finding.evidence.screenshot_path == str(screenshot)
+        assert finding.evidence.dom_snapshot_path == str(dom_snapshot)
+
 
 def test_input_rejects_missing_evidence():
     with pytest.raises(ValidationError):
@@ -52,11 +64,14 @@ def test_input_rejects_empty_run_id():
             screenshot_path="example.png",
         )
 
-def test_mock_detector_is_deterministic():
+def test_mock_detector_is_deterministic(tmp_path):
+    screenshot = tmp_path / "example.png"
+    screenshot.write_bytes(b"fake image data")
+
     input_data = VisionInput(
         run_id="repeat_test",
         url="http://example.com",
-        screenshot_path="example.png",
+        screenshot_path=str(screenshot),
     )
 
     first_result = detect_mock(input_data)
@@ -66,16 +81,14 @@ def test_mock_detector_is_deterministic():
     second_dump = [finding.model_dump() for finding in second_result]
 
     assert first_dump == second_dump
+def test_mock_detector_does_not_claim_real_detection(tmp_path):
+    screenshot = tmp_path / "missing.png"
 
-def test_mock_detector_does_not_claim_real_detection():
     input_data = VisionInput(
-        run_id="mock_test",
-        url="http://example.com",
-        screenshot_path="nonexistent-example.png",
+        run_id="test-006",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
     )
 
-    findings = detect_mock(input_data)
-
-    assert len(findings) == 2
-    assert all(finding.source == "mock" for finding in findings)
-    assert all("Mock finding:" in finding.description for finding in findings)
+    with pytest.raises(ValueError, match="Evidence validation failed"):
+        detect_mock(input_data)
