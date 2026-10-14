@@ -60,6 +60,7 @@ def detect_mock(
                 "This is sample output, not a verified defect."
             ),
             selector=None,
+            bounding_box=None,
             evidence=evidence,
             source="mock",
         ),
@@ -73,6 +74,7 @@ def detect_mock(
                 "This is sample output, not a verified defect."
             ),
             selector=None,
+            bounding_box=None,
             evidence=evidence,
             source="mock",
         ),

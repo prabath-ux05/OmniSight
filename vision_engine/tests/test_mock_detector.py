@@ -196,3 +196,45 @@ def test_finding_rejects_unsupported_severity():
             evidence=EvidenceReferences(),
             source="mock",
         )
+
+def test_finding_accepts_null_bounding_box():
+    finding = VisionFinding(
+        finding_id="test-bbox-null",
+        category="layout_overflow",
+        severity="medium",
+        confidence=0.9,
+        description="Test finding",
+        bounding_box=None,
+        evidence=EvidenceReferences(),
+    )
+
+    assert finding.bounding_box is None
+
+
+def test_finding_accepts_valid_bounding_box():
+    finding = VisionFinding(
+        finding_id="test-bbox-valid",
+        category="layout_overflow",
+        severity="medium",
+        confidence=0.9,
+        description="Test finding",
+        bounding_box={
+            "x": 120,
+            "y": 240,
+            "width": 300,
+            "height": 150,
+        },
+        evidence=EvidenceReferences(),
+    )
+
+    assert finding.bounding_box.x == 120
+    assert finding.bounding_box.y == 240
+    assert finding.bounding_box.width == 300
+    assert finding.bounding_box.height == 150
+
+
+def test_evidence_references_allow_missing_paths():
+    evidence = EvidenceReferences()
+
+    assert evidence.screenshot_path is None
+    assert evidence.dom_snapshot_path is None

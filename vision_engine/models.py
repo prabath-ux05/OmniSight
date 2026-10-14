@@ -30,6 +30,14 @@ class EvidenceReferences(BaseModel):
     dom_snapshot_path: str | None = None
 
 
+class BoundingBox(BaseModel):
+    """Coordinates of a detected UI defect."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
 class VisionFinding(BaseModel):
     """A structured UI defect finding."""
 
@@ -48,6 +56,8 @@ class VisionFinding(BaseModel):
     description: str = Field(min_length=1)
 
     selector: str | None = None
+
+    bounding_box: BoundingBox | None = None
 
     evidence: EvidenceReferences
 
