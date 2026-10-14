@@ -1,4 +1,3 @@
-
 """Deterministic mock detector for the OmniSight Vision Engine."""
 
 from typing import Literal
@@ -30,8 +29,11 @@ def detect_mock(
         scenario: "defect" returns sample findings; "clean" returns none.
 
     Raises:
-        ValueError: If evidence validation fails.
+        ValueError: If the scenario is unsupported or evidence validation fails.
     """
+    if scenario not in ("defect", "clean"):
+        raise ValueError(f"Unsupported mock scenario: {scenario}")
+
     errors = validate_evidence(input_data)
 
     if errors:

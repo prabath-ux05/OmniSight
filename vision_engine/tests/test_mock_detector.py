@@ -4,8 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from vision_engine.detection.mock_detector import detect_mock
-from vision_engine.models import VisionInput
-from pathlib import Path
+from vision_engine.models import EvidenceReferences, VisionFinding, VisionInput
 
 def test_mock_detector_returns_predictable_findings(tmp_path):
     screenshot = tmp_path / "example.png"
@@ -118,3 +117,82 @@ def test_mock_detector_clean_scenario_still_validates_evidence():
 
     with pytest.raises(ValueError, match="Evidence validation failed"):
         detect_mock(input_data, scenario="clean")
+
+def test_mock_detector_rejects_unsupported_scenario(tmp_path):
+    screenshot = tmp_path / "example.png"
+    screenshot.write_bytes(b"fake image data")
+
+    input_data = VisionInput(
+        run_id="invalid-scenario-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Unsupported mock scenario",
+    ):
+        detect_mock(input_data, scenario="unknown")
+
+def test_input_rejects_empty_url():
+    with pytest.raises(ValidationError):
+        VisionInput(
+            run_id="test-empty-url",
+            url="",
+            screenshot_path="example.png",
+        )
+
+
+def test_finding_rejects_unsupported_category():
+
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="test-001",
+            category="unknown_category",
+            severity="medium",
+            confidence=0.9,
+            description="Test finding",
+            evidence=EvidenceReferences(),
+            source="mock",
+        )
+
+
+def test_finding_rejects_confidence_above_one():
+
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="test-002",
+            category="layout_overflow",
+            severity="medium",
+            confidence=1.1,
+            description="Test finding",
+            evidence=EvidenceReferences(),
+            source="mock",
+        )
+
+
+def test_finding_rejects_negative_confidence():
+
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="test-003",
+            category="layout_overflow",
+            severity="medium",
+            confidence=-0.1,
+            description="Test finding",
+            evidence=EvidenceReferences(),
+            source="mock",
+        )
+
+def test_finding_rejects_unsupported_severity():
+
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="test-invalid-severity",
+            category="layout_overflow",
+            severity="urgent",
+            confidence=0.9,
+            description="Test finding",
+            evidence=EvidenceReferences(),
+            source="mock",
+        )
