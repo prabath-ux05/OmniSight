@@ -124,3 +124,34 @@ def test_valid_screenshot_with_missing_dom_passes_partially(tmp_path):
 
     assert len(errors) == 1
     assert "DOM snapshot file does not exist" in errors[0]
+
+
+def test_unreadable_screenshot_is_reported(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from vision_engine.evidence_validator import validate_evidence
+    from vision_engine.models import VisionInput
+
+    screenshot = tmp_path / "screenshot.png"
+    screenshot.write_bytes(b"fake image data")
+
+    original_open = Path.open
+
+    def raise_permission_error(self, *args, **kwargs):
+        if self == screenshot:
+            raise PermissionError("Permission denied")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", raise_permission_error)
+
+    input_data = VisionInput(
+        run_id="test-run",
+        screenshot_path=str(screenshot),
+        dom_snapshot_path=None,
+        url="https://example.com",
+    )
+
+    errors = validate_evidence(input_data)
+
+    assert any("screenshot file cannot be read" in error for error in errors)
+    assert any("No usable evidence files were found." == error for error in errors)
