@@ -35,8 +35,8 @@ class BoundingBox(BaseModel):
 
     x: float
     y: float
-    width: float
-    height: float
+    width: float = Field(ge=0)
+    height: float = Field(ge=0)
 
 class VisionFinding(BaseModel):
     """A structured UI defect finding."""

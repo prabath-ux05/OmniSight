@@ -238,3 +238,20 @@ def test_evidence_references_allow_missing_paths():
 
     assert evidence.screenshot_path is None
     assert evidence.dom_snapshot_path is None
+
+def test_finding_rejects_negative_bounding_box_dimensions():
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="test-bbox-negative",
+            category="layout_overflow",
+            severity="medium",
+            confidence=0.9,
+            description="Test finding",
+            bounding_box={
+                "x": 10,
+                "y": 20,
+                "width": -100,
+                "height": 50,
+            },
+            evidence=EvidenceReferences(),
+        )
