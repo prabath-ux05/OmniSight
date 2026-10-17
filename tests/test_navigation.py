@@ -1,4 +1,4 @@
-from browser_agent.navigation.navigator import BrowserNavigator
+from navigation.navigator import BrowserNavigator
 
 
 def test_navigation_success():
@@ -6,7 +6,8 @@ def test_navigation_success():
     navigator = BrowserNavigator()
 
     result = navigator.navigate(
-        "https://example.com"
+        url="https://example.com",
+        run_id="test_run"
     )
 
     assert result.status == "success"
@@ -19,7 +20,8 @@ def test_invalid_url():
     navigator = BrowserNavigator()
 
     result = navigator.navigate(
-        "invalid-url"
+        url="invalid-url",
+        run_id="test_run"
     )
 
     assert result.status == "failed"

@@ -11,6 +11,8 @@ Responsibilities:
 
 from dataclasses import dataclass
 from typing import Optional
+from screenshots.screenshot_manager import ScreenshotManager
+
 
 from playwright.sync_api import (
     sync_playwright,
@@ -21,8 +23,10 @@ from playwright.sync_api import (
 @dataclass
 class NavigationResult:
     status: str
+    run_id: str
     url: str
     page_title: str
+    screenshot_path: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -36,7 +40,7 @@ class BrowserNavigator:
         self.timeout_ms = timeout_ms
         self.headless = headless
 
-    def navigate(self, url: str) -> NavigationResult:
+    def navigate(self, url: str, run_id: str) -> NavigationResult:
 
         browser = None
 
@@ -57,16 +61,24 @@ class BrowserNavigator:
 
                 title = page.title()
 
-                return NavigationResult(
-                    status="success",
-                    url=page.url,
-                    page_title=title
+                screenshot_path = ScreenshotManager.save_screenshot(
+                    page,
+                    run_id
                 )
 
-        except PlaywrightTimeoutError:
+                return NavigationResult(
+                    status="success",
+                    run_id=run_id,
+                    url=page.url,
+                    page_title=title,
+                    screenshot_path=screenshot_path
+                )
+
+        except PlaywrightTimeoutError as exc:
 
             return NavigationResult(
                 status="failed",
+                run_id=run_id,
                 url=url,
                 page_title="",
                 error="Navigation timeout"
@@ -76,6 +88,7 @@ class BrowserNavigator:
 
             return NavigationResult(
                 status="failed",
+                run_id=run_id,
                 url=url,
                 page_title="",
                 error=str(exc)
