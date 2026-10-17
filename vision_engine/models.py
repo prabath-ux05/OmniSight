@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field, model_validator
 class VisionInput(BaseModel):
     """Evidence supplied to the Vision Engine."""
 
-    run_id: str = Field(min_length=1)
-    url: str = Field(min_length=1)
+    run_id: str = Field(min_length=1, pattern=r".*\S.*")
+    url: str = Field(min_length=1, pattern=r".*\S.*")
 
     screenshot_path: str | None = None
     dom_snapshot_path: str | None = None

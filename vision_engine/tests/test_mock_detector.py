@@ -255,3 +255,21 @@ def test_finding_rejects_negative_bounding_box_dimensions():
             },
             evidence=EvidenceReferences(),
         )
+
+
+def test_input_rejects_whitespace_only_run_id():
+    with pytest.raises(ValidationError):
+        VisionInput(
+            run_id="   ",
+            url="https://example.com",
+            screenshot_path="example.png",
+        )
+
+
+def test_input_rejects_whitespace_only_url():
+    with pytest.raises(ValidationError):
+        VisionInput(
+            run_id="test-whitespace-url",
+            url="   ",
+            screenshot_path="example.png",
+        )
