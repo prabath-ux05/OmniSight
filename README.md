@@ -61,7 +61,7 @@ The architecture is modularized to support concurrent development across four te
 | Member / Focus Area | Primary Modules | Responsibilities |
 | :--- | :--- | :--- |
 | **Member 1: Vision & Intelligence** | `vision_engine/` | Multimodal model integration, element detection, prompt engineering, visual bounding boxes. |
-| **Member 2: RPA & Browser Agent** | `browser_agent/` | Browser automation runtime, page navigation, screenshot capture, DOM serialization. |
+| **Member 2: RPA & Browser Agent** | `browser_agent/` | Playwright setup, page navigation engine, screenshot execution, and browser interaction routines. |
 | **Member 3: Self-Healing & Verification** | `self_healing/` | Failure analysis, selector repair generator, patch verification test runner. |
 | **Member 4: Backend & GitHub Integration** | `backend/`, `github_integration/` | FastAPI orchestration APIs, branch/PR automation, state management, frontend preparation. |
 
@@ -70,13 +70,14 @@ The architecture is modularized to support concurrent development across four te
 ## 🛠️ Setup & Development Status
 
 ### Current Status
+
 - [x] Initial monorepo layout and directory scaffolding established
 - [x] Baseline dependencies defined (`requirements.txt`)
 - [x] Environment configuration blueprint created (`.env.example`)
 - [x] Version control rules configured (`.gitignore`)
 - [ ] Environment variable configuration (`.env`)
 - [ ] Core backend endpoints and services implementation
-- [ ] Browser automation driver setup (Playwright / Selenium)
+- [x] Browser automation driver setup (Playwright navigation & screenshot execution)
 - [ ] Vision model inference pipeline setup
 - [ ] Self-healing verification loop implementation
 - [ ] GitHub App / personal access token integration
@@ -84,27 +85,34 @@ The architecture is modularized to support concurrent development across four te
 
 ### Baseline Setup
 
-1. **Create and activate a Python virtual environment**:
-   ```bash
-   python -m venv .venv
-   # Windows (PowerShell):
-   .venv\Scripts\Activate.ps1
-   # macOS/Linux:
-   source .venv/bin/activate
-   ```
+**1. Create and activate a Python virtual environment**:
 
-2. **Install baseline dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+python -m venv .venv
 
-3. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your local settings and API keys
-   ```
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
 
-4. **Verify Installation**:
-   ```bash
-   pytest
-   ```
+# macOS/Linux:
+source .venv/bin/activate
+```
+
+**2. Install baseline dependencies**:
+
+```bash
+pip install -r requirements.txt
+```
+
+**3. Configure Environment Variables**:
+
+```bash
+cp .env.example .env
+
+# Edit .env with your local settings and API keys
+```
+
+**4. Verify Installation**:
+
+```bash
+pytest
+```
