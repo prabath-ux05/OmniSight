@@ -42,11 +42,11 @@ def validate_evidence(input_data: VisionInput) -> list[str]:
 
         try:
             with path.open("rb") as evidence_file:
-                evidence_file.read(1)
+                if not evidence_file.read(1):
+                    errors.append(f"{evidence_name} file is empty: {raw_path}")
+                    continue
         except OSError:
-            errors.append(
-                f"{evidence_name} file cannot be read: {raw_path}"
-            )
+            errors.append(f"{evidence_name} file cannot be read: {raw_path}")
             continue
 
         usable_evidence += 1

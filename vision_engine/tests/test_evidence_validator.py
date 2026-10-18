@@ -155,3 +155,19 @@ def test_unreadable_screenshot_is_reported(tmp_path, monkeypatch):
 
     assert any("screenshot file cannot be read" in error for error in errors)
     assert any("No usable evidence files were found." == error for error in errors)
+
+
+def test_empty_screenshot_is_rejected(tmp_path):
+    screenshot = tmp_path / "empty.png"
+    screenshot.write_bytes(b"")
+
+    input_data = VisionInput(
+        run_id="test-empty-screenshot",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
+    )
+
+    errors = validate_evidence(input_data)
+
+    assert any("screenshot file is empty" in error for error in errors)
+    assert "No usable evidence files were found." in errors
