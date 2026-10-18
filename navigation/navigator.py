@@ -9,7 +9,7 @@ Responsibilities:
 - Close resources cleanly
 """
 from datetime import datetime, timezone
-from evidence.dom_capture import DOMCapture
+from browser_agent.evidence.dom_capture import DOMCapture
 from dataclasses import dataclass
 from typing import Optional
 from screenshots.screenshot_manager import ScreenshotManager
