@@ -8,7 +8,8 @@ Responsibilities:
 - Handle failures
 - Close resources cleanly
 """
-
+from datetime import datetime, timezone
+from evidence.dom_capture import DOMCapture
 from dataclasses import dataclass
 from typing import Optional
 from screenshots.screenshot_manager import ScreenshotManager
@@ -26,7 +27,10 @@ class NavigationResult:
     run_id: str
     url: str
     page_title: str
+    captured_at: str
+    viewport: dict
     screenshot_path: Optional[str] = None
+    dom_snapshot_path: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -61,7 +65,18 @@ class BrowserNavigator:
 
                 title = page.title()
 
+                viewport = page.viewport_size
+
+                capture_time = datetime.now(
+                    timezone.utc
+                ).isoformat()
+
                 screenshot_path = ScreenshotManager.save_screenshot(
+                    page,
+                    run_id
+                )
+
+                dom_snapshot_path = DOMCapture.save_dom_snapshot(
                     page,
                     run_id
                 )
@@ -71,7 +86,10 @@ class BrowserNavigator:
                     run_id=run_id,
                     url=page.url,
                     page_title=title,
-                    screenshot_path=screenshot_path
+                    captured_at=capture_time,
+                    viewport=viewport,
+                    screenshot_path=screenshot_path,
+                    dom_snapshot_path=dom_snapshot_path
                 )
 
         except PlaywrightTimeoutError as exc:
@@ -81,6 +99,10 @@ class BrowserNavigator:
                 run_id=run_id,
                 url=url,
                 page_title="",
+                captured_at=datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                viewport={},
                 error="Navigation timeout"
             )
 
@@ -91,6 +113,10 @@ class BrowserNavigator:
                 run_id=run_id,
                 url=url,
                 page_title="",
+                captured_at=datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                viewport={},
                 error=str(exc)
             )
 
