@@ -1,19 +1,22 @@
 """
-Browser Agent -
+Browser Agent
 
 Responsibilities:
 - Launch browser
 - Navigate to URL
 - Collect page metadata
+- Capture browser console errors
+- Capture page exceptions
 - Handle failures
 - Close resources cleanly
 """
+
 from datetime import datetime, timezone
-from browser_agent.evidence.dom_capture import DOMCapture
 from dataclasses import dataclass
 from typing import Optional
-from screenshots.screenshot_manager import ScreenshotManager
 
+from evidence.dom_capture import DOMCapture
+from screenshots.screenshot_manager import ScreenshotManager
 
 from playwright.sync_api import (
     sync_playwright,
@@ -29,8 +32,13 @@ class NavigationResult:
     page_title: str
     captured_at: str
     viewport: dict
+
     screenshot_path: Optional[str] = None
     dom_snapshot_path: Optional[str] = None
+
+    console_errors: list = None
+    page_errors: list = None
+
     error: Optional[str] = None
 
 
@@ -44,11 +52,37 @@ class BrowserNavigator:
         self.timeout_ms = timeout_ms
         self.headless = headless
 
-    def navigate(self, url: str, run_id: str) -> NavigationResult:
+    def navigate(
+        self,
+        url: str,
+        run_id: str
+    ) -> NavigationResult:
 
         browser = None
 
+        console_errors = []
+        page_errors = []
+
+        if not (
+            url.startswith("http://")
+            or url.startswith("https://")
+        ):
+            return NavigationResult(
+                status="failed",
+                run_id=run_id,
+                url=url,
+                page_title="",
+                captured_at=datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                viewport={},
+                console_errors=[],
+                page_errors=[],
+                error="Invalid URL"
+            )
+
         try:
+
             with sync_playwright() as p:
 
                 browser = p.chromium.launch(
@@ -56,6 +90,24 @@ class BrowserNavigator:
                 )
 
                 page = browser.new_page()
+
+                # Capture browser console errors
+                page.on(
+                    "console",
+                    lambda msg: console_errors.append(
+                        msg.text
+                    )
+                    if msg.type == "error"
+                    else None
+                )
+
+                # Capture page JavaScript exceptions
+                page.on(
+                    "pageerror",
+                    lambda exc: page_errors.append(
+                        str(exc)
+                    )
+                )
 
                 page.goto(
                     url,
@@ -65,20 +117,28 @@ class BrowserNavigator:
 
                 title = page.title()
 
-                viewport = page.viewport_size
+                viewport = (
+                    page.viewport_size
+                    if page.viewport_size
+                    else {}
+                )
 
                 capture_time = datetime.now(
                     timezone.utc
                 ).isoformat()
 
-                screenshot_path = ScreenshotManager.save_screenshot(
-                    page,
-                    run_id
+                screenshot_path = (
+                    ScreenshotManager.save_screenshot(
+                        page,
+                        run_id
+                    )
                 )
 
-                dom_snapshot_path = DOMCapture.save_dom_snapshot(
-                    page,
-                    run_id
+                dom_snapshot_path = (
+                    DOMCapture.save_dom_snapshot(
+                        page,
+                        run_id
+                    )
                 )
 
                 return NavigationResult(
@@ -89,10 +149,12 @@ class BrowserNavigator:
                     captured_at=capture_time,
                     viewport=viewport,
                     screenshot_path=screenshot_path,
-                    dom_snapshot_path=dom_snapshot_path
+                    dom_snapshot_path=dom_snapshot_path,
+                    console_errors=console_errors,
+                    page_errors=page_errors
                 )
 
-        except PlaywrightTimeoutError as exc:
+        except PlaywrightTimeoutError:
 
             return NavigationResult(
                 status="failed",
@@ -103,6 +165,8 @@ class BrowserNavigator:
                     timezone.utc
                 ).isoformat(),
                 viewport={},
+                console_errors=console_errors,
+                page_errors=page_errors,
                 error="Navigation timeout"
             )
 
@@ -117,6 +181,8 @@ class BrowserNavigator:
                     timezone.utc
                 ).isoformat(),
                 viewport={},
+                console_errors=console_errors,
+                page_errors=page_errors,
                 error=str(exc)
             )
 
