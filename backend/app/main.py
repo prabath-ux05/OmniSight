@@ -5,6 +5,7 @@ This module provides the central FastAPI application instance for OmniSight.
 
 from fastapi import FastAPI
 from backend.app.api.health import router as health_router
+from backend.app.api.runs import router as runs_router
 
 app = FastAPI(
     title="OmniSight Backend API",
@@ -15,5 +16,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Register health check router
+# Register routers
 app.include_router(health_router)
+app.include_router(runs_router)
