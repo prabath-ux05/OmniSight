@@ -1,6 +1,8 @@
 # OmniSight - Multimodal UI Self-Healing & RPA Agent
 
-OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. It aims to detect UI changes, diagnose broken selectors, repair test scripts, and automate GitHub pull requests.
+OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. It is designed to combine vision-language models, browser automation, and automated Git workflows to detect UI changes, diagnose broken selectors and workflows, repair test scripts, and submit self-healing pull requests.
+
+The project currently includes a Playwright-based Browser Agent that supports page navigation, screenshot capture, DOM snapshot generation, metadata collection, browser error monitoring, and automated testing. Other major components are under development.
 
 ---
 
@@ -27,30 +29,30 @@ OmniSight/
 │   │   ├── schemas/          # Pydantic schemas
 │   │   └── services/         # Business logic
 │   └── tests/                # Backend tests
-├── browser_agent/             # Browser automation engine
+├── browser_agent/            # Browser automation engine
 │   ├── navigation/           # Page navigation and interactions
 │   ├── screenshots/          # Screenshot capture and storage
 │   ├── evidence/             # DOM snapshots and browser evidence
 │   └── tests/                # Browser Agent tests
-├── vision_engine/             # Vision models and element detection
+├── vision_engine/            # Vision models and element detection
 │   ├── detection/            # Visual element localization
-│   ├── prompting/             # Vision model prompts
+│   ├── prompting/            # Vision model prompts
 │   └── tests/                # Vision engine tests
-├── self_healing/              # Failure analysis and repair
+├── self_healing/             # Failure analysis and repair
 │   ├── analysis/             # Root cause analysis
 │   ├── code_generation/      # Selector repair generation
 │   └── verification/         # Patch verification
-├── github_integration/        # GitHub automation
+├── github_integration/       # GitHub automation
 │   ├── branches/             # Branch management
 │   ├── commits/              # Commit generation
 │   └── pull_requests/        # Pull request creation
-├── frontend/                  # Planned React dashboard
-├── docs/                      # Documentation
-├── tests/                     # End-to-end tests
-├── .gitignore                 # Git ignore rules
-├── .env.example               # Environment template
-├── requirements.txt           # Python dependencies
-└── README.md                  # Project documentation
+├── frontend/                 # Planned React dashboard
+├── docs/                     # Documentation
+├── tests/                    # End-to-end tests
+├── .gitignore                # Git ignore rules
+├── .env.example              # Environment template
+├── requirements.txt          # Python dependencies
+└── README.md                 # Project documentation
 ```
 
 ---
