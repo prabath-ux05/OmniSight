@@ -1,18 +1,18 @@
 # OmniSight - Multimodal UI Self-Healing & RPA Agent
 
-OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. By combining vision-language models, browser automation, and automated Git workflows, OmniSight dynamically detects UI changes, diagnoses broken selectors/flows, repairs test scripts, and automatically submits self-healing pull requests.
+OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. It aims to detect UI changes, diagnose broken selectors, repair test scripts, and automate GitHub pull requests.
 
 ---
 
 ## 🚀 Project Objective
 
-Modern UI automation scripts frequently break due to minor frontend updates, DOM changes, dynamic element IDs, and CSS restructuring. OmniSight solves this by:
+OmniSight aims to solve common UI automation failures through:
 
-1. **Multimodal Visual Inspection**: Inspecting web applications through visual screenshots and DOM trees simultaneously.
-2. **Autonomous Diagnosis**: Identifying broken locators, layout drift, and UI regressions using vision models.
-3. **Automated Code Self-Healing**: Generating repaired selector strategies and test script updates.
-4. **Seamless GitHub Integration**: Creating dedicated branches, committing validated fixes, and opening automated pull requests with visual diff reports.
-5. **Human-in-the-Loop Dashboard**: Offering a streamlined web dashboard for review, manual execution overrides, and telemetry.
+1. **Multimodal Visual Inspection**: Analyzing screenshots and DOM snapshots.
+2. **Autonomous Diagnosis**: Identifying broken locators and UI changes.
+3. **Automated Code Self-Healing**: Generating and verifying test repairs.
+4. **GitHub Integration**: Creating branches, commits, and pull requests.
+5. **Human-in-the-Loop Dashboard**: Providing a web interface for reviewing fixes and monitoring execution.
 
 ---
 
@@ -20,50 +20,49 @@ Modern UI automation scripts frequently break due to minor frontend updates, DOM
 
 ```text
 OmniSight/
-├── backend/                  # Core FastAPI backend application
+├── backend/                  # FastAPI backend
 │   ├── app/
-│   │   ├── api/              # API endpoints and route handlers
-│   │   ├── core/             # Configuration, logging, and security
-│   │   ├── schemas/          # Pydantic data schemas
-│   │   └── services/         # Application business logic
-│   └── tests/                # Backend unit and integration tests
-├── browser_agent/            # RPA automation & browser execution engine
-│   ├── navigation/           # Action runners, click/type/scroll routines
-│   ├── screenshots/          # Screen capture artifacts and storage
-│   └── tests/                # Browser automation test suites
-├── vision_engine/            # Multimodal vision and locator models
-│   ├── detection/            # Bounding box and visual element localization
-│   ├── prompting/            # Vision model prompts and structured outputs
-│   └── tests/                # Vision engine evaluations
-├── self_healing/             # Self-healing analysis and repair pipeline
-│   ├── analysis/             # Root cause failure analysis and DOM/visual diff
-│   ├── code_generation/      # Automated code and selector repair generator
-│   └── verification/         # Pre-commit patch execution & verification
-├── github_integration/       # Automated version control workflow
-│   ├── branches/             # Branch creation and management
-│   ├── commits/              # Code patching and commit generation
-│   └── pull_requests/        # Pull request creation and PR descriptions
-├── frontend/                 # Future React-based control and monitoring dashboard
-├── docs/                     # Architectural specs, API docs, and guides
-├── tests/                    # End-to-end integration test suites
-├── .gitignore                # Git ignore rules for Python, Node, and secrets
-├── .env.example              # Environment variables template
-├── requirements.txt          # Baseline Python dependencies
-└── README.md                 # Project documentation
+│   │   ├── api/              # API endpoints
+│   │   ├── core/             # Configuration and security
+│   │   ├── schemas/          # Pydantic schemas
+│   │   └── services/         # Business logic
+│   └── tests/                # Backend tests
+├── browser_agent/             # Browser automation engine
+│   ├── navigation/           # Page navigation and interactions
+│   ├── screenshots/          # Screenshot capture and storage
+│   ├── evidence/             # DOM snapshots and browser evidence
+│   └── tests/                # Browser Agent tests
+├── vision_engine/             # Vision models and element detection
+│   ├── detection/            # Visual element localization
+│   ├── prompting/             # Vision model prompts
+│   └── tests/                # Vision engine tests
+├── self_healing/              # Failure analysis and repair
+│   ├── analysis/             # Root cause analysis
+│   ├── code_generation/      # Selector repair generation
+│   └── verification/         # Patch verification
+├── github_integration/        # GitHub automation
+│   ├── branches/             # Branch management
+│   ├── commits/              # Commit generation
+│   └── pull_requests/        # Pull request creation
+├── frontend/                  # Planned React dashboard
+├── docs/                      # Documentation
+├── tests/                     # End-to-end tests
+├── .gitignore                 # Git ignore rules
+├── .env.example               # Environment template
+├── requirements.txt           # Python dependencies
+└── README.md                  # Project documentation
 ```
 
 ---
 
 ## 👥 Module Distribution (4-Member Collaborative Setup)
 
-The architecture is modularized to support concurrent development across four team members:
-
 | Member / Focus Area | Primary Modules | Responsibilities |
 | :--- | :--- | :--- |
-| **Member 1: Vision & Intelligence** | `vision_engine/` | Multimodal model integration, element detection, prompt engineering, visual bounding boxes. |
-| **Member 2: RPA & Browser Agent** | `browser_agent/` | Playwright setup, page navigation engine, screenshot execution, and browser interaction routines. |
-| **Member 3: Self-Healing & Verification** | `self_healing/` | Failure analysis, selector repair generator, patch verification test runner. |
-| **Member 4: Backend & GitHub Integration** | `backend/`, `github_integration/` | FastAPI orchestration APIs, branch/PR automation, state management, frontend preparation. |
+| **Member 1: Vision & Intelligence** | `vision_engine/` | Vision model integration, element detection, and prompt engineering. |
+| **Member 2: RPA & Browser Agent** | `browser_agent/` | Playwright automation, navigation, screenshots, DOM snapshots, metadata collection, error handling, and unit testing. |
+| **Member 3: Self-Healing & Verification** | `self_healing/` | Failure analysis, selector repair, and patch verification. |
+| **Member 4: Backend & GitHub Integration** | `backend/`, `github_integration/` | FastAPI APIs, backend orchestration, and GitHub branch and pull request automation. |
 
 ---
 
@@ -71,47 +70,56 @@ The architecture is modularized to support concurrent development across four te
 
 ### Current Status
 
-- [x] Initial monorepo layout and directory scaffolding established
-- [x] Baseline dependencies defined (`requirements.txt`)
-- [x] Environment configuration blueprint created (`.env.example`)
-- [x] Version control rules configured (`.gitignore`)
-- [ ] Environment variable configuration (`.env`)
-- [ ] Core backend endpoints and services implementation
-- [x] Browser automation driver setup (Playwright navigation & screenshot execution)
-- [ ] Vision model inference pipeline setup
-- [ ] Self-healing verification loop implementation
-- [ ] GitHub App / personal access token integration
-- [ ] Frontend React dashboard scaffolding
+- [x] Initial repository structure and dependencies configured
+- [x] `.env.example` and `.gitignore` created
+- [x] Playwright browser navigation implemented
+- [x] Screenshot capture and artifact storage implemented
+- [x] DOM snapshot and browser evidence capture implemented
+- [x] Metadata collection (URL, title, timestamp, viewport)
+- [x] Browser console errors and JavaScript exceptions captured
+- [x] Navigation timeout handling and invalid URL validation
+- [x] Safe browser cleanup and Browser Agent unit tests
+- [ ] Environment configuration (`.env`)
+- [ ] Backend APIs and services implementation
+- [ ] Vision model inference pipeline
+- [ ] Self-healing and verification pipeline
+- [ ] GitHub integration
+- [ ] React dashboard
 
 ### Baseline Setup
 
-**1. Create and activate a Python virtual environment**:
+**1. Create and activate a virtual environment**
 
 ```bash
 python -m venv .venv
 
-# Windows (PowerShell):
+# Windows (PowerShell)
 .venv\Scripts\Activate.ps1
 
-# macOS/Linux:
+# macOS/Linux
 source .venv/bin/activate
 ```
 
-**2. Install baseline dependencies**:
+**2. Install dependencies and the Chromium browser**
 
 ```bash
 pip install -r requirements.txt
+python -m playwright install chromium
 ```
 
-**3. Configure Environment Variables**:
+**3. Configure environment variables**
 
 ```bash
-cp .env.example .env
+# Windows (PowerShell)
+Copy-Item .env.example .env
 
-# Edit .env with your local settings and API keys
+# macOS/Linux
+cp .env.example .env
 ```
 
-**4. Verify Installation**:
+Edit `.env` with your required configuration and API keys.
+
+**4. Run tests**
 
 ```bash
 pytest
