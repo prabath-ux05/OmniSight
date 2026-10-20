@@ -273,3 +273,37 @@ def test_input_rejects_whitespace_only_url():
             url="   ",
             screenshot_path="example.png",
         )
+
+
+def test_mock_detector_rejects_empty_screenshot(tmp_path):
+    screenshot = tmp_path / "empty.png"
+    screenshot.write_bytes(b"")
+
+    input_data = VisionInput(
+        run_id="empty-screenshot-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="screenshot file is empty",
+    ):
+        detect_mock(input_data)
+
+
+def test_mock_detector_rejects_empty_dom_snapshot(tmp_path):
+    dom_snapshot = tmp_path / "empty.html"
+    dom_snapshot.write_text("", encoding="utf-8")
+
+    input_data = VisionInput(
+        run_id="empty-dom-test",
+        url="https://example.com",
+        dom_snapshot_path=str(dom_snapshot),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="DOM snapshot file is empty",
+    ):
+        detect_mock(input_data)
