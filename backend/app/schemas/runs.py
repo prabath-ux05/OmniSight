@@ -1,17 +1,21 @@
 """Data schemas for OmniSight inspection runs."""
 
 from typing import Literal
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 class RunCreateRequest(BaseModel):
     """Request payload to create a new OmniSight inspection run."""
 
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     url: HttpUrl = Field(
         ...,
+        max_length=2048,
         description="Target web page URL to inspect",
         examples=["http://127.0.0.1:8000/"],
     )
+
 
 
 class RunResponse(BaseModel):
@@ -48,4 +52,8 @@ class RunResponse(BaseModel):
     message: str = Field(
         default="Run created successfully and queued for inspection.",
         description="Descriptive status message",
+    )
+    error: str | None = Field(
+        default=None,
+        description="Error message if run failed or encountered an issue",
     )
