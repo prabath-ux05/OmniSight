@@ -1,23 +1,14 @@
 
-# OmniSight — Multimodal UI Self-Healing & RPA Agent
 # OmniSight - Multimodal UI Self-Healing & RPA Agent
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing agent. It is designed to combine vision-language models, browser automation, and automated Git workflows to detect UI changes, diagnose broken selectors and workflows, repair test scripts, and submit self-healing pull requests.
 
 The project currently includes a Playwright-based Browser Agent that supports page navigation, screenshot capture, DOM snapshot generation, metadata collection, browser error monitoring, and automated testing. Other major components are under development.
 
-OmniSight is a multimodal Robotic Process Automation (RPA) and UI test self-healing project. It aims to combine vision-language models, browser automation, and GitHub workflows to detect UI changes, diagnose broken selectors, support automated test repairs, and submit changes for human review.
-
 ## 🚀 Project Objective
 
 UI automation scripts can break when frontend layouts, DOM structures, CSS classes, or dynamic element IDs change. OmniSight aims to address these issues through:
 OmniSight aims to solve common UI automation failures through:
-
-1. **Multimodal Visual Inspection**: Analyzing screenshots and DOM snapshots.
-2. **Autonomous Diagnosis**: Identifying broken locators and UI changes.
-3. **Automated Code Self-Healing**: Generating and verifying test repairs.
-4. **GitHub Integration**: Creating branches, commits, and pull requests.
-5. **Human-in-the-Loop Dashboard**: Providing a web interface for reviewing fixes and monitoring execution.
 
 1. **Multimodal Visual Inspection:** Analyze screenshots and DOM evidence together.
 2. **Autonomous Diagnosis:** Identify potential broken locators, layout drift, and UI regressions.
