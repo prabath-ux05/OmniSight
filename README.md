@@ -1,3 +1,4 @@
+
 # OmniSight — Multimodal UI Self-Healing & RPA Agent
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing project. It aims to combine vision-language models, browser automation, and Git workflows to detect UI changes, diagnose broken selectors and workflows, generate candidate test repairs, and submit changes for human review.
@@ -18,42 +19,29 @@ UI automation scripts can break when frontend layouts, DOM structures, CSS class
 
 ```text
 OmniSight/
-├── backend/                       # Backend and API
-│   ├── app/                       # Backend application components
-│   │   ├── api/                   # API endpoints
-│   │   ├── core/                  # Configuration and security
-│   │   ├── schemas/               # Request and response schemas
-│   │   └── services/              # Business logic
-│   └── tests/                     # Backend tests
+├── vision_engine/
+│   ├── detection/
+│   │   └── mock_detector.py
+│   ├── tests/
+│   │   ├── test_evidence_validator.py
+│   │   └── test_mock_detector.py
+│   ├── models.py
+│   ├── evidence_validator.py
+│   └── README.md
+├── backend/                       # Backend and API (team development)
 ├── browser_agent/                 # Browser automation and evidence capture
-│   ├── navigation/                # Navigation and browser interactions
-│   ├── screenshots/               # Screenshot artifacts
-│   ├── evidence/                  # DOM snapshots and browser evidence
-│   └── tests/                     # Browser Agent tests
-├── vision_engine/                 # Visual inspection and defect detection
-│   ├── detection/                 # Detection logic and mock detector
-│   ├── tests/                     # Vision Engine tests
-│   ├── models.py                  # Input and finding models
-│   ├── evidence_validator.py      # Evidence file validation
-│   └── README.md                  # Vision Engine documentation
 ├── self_healing/                  # Failure analysis and repair pipeline
-│   ├── analysis/                  # Root cause analysis
-│   ├── code_generation/            # Candidate repair generation
-│   └── verification/              # Repair verification
 ├── github_integration/            # GitHub and Git workflow automation
-│   ├── branches/                  # Branch management
-│   ├── commits/                   # Commit workflows
-│   └── pull_requests/             # Pull request workflows
 ├── frontend/                      # Planned monitoring dashboard
 ├── docs/                          # Project documentation
 ├── tests/                         # Project-level and integration tests
-├── .gitignore                     # Git ignore rules
-├── .env.example                   # Environment variable template
-├── requirements.txt               # Python dependencies
-└── README.md                      # Main project documentation
+├── .gitignore
+├── .env.example
+├── requirements.txt
+└── README.md
 ```
 
-This structure describes the project's intended and documented modules. Individual modules may contain additional files and directories, and some listed components may still be under development.
+The tree lists the Vision Engine files implemented for this contribution and the other project modules at a high level. The other modules may contain additional files and are maintained by their respective team members.
 
 ## 👥 Team Module Distribution
 
@@ -134,27 +122,95 @@ Configure only the environment variables required for your assigned work. Never 
 
 ### 6. Run tests
 
-From the repository root:
+Run the full test suite from the repository root:
 
 ```bash
 python -m pytest -v
+```
+
+To run only the Vision Engine tests:
+
+```bash
+python -m pytest ./vision_engine/tests -q
 ```
 
 Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
 
 ## 📌 Development Status
 
-The following checklist reflects the documented project status. Features should only be marked complete when their implementation and tests have been verified.
+The following checklist reflects the documented Vision Engine development status. Features should only be marked complete when their implementation and tests have been verified.
 
-### Foundation and Vision Engine
+### Vision Engine — Member 1: Vision & Intelligence
 
-- [x] Initial repository structure and baseline dependencies documented.
-- [x] Environment variable template and Git ignore rules configured.
-- [x] Vision Engine input and finding models implemented.
-- [x] Deterministic mock detector implemented.
-- [x] Evidence file validation implemented and integrated.
-- [x] Tests for input validation, evidence validation, and mock detection added.
-- [x] Clean-page mock scenario implemented.
-- [ ] Integrate an approved vision-language model.
-- [ ] Refine defect categories and output validation.
-- [ ] Implement
+- [x] Implemented input and finding models using Pydantic.
+- [x] Added evidence-reference and bounding-box models.
+- [x] Added input validation for required fields and evidence requirements.
+- [x] Implemented evidence file validation for existence, file type, readability, and empty files.
+- [x] Implemented a deterministic mock detector.
+- [x] Added a mock defect scenario for `layout_overflow` and `broken_image`.
+- [x] Added a clean-page scenario that returns no findings.
+- [x] Added automated tests for input validation, evidence validation, and mock detection.
+- [ ] Refine defect categories and finding-output validation.
+- [ ] Integrate an approved vision-language model when provider access is available.
+- [ ] Validate real model responses and expand failure-handling tests.
+
+### Vision Engine Implementation Details
+
+#### Implemented Files
+
+| File | Description |
+|---|---|
+| `vision_engine/models.py` | Defines the input, finding, evidence-reference, and bounding-box models. |
+| `vision_engine/evidence_validator.py` | Checks evidence paths, file existence, file type, readability, and empty files. |
+| `vision_engine/detection/mock_detector.py` | Provides deterministic mock defect and clean-page scenarios. |
+| `vision_engine/tests/test_evidence_validator.py` | Covers evidence-validation behavior and failure cases. |
+| `vision_engine/tests/test_mock_detector.py` | Covers mock detection scenarios and evidence-validation failures. |
+| `vision_engine/README.md` | Documents the Vision Engine module and its current capabilities. |
+
+#### Current Capabilities
+
+- Accepts a run identifier, URL, and optional screenshot and DOM snapshot paths, requiring at least one evidence path.
+- Validates required input fields and rejects blank `run_id` and `url` values.
+- Checks whether supplied evidence files exist, are regular files, can be opened, and are non-empty.
+- Produces example findings for `layout_overflow` and `broken_image` in the mock defect scenario.
+- Returns an empty findings list in the mock clean scenario.
+- Represents findings with category, severity, confidence, description, and evidence references.
+- Preserves the provided evidence references in mock findings.
+
+#### Current Limitations
+
+The mock detector does not analyze screenshot pixels or DOM content to identify real defects. Its findings are deterministic examples for testing. Evidence validation checks basic file accessibility and non-empty content, but does not verify the semantic validity of image or DOM data. Real vision-language model integration is not yet implemented.
+
+The latest confirmed development test result was **36 passed**. Run the Vision Engine test command again to verify the current state.
+
+### Other Project Modules
+
+The Browser Agent, Self-Healing, Backend, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status should be updated by their respective team members based on their actual code and test results.
+
+## 📋 Development Guidelines
+
+- Work on your assigned feature branch.
+- Keep commits focused and descriptive.
+- Add or update tests when changing behavior.
+- Run relevant tests before pushing changes.
+- Review `git diff` before committing.
+- Do not commit secrets, local virtual environments, or generated artifacts.
+- Use approved credentials and providers for external model integrations.
+- Submit changes through pull requests and follow the team's review process.
+
+## 🗺️ Future Roadmap
+
+- Integrate an approved vision-language model into the Vision Engine.
+- Improve visual defect classification and finding validation.
+- Connect screenshot and DOM evidence from the Browser Agent to visual inspection.
+- Develop the self-healing pipeline for candidate selector repairs.
+- Integrate backend APIs and GitHub workflows.
+- Develop the human-in-the-loop dashboard for reviewing findings and proposed repairs.
+
+## 🤝 Contribution
+
+Contributions should follow the team's assigned module responsibilities and development workflow. Keep changes scoped to your assigned work, test them where possible, and document limitations clearly.
+
+## ⚖️ Current Project Limitations
+
+OmniSight is under active development. The Vision Engine currently provides validated data models, evidence-file checks, and deterministic mock detection. End-to-end visual analysis, automated repair generation, and full integration across all modules depend on further development and testing.
