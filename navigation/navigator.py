@@ -7,12 +7,16 @@ Responsibilities:
 - Collect page metadata
 - Capture browser console errors
 - Capture page exceptions
+- Capture screenshot evidence
+- Capture DOM evidence
+- Validate generated artifacts
 - Handle failures
 - Close resources cleanly
 """
 
 from datetime import datetime, timezone
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 from evidence.dom_capture import DOMCapture
@@ -26,7 +30,6 @@ from playwright.sync_api import (
 
 @dataclass
 class NavigationResult:
-    status: str
     run_id: str
     url: str
     page_title: str
@@ -39,6 +42,7 @@ class NavigationResult:
     console_errors: list = None
     page_errors: list = None
 
+    status: str = "success"
     error: Optional[str] = None
 
 
@@ -63,6 +67,7 @@ class BrowserNavigator:
         console_errors = []
         page_errors = []
 
+        # Day 4 - URL Validation
         if not (
             url.startswith("http://")
             or url.startswith("https://")
@@ -81,6 +86,22 @@ class BrowserNavigator:
                 error="Invalid URL"
             )
 
+        # Day 5 - run_id Validation
+        if not run_id:
+            return NavigationResult(
+                status="failed",
+                run_id="",
+                url=url,
+                page_title="",
+                captured_at=datetime.now(
+                    timezone.utc
+                ).isoformat(),
+                viewport={},
+                console_errors=[],
+                page_errors=[],
+                error="run_id is required"
+            )
+
         try:
 
             with sync_playwright() as p:
@@ -91,7 +112,7 @@ class BrowserNavigator:
 
                 page = browser.new_page()
 
-                # Capture browser console errors
+                # Day 4 - Browser Console Errors
                 page.on(
                     "console",
                     lambda msg: console_errors.append(
@@ -101,7 +122,7 @@ class BrowserNavigator:
                     else None
                 )
 
-                # Capture page JavaScript exceptions
+                # Day 4 - JavaScript Exceptions
                 page.on(
                     "pageerror",
                     lambda exc: page_errors.append(
@@ -134,12 +155,24 @@ class BrowserNavigator:
                     )
                 )
 
+                # Day 5 Validation
+                if not Path(screenshot_path).exists():
+                    raise FileNotFoundError(
+                        "Screenshot file not created"
+                    )
+
                 dom_snapshot_path = (
                     DOMCapture.save_dom_snapshot(
                         page,
                         run_id
                     )
                 )
+
+                # Day 5 Validation
+                if not Path(dom_snapshot_path).exists():
+                    raise FileNotFoundError(
+                        "DOM snapshot file not created"
+                    )
 
                 return NavigationResult(
                     status="success",
