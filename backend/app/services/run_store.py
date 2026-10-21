@@ -16,14 +16,16 @@ A persistent database backend with ORM/migrations should replace this store in a
 
 from datetime import datetime, timezone
 import uuid
+from backend.app.schemas.findings import EvidenceReferences, FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
 
 
 class RunStore:
-    """In-memory repository managing inspection runs."""
+    """In-memory repository managing inspection runs and defect findings."""
 
     def __init__(self) -> None:
         self._runs: dict[str, RunResponse] = {}
+        self._findings: dict[str, list[FindingResponse]] = {}
 
     def create(self, request: RunCreateRequest) -> RunResponse:
         """Create and record a new run in the initial 'queued' status.
@@ -42,6 +44,7 @@ class RunStore:
             message="Run created successfully and queued for inspection.",
         )
         self._runs[run_id] = run
+        self._findings[run_id] = []
         return run
 
     def get(self, run_id: str) -> RunResponse | None:
@@ -52,10 +55,53 @@ class RunStore:
         """List all stored runs."""
         return list(self._runs.values())
 
+    def get_findings(self, run_id: str) -> list[FindingResponse] | None:
+        """Retrieve findings associated with a run. Returns None if run does not exist."""
+        if run_id not in self._runs:
+            return None
+        return self._findings.get(run_id, [])
+
+    def set_findings(self, run_id: str, findings: list[FindingResponse]) -> None:
+        """Set findings for a run."""
+        self._findings[run_id] = findings
+
     def clear(self) -> None:
-        """Clear all stored runs (used for test isolation)."""
+        """Clear all stored runs and findings (used for test isolation)."""
         self._runs.clear()
+        self._findings.clear()
 
 
 # Global in-memory singleton
 run_store = RunStore()
+
+
+def create_mock_findings(run_id: str) -> list[FindingResponse]:
+    """Generate clearly labelled mock defect findings for early milestone development."""
+    return [
+        FindingResponse(
+            finding_id=f"defect_{run_id}_001",
+            category="layout_overflow",
+            severity="medium",
+            confidence=0.92,
+            description="[MOCK] Content panel text extends beyond container boundary.",
+            selector="#main-content-panel",
+            evidence=EvidenceReferences(
+                screenshot_path=f"artifacts/{run_id}/before.png",
+                dom_snapshot_path=f"artifacts/{run_id}/dom.html",
+            ),
+            source="mock",
+        ),
+        FindingResponse(
+            finding_id=f"defect_{run_id}_002",
+            category="broken_image",
+            severity="high",
+            confidence=0.88,
+            description="[MOCK] Service topology image fails to display.",
+            selector="#service-topology-image",
+            evidence=EvidenceReferences(
+                screenshot_path=f"artifacts/{run_id}/before.png",
+            ),
+            source="mock",
+        ),
+    ]
+
