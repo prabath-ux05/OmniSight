@@ -11,8 +11,12 @@ class VisionInput(BaseModel):
     run_id: str = Field(min_length=1, pattern=r".*\S.*")
     url: str = Field(min_length=1, pattern=r".*\S.*")
 
-    screenshot_path: str | None = None
-    dom_snapshot_path: str | None = None
+    screenshot_path: str | None = Field(
+        default=None, min_length=1, pattern=r".*\S.*"
+    )
+    dom_snapshot_path: str | None = Field(
+        default=None, min_length=1, pattern=r".*\S.*"
+    )
 
     @model_validator(mode="after")
     def require_some_evidence(self):
@@ -37,6 +41,7 @@ class BoundingBox(BaseModel):
     y: float
     width: float = Field(ge=0)
     height: float = Field(ge=0)
+
 
 class VisionFinding(BaseModel):
     """A structured UI defect finding."""
