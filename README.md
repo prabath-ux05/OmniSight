@@ -1,4 +1,3 @@
-
 # OmniSight — Multimodal UI Self-Healing & RPA Agent
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing project. It aims to combine vision-language models, browser automation, and Git workflows to detect UI changes, diagnose broken selectors and workflows, generate candidate test repairs, and submit changes for human review.
@@ -30,18 +29,23 @@ OmniSight/
 │   └── README.md
 ├── backend/                       # Backend and API (team development)
 ├── browser_agent/                 # Browser automation and evidence capture
+│   ├── navigation/                # Browser navigation and interactions
+│   ├── screenshots/               # Screenshot capture and artifacts
+│   ├── evidence/                  # DOM snapshots and execution evidence
+│   └── tests/                     # Browser Agent automated tests
 ├── self_healing/                  # Failure analysis and repair pipeline
 ├── github_integration/            # GitHub and Git workflow automation
 ├── frontend/                      # Planned monitoring dashboard
 ├── docs/                          # Project documentation
 ├── tests/                         # Project-level and integration tests
+├── artifacts/                     # Generated browser execution artifacts
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 └── README.md
 ```
 
-The tree lists the Vision Engine files implemented for this contribution and the other project modules at a high level. The other modules may contain additional files and are maintained by their respective team members.
+The tree lists the implemented Vision Engine files and the Browser Agent module structure. The other project modules are shown at a high level and may contain additional files maintained by their respective team members.
 
 ## 👥 Team Module Distribution
 
@@ -183,9 +187,75 @@ The mock detector does not analyze screenshot pixels or DOM content to identify 
 
 The latest confirmed development test result was **36 passed**. Run the Vision Engine test command again to verify the current state.
 
+### Browser Agent — Member 2: RPA & Browser Automation
+
+#### Implementation Status
+
+- [x] Implemented Playwright-based browser automation using Chromium.
+- [x] Implemented navigation to target URLs.
+- [x] Added page title and metadata collection.
+- [x] Implemented full-page screenshot capture and run-based artifact storage.
+- [x] Implemented DOM snapshot capture.
+- [x] Added metadata collection for URL, page title, viewport information, and ISO-8601 timestamps.
+- [x] Implemented browser console error collection.
+- [x] Added JavaScript page exception tracking.
+- [x] Implemented invalid URL validation.
+- [x] Added navigation timeout handling.
+- [x] Implemented structured failure responses and safe browser resource cleanup.
+- [x] Defined and validated a standardized evidence contract.
+- [x] Developed automated tests for Browser Agent functionality.
+- [x] Prepared setup, usage, evidence structure, and integration documentation.
+
+#### Browser Agent Implementation Details
+
+The Browser Agent provides a Playwright-based browser automation module that captures browser execution evidence for use by other OmniSight components.
+
+**Implemented Capabilities**
+
+- **Browser Navigation:** Launches Chromium and navigates to target URLs.
+- **Screenshot Capture:** Captures full-page screenshots and stores artifacts organized by run.
+- **DOM Snapshot Generation:** Captures DOM evidence for further inspection by the Vision Engine.
+- **Metadata Collection:** Records the current URL, page title, viewport information, and ISO-8601 timestamps.
+- **Error Monitoring:** Collects browser console errors and JavaScript page exceptions.
+- **Failure Handling:** Validates URLs, handles navigation timeouts, returns structured failure information, and safely closes browser resources.
+- **Evidence Contract:** Standardizes browser execution results for integration with other modules.
+- **Automated Testing:** Covers navigation, screenshots, DOM capture, metadata, artifact creation, evidence validation, timeout scenarios, invalid URLs, and browser cleanup.
+- **Documentation:** Includes Playwright installation, test execution, evidence structure, and integration guidelines.
+
+#### Standardized Evidence Contract
+
+The Browser Agent defines a structured evidence contract containing:
+
+| Field | Description |
+|---|---|
+| Screenshot Paths | References to captured screenshots |
+| DOM Snapshot Paths | References to generated DOM snapshots |
+| Metadata | URL, page title, viewport information, and timestamps |
+| Console Errors | Collected browser console errors |
+| Page Errors | Captured JavaScript page exceptions |
+| Execution Status | Indicates the outcome of browser execution |
+| Error Information | Details about failures, including navigation and timeout errors |
+
+This contract allows the Vision Engine and other components to consume browser execution evidence through a consistent structure.
+
+#### Browser Agent Testing
+
+Automated tests were developed to verify:
+
+- Browser launch and navigation.
+- Screenshot capture and artifact creation.
+- DOM snapshot generation.
+- Metadata collection.
+- Evidence contract compliance.
+- Console error and JavaScript exception collection.
+- Invalid URL handling and navigation timeouts.
+- Structured failure responses and safe browser cleanup.
+
+The Browser Agent implementation and its automated tests have been completed according to the current development progress. Run the relevant test suite to verify the current state before integration or release.
+
 ### Other Project Modules
 
-The Browser Agent, Self-Healing, Backend, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status should be updated by their respective team members based on their actual code and test results.
+The Self-Healing, Backend, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status should be updated by their respective team members based on their actual code and test results.
 
 ## 📋 Development Guidelines
 
