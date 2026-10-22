@@ -40,7 +40,7 @@ OmniSight/
 ├── frontend/                      # Planned monitoring dashboard
 ├── docs/                          # Project documentation
 ├── tests/                         # Project-level and integration tests
-├── artifacts/                     # Generated browser execution artifacts
+├── artifacts/                     # Generated browser execution artifacts (local)
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
@@ -54,7 +54,7 @@ The tree lists the implemented Vision Engine files and the Browser Agent module 
 | Member / Focus Area | Primary Modules | Responsibilities |
 |---|---|---|
 | Member 1: Vision & Intelligence | `vision_engine/` | Visual defect detection, input/output models, evidence validation, model integration, prompt engineering, and element localization |
-| Member 2: RPA & Browser Agent | `browser_agent/` | Playwright navigation, browser interactions, screenshots, DOM snapshots, metadata collection, browser error handling, and testing |
+| Member 2: RPA & Browser Agent | `browser_agent/` | Playwright navigation, browser interactions, screenshots, DOM snapshots, metadata collection, browser error handling, evidence generation, and automated testing |
 | Member 3: Self-Healing & Verification | `self_healing/` | Failure analysis, candidate selector repairs, repair generation, and patch verification |
 | Member 4: Backend & GitHub Integration | `backend/`, `github_integration/` | API orchestration, backend services, Git workflows, branch management, pull requests, and application state |
 
@@ -201,6 +201,28 @@ The DOM detector does not execute JavaScript, inspect the rendered page layout, 
 
 The latest locally confirmed Vision Engine test result was **47 passed**. Rerun the Vision Engine tests to verify the current state.
 
+### Browser Agent — Member 2: RPA & Browser Agent
+
+- [x] Implemented Playwright-based browser automation using Chromium.
+- [x] Added browser launch, page navigation, page title retrieval, and URL collection.
+- [x] Implemented full-page screenshot capture and run-based artifact storage.
+- [x] Added DOM snapshot generation and evidence storage.
+- [x] Implemented metadata collection, including URL, page title, ISO-8601 timestamp, and viewport dimensions.
+- [x] Added browser console error collection and JavaScript page exception tracking.
+- [x] Implemented invalid URL validation and navigation timeout handling.
+- [x] Added structured success and failure responses.
+- [x] Implemented safe browser cleanup on success and failure.
+- [x] Standardized the evidence contract, including run ID, artifact paths, metadata, errors, status, and failure details.
+- [x] Added automated tests for navigation, screenshots, DOM capture, metadata, and evidence validation.
+- [x] Added tests for invalid URLs, missing run IDs, timeout handling, and artifact existence.
+- [x] Added a local HTML test page and temporary HTTP server for repeatable browser testing.
+- [x] Updated Git ignore rules to exclude generated browser artifacts from version control.
+- [x] Documented Playwright installation, usage, testing, evidence structure, and integration requirements.
+- [ ] Integrate the Browser Agent with the Vision Engine.
+- [ ] Integrate browser execution and evidence collection with the Backend.
+- [ ] Complete end-to-end testing across the integrated modules.
+- [ ] Perform final integration review and project handover.
+
 #### Browser Agent Implementation Details
 
 The Browser Agent provides a Playwright-based browser automation module that captures browser execution evidence for use by other OmniSight components.
@@ -214,7 +236,9 @@ The Browser Agent provides a Playwright-based browser automation module that cap
 - **Error Monitoring:** Collects browser console errors and JavaScript page exceptions.
 - **Failure Handling:** Validates URLs, handles navigation timeouts, returns structured failure information, and safely closes browser resources.
 - **Evidence Contract:** Standardizes browser execution results for integration with other modules.
-- **Automated Testing:** Covers navigation, screenshots, DOM capture, metadata, artifact creation, evidence validation, timeout scenarios, invalid URLs, and browser cleanup.
+- **Automated Testing:** Covers navigation, screenshots, DOM capture, metadata, artifact creation, evidence validation, invalid URLs, timeout handling, and browser cleanup.
+- **Local Test Environment:** Includes a local HTML test page and temporary HTTP server for repeatable browser tests without relying on external websites.
+- **Generated Artifacts:** Excludes generated browser evidence from Git tracking to keep the repository clean.
 - **Documentation:** Includes Playwright installation, test execution, evidence structure, and integration guidelines.
 
 #### Standardized Evidence Contract
@@ -223,28 +247,37 @@ The Browser Agent defines a structured evidence contract containing:
 
 | Field | Description |
 |---|---|
-| Screenshot Paths | References to captured screenshots |
-| DOM Snapshot Paths | References to generated DOM snapshots |
-| Metadata | URL, page title, viewport information, and timestamps |
-| Console Errors | Collected browser console errors |
-| Page Errors | Captured JavaScript page exceptions |
-| Execution Status | Indicates the outcome of browser execution |
-| Error Information | Details about failures, including navigation and timeout errors |
+| `run_id` | Unique identifier for the browser execution |
+| `url` | URL of the visited page |
+| `page_title` | Title of the page |
+| `captured_at` | Capture timestamp in ISO-8601 format |
+| `viewport` | Browser viewport width and height |
+| `screenshot_path` | Reference to the captured screenshot |
+| `dom_snapshot_path` | Reference to the generated DOM snapshot |
+| `console_errors` | Collected browser console errors |
+| `page_errors` | Captured JavaScript page exceptions |
+| `status` | Outcome of browser execution |
+| `error` | Failure details, when applicable |
 
 This contract allows the Vision Engine and other components to consume browser execution evidence through a consistent structure.
 
 #### Browser Agent Testing
 
-Automated tests were developed to verify:
+Automated tests cover:
 
 - Browser launch and navigation.
 - Screenshot capture and artifact creation.
 - DOM snapshot generation.
 - Metadata collection.
-- Evidence contract compliance.
+- Evidence contract validation.
 - Console error and JavaScript exception collection.
-- Invalid URL handling and navigation timeouts.
-- Structured failure responses and safe browser cleanup.
+- Invalid URL and missing run ID handling.
+- Navigation timeout handling.
+- Successful capture when the page contains a broken image.
+- Artifact existence and structured failure responses.
+- Safe browser cleanup.
+
+A local test page and temporary HTTP server support repeatable testing. The full test suite should be run before integration or release to verify the current state.
 
 The Browser Agent implementation and its automated tests have been completed according to the current development progress. Run the relevant test suite to verify the current state before integration or release.
 
