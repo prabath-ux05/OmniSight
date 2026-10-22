@@ -1,28 +1,28 @@
+
 from navigation.navigator import BrowserNavigator
 
 
-def test_navigation_success():
-
+def test_navigation_success(local_url):
     navigator = BrowserNavigator()
 
     result = navigator.navigate(
-        url="https://example.com",
-        run_id="test_run"
+        url=local_url,
+        run_id="test_run",
     )
 
     assert result.status == "success"
-    assert result.page_title != ""
-    assert "example" in result.page_title.lower()
+    assert result.page_title == "OmniSight Test Page"
+    assert result.url == local_url
+    assert result.run_id == "test_run"
 
 
 def test_invalid_url():
-
     navigator = BrowserNavigator()
 
     result = navigator.navigate(
         url="invalid-url",
-        run_id="test_run"
+        run_id="invalid_run",
     )
 
     assert result.status == "failed"
-    assert result.error is not None
+    assert result.error == "Invalid URL"
