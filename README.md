@@ -27,25 +27,25 @@ OmniSight/
 │   ├── models.py
 │   ├── evidence_validator.py
 │   └── README.md
-├── backend/                       # Backend and API (team development)
-├── browser_agent/                 # Browser automation and evidence capture
-│   ├── navigation/                # Browser navigation and interactions
-│   ├── screenshots/               # Screenshot capture and artifacts
-│   ├── evidence/                  # DOM snapshots and execution evidence
-│   └── tests/                     # Browser Agent automated tests
-├── self_healing/                  # Failure analysis and repair pipeline
-├── github_integration/            # GitHub and Git workflow automation
-├── frontend/                      # Planned monitoring dashboard
-├── docs/                          # Project documentation
-├── tests/                         # Project-level and integration tests
-├── artifacts/                     # Generated browser execution artifacts
+├── backend/                     # Backend and API
+├── browser_agent/               # Browser automation and evidence capture
+│   ├── navigation/              # Browser navigation and interactions
+│   ├── screenshots/             # Screenshot capture and artifacts
+│   ├── evidence/                 # DOM snapshots and execution evidence
+│   └── tests/                   # Browser Agent automated tests
+├── self_healing/                # Failure analysis and repair pipeline
+├── github_integration/          # GitHub and Git workflow automation
+├── frontend/                    # Planned monitoring dashboard
+├── docs/                        # Project documentation
+├── tests/                       # Project-level and integration tests
+├── artifacts/                   # Generated browser execution artifacts
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 └── README.md
 ```
 
-The tree lists the implemented Vision Engine files and the Browser Agent module structure. The other project modules are shown at a high level and may contain additional files maintained by their respective team members.
+The tree lists the implemented Vision Engine files and the Browser Agent module structure. Other project modules are shown at a high level and may contain additional files maintained by their respective team members.
 
 ## 👥 Team Module Distribution
 
@@ -65,7 +65,7 @@ The tree lists the implemented Vision Engine files and the Browser Agent module 
 - Access to the OmniSight repository.
 - Playwright and its required browser installed for Browser Agent work.
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 If you have not cloned the repository yet:
 
@@ -76,7 +76,7 @@ cd OmniSight
 
 If you already have the repository locally, open its root directory instead of cloning it again.
 
-### 2. Create and activate a virtual environment
+### 2. Create and Activate a Virtual Environment
 
 **Windows PowerShell:**
 
@@ -92,15 +92,15 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Python dependencies
+### 3. Install Python Dependencies
 
-Run from the repository root:
+Run this command from the repository root:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### 4. Install the Playwright Chromium browser
+### 4. Install the Playwright Chromium Browser
 
 For Browser Agent development, install Chromium using:
 
@@ -108,7 +108,7 @@ For Browser Agent development, install Chromium using:
 python -m playwright install chromium
 ```
 
-### 5. Configure environment variables
+### 5. Configure Environment Variables
 
 **Windows PowerShell:**
 
@@ -124,7 +124,7 @@ cp .env.example .env
 
 Configure only the environment variables required for your assigned work. Never commit `.env` files, API keys, passwords, or access tokens. External model integrations must use team-approved providers and authorized credentials.
 
-### 6. Run tests
+### 6. Run Tests
 
 Run the full test suite from the repository root:
 
@@ -138,11 +138,11 @@ To run only the Vision Engine tests:
 python -m pytest ./vision_engine/tests -q
 ```
 
-Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
+Run the relevant module tests when working on an individual component. Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
 
 ## 📌 Development Status
 
-The following checklist reflects the documented Vision Engine development status. Features should only be marked complete when their implementation and tests have been verified.
+The following checklist reflects the documented Vision Engine and Browser Agent development status. Features should only be marked complete when their implementation and tests have been verified.
 
 ### Vision Engine — Member 1: Vision & Intelligence
 
@@ -185,7 +185,7 @@ The following checklist reflects the documented Vision Engine development status
 
 The mock detector does not analyze screenshot pixels or DOM content to identify real defects. Its findings are deterministic examples for testing. Evidence validation checks basic file accessibility and non-empty content, but does not verify the semantic validity of image or DOM data. Real vision-language model integration is not yet implemented.
 
-The latest confirmed development test result was **36 passed**. Run the Vision Engine test command again to verify the current state.
+The latest confirmed development test result documented for the Vision Engine was **36 passed**. Run the Vision Engine test command again to verify the current state.
 
 ### Browser Agent — Member 2: RPA & Browser Automation
 
@@ -202,7 +202,7 @@ The latest confirmed development test result was **36 passed**. Run the Vision E
 - [x] Implemented invalid URL validation.
 - [x] Added navigation timeout handling.
 - [x] Implemented structured failure responses and safe browser resource cleanup.
-- [x] Defined and validated a standardized evidence contract.
+- [x] Defined a standardized evidence contract.
 - [x] Developed automated tests for Browser Agent functionality.
 - [x] Prepared setup, usage, evidence structure, and integration documentation.
 
@@ -224,17 +224,21 @@ The Browser Agent provides a Playwright-based browser automation module that cap
 
 #### Standardized Evidence Contract
 
-The Browser Agent defines a structured evidence contract containing:
+The Browser Agent defines a structured evidence contract containing the following information:
 
 | Field | Description |
 |---|---|
-| Screenshot Paths | References to captured screenshots |
-| DOM Snapshot Paths | References to generated DOM snapshots |
-| Metadata | URL, page title, viewport information, and timestamps |
-| Console Errors | Collected browser console errors |
-| Page Errors | Captured JavaScript page exceptions |
-| Execution Status | Indicates the outcome of browser execution |
-| Error Information | Details about failures, including navigation and timeout errors |
+| `run_id` | Identifier associated with the browser execution |
+| `url` | URL associated with the page execution |
+| `page_title` | Title of the captured page |
+| `captured_at` | Timestamp associated with evidence capture |
+| `viewport` | Browser viewport information |
+| `screenshot_path` | Reference to the captured screenshot |
+| `dom_snapshot_path` | Reference to the generated DOM snapshot |
+| `console_errors` | Collected browser console errors |
+| `page_errors` | Captured JavaScript page exceptions |
+| `status` | Indicates the outcome of browser execution |
+| `error` | Details about failures, including navigation and timeout errors |
 
 This contract allows the Vision Engine and other components to consume browser execution evidence through a consistent structure.
 
@@ -251,7 +255,7 @@ Automated tests were developed to verify:
 - Invalid URL handling and navigation timeouts.
 - Structured failure responses and safe browser cleanup.
 
-The Browser Agent implementation and its automated tests have been completed according to the current development progress. Run the relevant test suite to verify the current state before integration or release.
+The Browser Agent implementation and its automated tests are documented as completed. Run the relevant test suite to verify the current state before integration or release.
 
 ### Other Project Modules
 
