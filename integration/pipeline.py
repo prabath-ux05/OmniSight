@@ -7,6 +7,7 @@ for connecting inspection requests and visual/locator defect findings.
 from __future__ import annotations
 
 import json
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Optional, Sequence, Union
 
@@ -17,6 +18,7 @@ from integration.contracts import (
     InspectionState,
     Severity,
 )
+from integration.demo_runner import construct_demo_url
 
 
 @dataclass
@@ -257,8 +259,232 @@ class IntegrationPipelineAdapter:
     execute = run
     create_result = run
 
+    def execute_inspection(
+        self,
+        request: Union[InspectionRequest, dict[str, Any], str],
+        *,
+        navigator: Optional[Any] = None,
+        detector: Optional[Callable[[Any], list[Any]]] = None,
+        run_id: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> PipelineResult:
+        """Execute the full Demo Site -> Browser Agent -> Vision Engine inspection flow."""
+        merged_meta = dict(self.metadata)
+        if metadata:
+            merged_meta.update(metadata)
+        return execute_inspection_flow(
+            request=request,
+            navigator=navigator,
+            detector=detector,
+            run_id=run_id,
+            metadata=merged_meta,
+        )
+
+
+def vision_finding_to_inspection_finding(finding: Any) -> InspectionFinding:
+    """Convert a Vision Engine VisionFinding into a shared InspectionFinding."""
+    if isinstance(finding, InspectionFinding):
+        return finding
+
+    # Handle VisionFinding (Pydantic model) or dict-like object
+    if hasattr(finding, "category"):
+        raw_category = finding.category
+    elif isinstance(finding, dict):
+        raw_category = finding.get("category") or finding.get("defect_category")
+    else:
+        raise TypeError(f"Unsupported finding type: {type(finding).__name__}")
+
+    category_mapping = {
+        "layout_overflow": DefectCategory.OVERFLOW,
+        "missing_visible_element": DefectCategory.MISSING_ELEMENT,
+        "broken_image": DefectCategory.BROKEN_IMAGE,
+    }
+    norm_cat = category_mapping.get(
+        str(raw_category), DefectCategory.from_str(str(raw_category))
+    )
+
+    raw_sev = getattr(finding, "severity", None) or (
+        finding.get("severity") if isinstance(finding, dict) else "info"
+    )
+    norm_sev = Severity.from_str(str(raw_sev))
+
+    description = getattr(finding, "description", None) or (
+        finding.get("description") if isinstance(finding, dict) else ""
+    )
+    selector = getattr(finding, "selector", None) or (
+        finding.get("selector") if isinstance(finding, dict) else None
+    )
+    confidence = getattr(finding, "confidence", None)
+    if confidence is None and isinstance(finding, dict):
+        confidence = finding.get("confidence")
+
+    meta: dict[str, Any] = {}
+    if hasattr(finding, "finding_id"):
+        meta["finding_id"] = finding.finding_id
+    elif isinstance(finding, dict) and "finding_id" in finding:
+        meta["finding_id"] = finding["finding_id"]
+
+    if hasattr(finding, "source"):
+        meta["source"] = finding.source
+    elif isinstance(finding, dict) and "source" in finding:
+        meta["source"] = finding["source"]
+
+    if hasattr(finding, "bounding_box") and finding.bounding_box:
+        meta["bounding_box"] = (
+            finding.bounding_box.model_dump()
+            if hasattr(finding.bounding_box, "model_dump")
+            else dict(finding.bounding_box)
+        )
+    elif isinstance(finding, dict) and "bounding_box" in finding:
+        meta["bounding_box"] = finding["bounding_box"]
+
+    if hasattr(finding, "evidence") and finding.evidence:
+        meta["evidence"] = (
+            finding.evidence.model_dump()
+            if hasattr(finding.evidence, "model_dump")
+            else dict(finding.evidence)
+        )
+    elif isinstance(finding, dict) and "evidence" in finding:
+        meta["evidence"] = finding["evidence"]
+
+    return InspectionFinding(
+        defect_category=norm_cat,
+        severity=norm_sev,
+        description=description,
+        selector=selector,
+        confidence=confidence,
+        metadata=meta,
+    )
+
+
+def execute_inspection_flow(
+    request: Union[InspectionRequest, dict[str, Any], str],
+    *,
+    navigator: Optional[Any] = None,
+    detector: Optional[Callable[[Any], list[Any]]] = None,
+    run_id: Optional[str] = None,
+    metadata: Optional[dict[str, Any]] = None,
+) -> PipelineResult:
+    """Execute the end-to-end multimodal inspection flow.
+
+    Flow: Demo Site -> Browser Agent (navigation & evidence capture)
+          -> Vision Engine (evidence validation & defect detection)
+          -> Structured Findings (PipelineResult with InspectionFindings).
+
+    Args:
+        request: Target inspection request, dict, or URL string.
+        navigator: Optional browser navigator instance (defaults to BrowserNavigator).
+        detector: Optional vision detector callable (defaults to detect_mock).
+        run_id: Optional identifier for the run.
+        metadata: Optional additional metadata.
+
+    Returns:
+        PipelineResult containing the request, collected findings, and runtime metadata.
+    """
+    if isinstance(request, str):
+        req = InspectionRequest(target_url=request)
+    elif isinstance(request, dict):
+        req = InspectionRequest.from_dict(request)
+    elif isinstance(request, InspectionRequest):
+        req = request
+    else:
+        raise TypeError(
+            f"request must be an InspectionRequest, dict, or str, got {type(request).__name__}"
+        )
+
+    # Resolve target URL with query params for state if applicable
+    target_url = construct_demo_url(req.target_url, req.state)
+
+    actual_run_id = run_id or f"run_{uuid.uuid4().hex[:10]}"
+
+    # Step 1: Browser Agent navigation & evidence capture
+    if navigator is None:
+        try:
+            from browser_agent.navigation.navigator import BrowserNavigator
+        except ImportError:
+            from navigation.navigator import BrowserNavigator
+        navigator = BrowserNavigator(timeout_ms=int(req.timeout * 1000))
+
+    try:
+        nav_result = navigator.navigate(url=target_url, run_id=actual_run_id)
+    except Exception as exc:
+        failed_meta = dict(metadata or {})
+        failed_meta.update({"error": str(exc), "run_id": actual_run_id, "url": target_url})
+        return PipelineResult(request=req, success=False, metadata=failed_meta)
+
+    if getattr(nav_result, "status", "failed") != "success":
+        failed_meta = dict(metadata or {})
+        failed_meta.update({
+            "error": getattr(nav_result, "error", "Navigation failed"),
+            "run_id": actual_run_id,
+            "url": target_url,
+            "status": getattr(nav_result, "status", "failed"),
+            "console_errors": getattr(nav_result, "console_errors", []),
+            "page_errors": getattr(nav_result, "page_errors", []),
+        })
+        return PipelineResult(request=req, success=False, metadata=failed_meta)
+
+    # Step 2: Validate evidence and construct VisionInput
+    from vision_engine.evidence_validator import validate_evidence
+    from vision_engine.models import VisionInput
+
+    screenshot_path = getattr(nav_result, "screenshot_path", None)
+    dom_snapshot_path = getattr(nav_result, "dom_snapshot_path", None)
+
+    vision_input = VisionInput(
+        run_id=actual_run_id,
+        url=getattr(nav_result, "url", target_url),
+        screenshot_path=screenshot_path,
+        dom_snapshot_path=dom_snapshot_path,
+    )
+
+    validation_errors = validate_evidence(vision_input)
+    if validation_errors:
+        failed_meta = dict(metadata or {})
+        failed_meta.update({
+            "error": "Evidence validation failed: " + "; ".join(validation_errors),
+            "run_id": actual_run_id,
+            "validation_errors": validation_errors,
+        })
+        return PipelineResult(request=req, success=False, metadata=failed_meta)
+
+    # Step 3: Vision Engine detection
+    if detector is not None:
+        raw_vision_findings = detector(vision_input)
+    else:
+        from vision_engine.detection.mock_detector import detect_mock
+
+        scenario = "clean" if req.state == InspectionState.CLEAN else "defect"
+        raw_vision_findings = detect_mock(vision_input, scenario=scenario)
+
+    # Step 4: Map Vision Engine findings to structured shared InspectionFindings
+    findings = [vision_finding_to_inspection_finding(vf) for vf in raw_vision_findings]
+
+    run_meta = {
+        "run_id": actual_run_id,
+        "page_title": getattr(nav_result, "page_title", ""),
+        "captured_at": getattr(nav_result, "captured_at", ""),
+        "viewport": getattr(nav_result, "viewport", {}),
+        "screenshot_path": screenshot_path,
+        "dom_snapshot_path": dom_snapshot_path,
+        "console_errors": getattr(nav_result, "console_errors", []) or [],
+        "page_errors": getattr(nav_result, "page_errors", []) or [],
+        "vision_findings_count": len(findings),
+    }
+    if metadata:
+        run_meta.update(metadata)
+
+    return PipelineResult(
+        request=req,
+        findings=findings,
+        success=True,
+        metadata=run_meta,
+    )
+
 
 # Backward-compatible and semantic aliases
+execute_inspection = execute_inspection_flow
+run_inspection = execute_inspection_flow
 InspectionPipelineResult = PipelineResult
 InspectionPipelineAdapter = IntegrationPipelineAdapter
 PipelineAdapter = IntegrationPipelineAdapter
@@ -269,4 +495,8 @@ __all__ = [
     "IntegrationPipelineAdapter",
     "InspectionPipelineAdapter",
     "PipelineAdapter",
+    "execute_inspection_flow",
+    "execute_inspection",
+    "run_inspection",
+    "vision_finding_to_inspection_finding",
 ]

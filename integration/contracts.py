@@ -70,6 +70,7 @@ class DefectCategory(str, Enum):
                 "missing": cls.MISSING_ELEMENT,
                 "missing_element": cls.MISSING_ELEMENT,
                 "missingelement": cls.MISSING_ELEMENT,
+                "missing_visible_element": cls.MISSING_ELEMENT,
                 "broken_image": cls.BROKEN_IMAGE,
                 "brokenimage": cls.BROKEN_IMAGE,
                 "broken_img": cls.BROKEN_IMAGE,
