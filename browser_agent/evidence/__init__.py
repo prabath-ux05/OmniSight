@@ -1,0 +1,1 @@
+from .dom_capture import DOMCapture
