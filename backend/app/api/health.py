@@ -1,6 +1,5 @@
-"""Health check router for the OmniSight Backend API."""
-
 from fastapi import APIRouter
+from backend.app.core.logging import logger
 from backend.app.schemas.health import HealthResponse
 
 router = APIRouter(tags=["Health"])
@@ -17,8 +16,10 @@ router = APIRouter(tags=["Health"])
 )
 def get_health() -> HealthResponse:
     """Return a simple confirmation that the backend API is running."""
+    logger.debug("Health check requested.")
     return HealthResponse(
         status="ok",
         app="OmniSight Backend",
         version="0.1.0",
     )
+
