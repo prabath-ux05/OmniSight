@@ -351,4 +351,54 @@ def test_get_run_findings_whitespace_id_returns_400():
     assert "must not be empty or whitespace" in data["detail"]
 
 
+def test_consistent_run_ids_and_lifecycle_status_values():
+    """Verify consistent run ID formatting and valid lifecycle status values."""
+    allowed_statuses = {
+        "queued",
+        "capturing",
+        "analyzing",
+        "repair_pending",
+        "repairing",
+        "verifying",
+        "completed",
+        "failed",
+        "cancelled",
+    }
+
+    # 1. Create a run via POST
+    post_code, post_data = asyncio.run(
+        dispatch_asgi_post("/api/v1/runs", {"url": "http://127.0.0.1:8000/"})
+    )
+    assert post_code == 201
+    created_id = post_data["run_id"]
+
+    # Verify ID structure: must start with 'run_' and have non-empty alphanumeric suffix
+    assert created_id.startswith("run_")
+    assert len(created_id) > 4
+
+    # Verify status is valid and initially 'queued'
+    assert post_data["status"] in allowed_statuses
+    assert post_data["status"] == "queued"
+
+    # 2. Retrieve the run via GET and verify exact run_id and status consistency
+    get_code, get_data = asyncio.run(dispatch_asgi_get(f"/api/v1/runs/{created_id}"))
+    assert get_code == 200
+    assert get_data["run_id"] == created_id
+    assert get_data["status"] == post_data["status"]
+
+    # 3. Attach findings and verify evidence paths preserve the consistent run_id
+    mock_findings = create_mock_findings(created_id)
+    run_store.set_findings(created_id, mock_findings)
+
+    findings_code, findings_data = asyncio.run(
+        dispatch_asgi_get(f"/api/v1/runs/{created_id}/findings")
+    )
+    assert findings_code == 200
+    for finding in findings_data:
+        assert created_id in finding["finding_id"]
+        if finding["evidence"]["screenshot_path"]:
+            assert created_id in finding["evidence"]["screenshot_path"]
+
+
+
 
