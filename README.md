@@ -34,17 +34,28 @@ OmniSight/
 │   ├── screenshots/               # Screenshot capture and artifacts
 │   ├── evidence/                  # DOM snapshots and execution evidence
 │   └── tests/                     # Browser Agent automated tests
-├── backend/                       # Backend and API
+├── backend/                       # FastAPI backend and orchestration API
+│   ├── app/
+│   │   ├── api/                   # Route handlers (health, runs, findings)
+│   │   ├── core/                  # Safe logging and configurations
+│   │   ├── schemas/               # Pydantic models (health, runs, findings, errors)
+│   │   ├── services/              # Business logic and in-memory RunStore
+│   │   └── main.py                # FastAPI application entry point
+│   └── tests/                     # Automated backend test suites
 ├── self_healing/                  # Failure analysis and repair pipeline
 ├── github_integration/            # GitHub and Git workflow automation
 ├── frontend/                      # Monitoring dashboard
-├── docs/                          # Project documentation
+├── docs/                          # Project and module documentation
+│   ├── backend_api.md             # Backend API guide and endpoint reference
+│   └── browser_agent_setup.md     # Browser Agent setup guide
 ├── tests/                         # Project-level and integration tests
 ├── artifacts/                     # Generated browser execution artifacts
+├── pytest.ini                     # Pytest configuration
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 └── README.md
+
 ```
 
 The tree lists the documented Vision Engine files and Browser Agent module structure. Other project modules may contain additional files maintained by their respective team members.
@@ -140,9 +151,28 @@ To run only the Vision Engine tests:
 python -m pytest ./vision_engine/tests -q
 ```
 
+To run the Backend tests:
+
+```bash
+pytest backend/tests -v
+```
+
 Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
 
+### 7. Run the Backend API Server
+
+Start the local FastAPI development server using Uvicorn:
+
+```bash
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Once running, access the interactive API documentation in your browser:
+- **Swagger UI (Interactive)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc (Specification)**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
 ## 📌 Development Status
+
 
 The following checklist reflects the documented development status. Features should only be marked complete when their implementation and tests have been verified.
 
@@ -285,11 +315,60 @@ A local test page and temporary HTTP server support repeatable testing. Run the 
 
 The Browser Agent implementation and its automated tests are documented as completed. Integration with the Vision Engine and Backend, along with full end-to-end validation, remains to be verified.
 
+### Backend & API Orchestration — Member 4: Backend Developer
+
+- [x] Initialized the FastAPI application entry point in `backend/app/main.py`.
+- [x] Implemented `GET /health` endpoint verifying backend server availability.
+- [x] Created `POST /api/v1/runs` endpoint with URL validation, whitespace stripping, and unique `run_id` generation.
+- [x] Implemented `GET /api/v1/runs/{run_id}` endpoint returning run status and metadata.
+- [x] Implemented `GET /api/v1/runs/{run_id}/findings` endpoint returning structured findings or empty lists.
+- [x] Implemented an in-memory `RunStore` repository for managing inspection runs and defect findings.
+- [x] Coordinated finding schemas (`FindingResponse`, `EvidenceReferences`) with the Vision Engine data contract.
+- [x] Added deterministic mock defect findings (`source="mock"`) for early milestone testing.
+- [x] Added centralized safe application logging without exposing secrets.
+- [x] Added standardized error response schemas and HTTP 400/404/422 validation handling.
+- [x] Configured `pytest.ini` with backend testpaths and pythonpath.
+- [x] Created 25 automated backend tests covering health, runs, findings, error handling, and lifecycle status consistency.
+- [ ] Connect the backend run lifecycle to the live Browser Agent Playwright runner.
+- [ ] Connect the backend findings retrieval to live Vision Engine inference.
+- [ ] Replace temporary in-memory `RunStore` with persistent database models and migrations.
+
+#### Backend Implementation Details
+
+| File | Description |
+|---|---|
+| `backend/app/main.py` | FastAPI application instance, router mounting, and OpenAPI metadata. |
+| `backend/app/api/health.py` | Health check endpoint controller (`GET /health`). |
+| `backend/app/api/runs.py` | Runs and findings route controllers (`POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/findings`). |
+| `backend/app/schemas/health.py` | Pydantic response schema for the `/health` endpoint. |
+| `backend/app/schemas/runs.py` | Pydantic schemas for run creation and run response metadata. |
+| `backend/app/schemas/findings.py` | Pydantic schemas for findings and evidence references matching the Vision Engine. |
+| `backend/app/schemas/errors.py` | Standardized error response model for 400/404 responses. |
+| `backend/app/services/run_store.py` | In-memory run and findings repository with mock findings generator. |
+| `backend/app/core/logging.py` | Centralized safe application logger. |
+| `backend/tests/test_health.py` | Automated unit and ASGI integration tests for `/health`. |
+| `backend/tests/test_runs.py` | Automated tests for run creation, retrieval, findings, error cases, and consistency. |
+| `docs/backend_api.md` | Comprehensive backend setup, endpoint documentation, and request/response examples. |
+
+#### Current Capabilities
+- Validates inspection URLs with automatic whitespace stripping and 2048-character length limit.
+- Generates unique run identifiers (`run_<hex>`) and initializes state to `"queued"`.
+- Communicates run status accurately without fabricating progress stages.
+- Returns structured findings matching the team's approved categories (`layout_overflow`, `missing_visible_element`, `broken_image`).
+- Rejects blank/whitespace run IDs with HTTP 400 and unknown run IDs with HTTP 404.
+- Provides interactive Swagger documentation at `/docs` and ReDoc at `/redoc`.
+
+#### Current Limitations
+- **In-Memory Storage**: Runs and findings are stored in RAM (`RunStore`) and will reset if the Uvicorn server restarts.
+- **Single-Process**: State is isolated to a single Uvicorn process and is not shared across multi-worker clusters.
+- **Mock Findings**: Findings currently use clearly labelled mock results (`source: "mock"`) until real VLM inference is connected.
+
 ### Other Project Modules
 
-The Self-Healing, Backend, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status should be updated by their respective team members based on their actual code and test results.
+The Self-Healing, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status will be updated by their respective team members based on their actual code and test results.
 
 ## 📋 Development Guidelines
+
 
 - Work on your assigned feature branch.
 - Keep commits focused and descriptive.
