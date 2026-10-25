@@ -5,6 +5,7 @@ This module provides the central FastAPI application instance for OmniSight.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from backend.app.api.artifacts import router as artifacts_router
 from backend.app.api.health import router as health_router
 from backend.app.api.runs import router as runs_router
 
@@ -35,4 +36,5 @@ app.add_middleware(
 # Register routers
 app.include_router(health_router)
 app.include_router(runs_router)
+app.include_router(artifacts_router)
 
