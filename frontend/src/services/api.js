@@ -169,13 +169,17 @@ export async function fetchRun(runId) {
 
 /**
  * Retrieve defect findings for a run (GET /api/v1/runs/{run_id}/findings)
+ *
+ * @param {string} runId - Unique identifier of the run
+ * @param {boolean} includeMock - Whether to request mock findings for testing
  */
-export async function fetchRunFindings(runId) {
+export async function fetchRunFindings(runId, includeMock = false) {
   if (!runId || !runId.trim()) {
     return { ok: false, error: 'Run ID is required.' };
   }
 
-  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/findings`;
+  const query = includeMock ? '?include_mock=true' : '';
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/findings${query}`;
 
   try {
     const res = await fetch(endpoint, {
@@ -184,6 +188,12 @@ export async function fetchRunFindings(runId) {
 
     if (res.ok) {
       const findings = await res.json();
+      if (!Array.isArray(findings)) {
+        return {
+          ok: false,
+          error: 'Malformed findings response from backend: expected a list of findings.',
+        };
+      }
       return { ok: true, data: findings };
     }
 

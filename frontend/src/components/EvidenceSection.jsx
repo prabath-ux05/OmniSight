@@ -17,6 +17,7 @@ export default function EvidenceSection({ finding, runId }) {
   }
 
   const evidence = finding.evidence || {};
+  const isMock = finding.source === 'mock' || (finding.description && finding.description.includes('[MOCK]'));
 
   return (
     <section className="card evidence-section">
@@ -60,17 +61,35 @@ export default function EvidenceSection({ finding, runId }) {
               <span className="meta-key">DOM Snapshot:</span>
               <code className="meta-val">{evidence.dom_snapshot_path || 'None recorded'}</code>
             </div>
+
             <div className="meta-row">
               <span className="meta-key">CSS / DOM Selector:</span>
-              <code className="meta-val">{finding.selector || 'Global layout scope'}</code>
+              <code className="meta-val">{finding.selector || 'Global / Not specified'}</code>
             </div>
+
             <div className="meta-row">
               <span className="meta-key">Defect Category:</span>
-              <span className="meta-val">{finding.category}</span>
+              <span className="meta-val">{finding.category || 'N/A'}</span>
             </div>
+
+            <div className="meta-row">
+              <span className="meta-key">Confidence Score:</span>
+              <span className="meta-val">
+                {typeof finding.confidence === 'number'
+                  ? `${Math.round(finding.confidence * 100)}%`
+                  : 'Not provided'}
+              </span>
+            </div>
+
             <div className="meta-row">
               <span className="meta-key">Source Engine:</span>
-              <span className="meta-val">{finding.source === 'mock' ? 'Deterministic Mock Detector' : 'Multimodal VLM'}</span>
+              <span className="meta-val">
+                {isMock ? (
+                  <span className="badge badge-source-mock">[MOCK] Test Fixture</span>
+                ) : (
+                  'Multimodal Vision Model'
+                )}
+              </span>
             </div>
           </div>
 

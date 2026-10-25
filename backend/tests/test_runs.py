@@ -283,6 +283,15 @@ def test_get_run_findings_with_mock_data_asgi():
     assert data[1]["category"] == "broken_image"
 
 
+def test_get_run_findings_include_mock_query_param():
+    """Verify that include_mock=True returns mock findings for development testing."""
+    created = create_run(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    findings = get_run_findings(created.run_id, include_mock=True)
+    assert len(findings) == 2
+    assert all(item.source == "mock" for item in findings)
+    assert all("[MOCK]" in item.description for item in findings)
+
+
 def test_get_run_findings_unknown_run_unit():
     """Unit test: get_run_findings raises HTTPException 404 for unknown run_id."""
     with pytest.raises(HTTPException) as exc_info:

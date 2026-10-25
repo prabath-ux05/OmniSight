@@ -785,3 +785,104 @@
   border-top: 1px solid var(--border-subtle);
   background-color: var(--bg-secondary);
 }
+
+/* Status Controls & Polling Indicator */
+.run-status-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-active-polling {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.polling-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+  animation: pulse-dot 1.5s infinite;
+  display: inline-block;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+.terminal-status-notice {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+/* Quick Lookup Form */
+.lookup-form {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.lookup-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lookup-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.text-input-sm {
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8125rem;
+}
+
+/* Findings Header Actions */
+.findings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-active-mock {
+  background-color: rgba(139, 92, 246, 0.25);
+  border-color: #8b5cf6;
+  color: #c4b5fd;
+}
+
+.test-hint-box {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px dashed var(--border-subtle);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+}
+
+.test-hint-label {
+  font-weight: 600;
+  color: #93c5fd;
+}
+
+.test-hint-text {
+  color: var(--text-muted);
+}
+

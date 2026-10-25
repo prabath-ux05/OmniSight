@@ -90,7 +90,7 @@ def get_run(run_id: str) -> RunResponse:
         404: {"model": ErrorResponse, "description": "Run not found"},
     },
 )
-def get_run_findings(run_id: str) -> list[FindingResponse]:
+def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingResponse]:
     """Retrieve structured defect findings by run_id."""
     clean_id = _validate_run_id(run_id)
     findings = run_store.get_findings(clean_id)
@@ -100,6 +100,9 @@ def get_run_findings(run_id: str) -> list[FindingResponse]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
         )
+    if include_mock and not findings:
+        from backend.app.services.run_store import create_mock_findings
+        return create_mock_findings(clean_id)
     return findings
 
 
