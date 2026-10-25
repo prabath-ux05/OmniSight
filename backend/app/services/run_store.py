@@ -65,6 +65,31 @@ class RunStore:
         """Set findings for a run."""
         self._findings[run_id] = findings
 
+    def update_run(
+        self,
+        run_id: str,
+        *,
+        status: str | None = None,
+        message: str | None = None,
+        error: str | None = None,
+    ) -> RunResponse | None:
+        """Update mutable status and message fields of an existing run."""
+        existing = self._runs.get(run_id)
+        if not existing:
+            return None
+
+        updated_dict = existing.model_dump()
+        if status is not None:
+            updated_dict["status"] = status
+        if message is not None:
+            updated_dict["message"] = message
+        if error is not None:
+            updated_dict["error"] = error
+
+        updated_run = RunResponse(**updated_dict)
+        self._runs[run_id] = updated_run
+        return updated_run
+
     def clear(self) -> None:
         """Clear all stored runs and findings (used for test isolation)."""
         self._runs.clear()
