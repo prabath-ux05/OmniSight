@@ -89,15 +89,17 @@ export async function fetchHealth() {
  * Create a new inspection run (POST /api/v1/runs)
  *
  * @param {string} targetUrl - Target web page URL to inspect
+ * @param {boolean} autoExecute - Whether to automatically schedule browser and vision execution
  * @returns {Promise<{ ok: boolean, data?: object, error?: string, status?: number, isNetworkError?: boolean }>}
  */
-export async function createInspectionRun(targetUrl) {
+export async function createInspectionRun(targetUrl, autoExecute = true) {
   const cleanUrl = (targetUrl || '').trim();
   if (!cleanUrl) {
     return { ok: false, error: 'Target website URL is required.' };
   }
 
-  const endpoint = `${API_BASE_URL}/api/v1/runs`;
+  const query = autoExecute ? '?auto_execute=true' : '';
+  const endpoint = `${API_BASE_URL}/api/v1/runs${query}`;
 
   try {
     const res = await fetch(endpoint, {
@@ -133,6 +135,53 @@ export async function createInspectionRun(targetUrl) {
       isNetworkError: true,
     };
   }
+}
+
+/**
+ * Trigger the inspection pipeline for an existing run (POST /api/v1/runs/{run_id}/execute)
+ */
+export async function executeRunPipeline(runId) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/execute`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (res.ok) {
+      const runData = await res.json();
+      return { ok: true, data: runData };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Execution failed for run '${runId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Returns the accessible HTTP URL for an inspection artifact (screenshot or DOM).
+ *
+ * @param {string} runId
+ * @param {string} filename
+ * @returns {string} Accessible URL
+ */
+export function getArtifactUrl(runId, filename) {
+  if (!runId || !filename) return '';
+  const cleanRun = encodeURIComponent(runId.trim());
+  const cleanFile = encodeURIComponent(filename.trim());
+  return `${API_BASE_URL}/api/v1/artifacts/${cleanRun}/${cleanFile}`;
 }
 
 /**
