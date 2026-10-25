@@ -1,140 +1,264 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import InspectionForm from './components/InspectionForm';
 import RunStatusCard from './components/RunStatusCard';
 import FindingsSection from './components/FindingsSection';
 import EvidenceSection from './components/EvidenceSection';
 import Alert from './components/Alert';
+import {
+  fetchHealth,
+  createInspectionRun,
+  fetchRun,
+  fetchRunFindings,
+  executeRunPipeline,
+} from './services/api';
 import './App.css';
+
+const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
 
 export default function App() {
   // Backend health status
   const [health, setHealth] = useState(null);
   const [isHealthLoading, setIsHealthLoading] = useState(false);
 
-  // Active run state
+  // Active run state (Day 14 & 17)
   const [currentRun, setCurrentRun] = useState(null);
   const [isRunLoading, setIsRunLoading] = useState(false);
+  const [isAutoPolling, setIsAutoPolling] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
-  // Findings state
+  // Findings state (Day 15)
   const [findings, setFindings] = useState(null);
   const [isFindingsLoading, setIsFindingsLoading] = useState(false);
+  const [findingsError, setFindingsError] = useState('');
   const [selectedFinding, setSelectedFinding] = useState(null);
+  const [includeMockFindings, setIncludeMockFindings] = useState(false);
 
-  // Alerts & errors
+  // Alerts & notifications
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // 1. Fetch Backend Health
+  // Ref to prevent overlapping polling intervals
+  const pollingTimerRef = useRef(null);
+
+  // ---------------------------------------------------------------------------
+  // 1. Backend Health Check
+  // ---------------------------------------------------------------------------
   const checkHealth = useCallback(async () => {
     setIsHealthLoading(true);
-    try {
-      const res = await fetch('/health');
-      if (res.ok) {
-        const data = await res.json();
-        setHealth(data);
-      } else {
-        setHealth({ status: 'unreachable' });
-      }
-    } catch (err) {
-      setHealth({ status: 'offline', error: err.message });
-    } finally {
-      setIsHealthLoading(false);
+    const result = await fetchHealth();
+    if (result.ok) {
+      setHealth(result.data);
+    } else {
+      setHealth({ status: 'offline', error: result.error });
     }
+    setIsHealthLoading(false);
   }, []);
 
   useEffect(() => {
     checkHealth();
   }, [checkHealth]);
 
-  // 2. Fetch Findings for a specific Run ID
-  const fetchFindings = useCallback(async (runId) => {
+  // ---------------------------------------------------------------------------
+  // 2. Fetch Findings (Day 15)
+  // ---------------------------------------------------------------------------
+  const loadFindings = useCallback(async (runId, useMock) => {
     if (!runId) return;
     setIsFindingsLoading(true);
-    try {
-      const res = await fetch(`/api/v1/runs/${encodeURIComponent(runId)}/findings`);
-      if (res.ok) {
-        const data = await res.json();
-        setFindings(data);
-        if (data && data.length > 0) {
-          setSelectedFinding(data[0]);
-        } else {
-          setSelectedFinding(null);
-        }
+    setFindingsError('');
+
+    const result = await fetchRunFindings(runId, useMock);
+
+    if (result.ok) {
+      setFindings(result.data);
+      if (Array.isArray(result.data) && result.data.length > 0) {
+        setSelectedFinding(result.data[0]);
       } else {
-        const errData = await res.json().catch(() => ({}));
-        setErrorMessage(errData.detail || `Failed to fetch findings for run ${runId}`);
-        setFindings(null);
         setSelectedFinding(null);
       }
-    } catch (err) {
-      setErrorMessage(`Network error fetching findings: ${err.message}`);
+    } else {
       setFindings(null);
       setSelectedFinding(null);
-    } finally {
-      setIsFindingsLoading(false);
+      setFindingsError(result.error);
     }
+
+    setIsFindingsLoading(false);
   }, []);
 
-  // 3. Initiate a New Inspection Run
+  // ---------------------------------------------------------------------------
+  // 3. Initiate a New Inspection Run (Day 13 & 14)
+  // ---------------------------------------------------------------------------
   const handleStartInspection = async (targetUrl) => {
     setErrorMessage('');
     setSuccessMessage('');
     setIsRunLoading(true);
     setFindings(null);
     setSelectedFinding(null);
+    setFindingsError('');
 
-    try {
-      const res = await fetch('/api/v1/runs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: targetUrl }),
-      });
+    const result = await createInspectionRun(targetUrl);
 
-      if (res.status === 201) {
-        const runData = await res.json();
-        setCurrentRun(runData);
-        setSuccessMessage(`Run ${runData.run_id} initiated successfully!`);
-        // Immediately fetch findings associated with this run
-        fetchFindings(runData.run_id);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        let errText = errData.detail || 'Failed to initiate inspection run.';
-        if (Array.isArray(errData.detail)) {
-          errText = errData.detail.map((d) => d.msg || JSON.stringify(d)).join('; ');
-        }
-        setErrorMessage(`Error (${res.status}): ${errText}`);
-      }
-    } catch (err) {
-      setErrorMessage(
-        `Unable to connect to OmniSight backend at http://127.0.0.1:8000. Please ensure the backend server is running. (${err.message})`
+    if (result.ok) {
+      const runData = result.data;
+      setCurrentRun(runData);
+      setSuccessMessage(
+        `Run '${runData.run_id}' initiated successfully! Initial status: ${runData.status.toUpperCase()}.`
       );
-    } finally {
-      setIsRunLoading(false);
+
+      // Start auto-polling if run is not terminal
+      if (!TERMINAL_STATUSES.includes(runData.status)) {
+        setIsAutoPolling(true);
+      } else {
+        setIsAutoPolling(false);
+      }
+
+      // Fetch initial findings (default to clean findings list)
+      await loadFindings(runData.run_id, includeMockFindings);
+    } else {
+      setCurrentRun(null);
+      setIsAutoPolling(false);
+      setErrorMessage(result.error);
     }
+
+    setIsRunLoading(false);
   };
 
-  // 4. Poll/Refresh Run Status
+  // ---------------------------------------------------------------------------
+  // 4. Poll / Refresh Run Status (Day 14)
+  // ---------------------------------------------------------------------------
   const handleRefreshRun = async (runId) => {
     if (!runId) return;
     setErrorMessage('');
     setIsRunLoading(true);
 
-    try {
-      const res = await fetch(`/api/v1/runs/${encodeURIComponent(runId)}`);
-      if (res.ok) {
-        const runData = await res.json();
-        setCurrentRun(runData);
-        // Refresh findings as well
-        fetchFindings(runId);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setErrorMessage(errData.detail || `Run ${runId} not found.`);
+    const result = await fetchRun(runId);
+    if (result.ok) {
+      const updatedRun = result.data;
+      setCurrentRun(updatedRun);
+
+      // Stop auto-polling if terminal status reached
+      if (TERMINAL_STATUSES.includes(updatedRun.status)) {
+        setIsAutoPolling(false);
       }
-    } catch (err) {
-      setErrorMessage(`Error refreshing run status: ${err.message}`);
-    } finally {
-      setIsRunLoading(false);
+
+      // Refresh findings as well
+      await loadFindings(runId, includeMockFindings);
+    } else {
+      // If run not found or network error, stop polling
+      setIsAutoPolling(false);
+      setErrorMessage(result.error);
+    }
+
+    setIsRunLoading(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 5. Look up an existing or unknown run ID (Day 14 testing)
+  // ---------------------------------------------------------------------------
+  const handleLookupRun = async (runId) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsRunLoading(true);
+    setFindings(null);
+    setSelectedFinding(null);
+    setFindingsError('');
+
+    const result = await fetchRun(runId);
+    if (result.ok) {
+      const runData = result.data;
+      setCurrentRun(runData);
+      setSuccessMessage(`Loaded run '${runData.run_id}'. Status: ${runData.status.toUpperCase()}.`);
+
+      if (!TERMINAL_STATUSES.includes(runData.status)) {
+        setIsAutoPolling(true);
+      } else {
+        setIsAutoPolling(false);
+      }
+
+      await loadFindings(runData.run_id, includeMockFindings);
+    } else {
+      // Report exact error (e.g. HTTP 404: Run 'xxx' not found.)
+      setCurrentRun(null);
+      setIsAutoPolling(false);
+      setErrorMessage(result.error);
+    }
+
+    setIsRunLoading(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 6. Execute Run Pipeline On Demand (Day 17)
+  // ---------------------------------------------------------------------------
+  const handleExecutePipeline = async (runId) => {
+    if (!runId) return;
+    setErrorMessage('');
+    setIsExecuting(true);
+
+    const result = await executeRunPipeline(runId);
+    if (result.ok) {
+      setCurrentRun(result.data);
+      setSuccessMessage(`Inspection pipeline dispatched for run '${runId}'.`);
+      setIsAutoPolling(true);
+    } else {
+      setErrorMessage(result.error);
+    }
+
+    setIsExecuting(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 7. Polling Lifecycle Effect (Day 14)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!currentRun?.run_id || !isAutoPolling) {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Stop polling if terminal status reached
+    if (TERMINAL_STATUSES.includes(currentRun.status)) {
+      setIsAutoPolling(false);
+      return;
+    }
+
+    // Poll every 4 seconds
+    pollingTimerRef.current = setInterval(async () => {
+      const result = await fetchRun(currentRun.run_id);
+      if (result.ok) {
+        const freshRun = result.data;
+        setCurrentRun(freshRun);
+
+        if (TERMINAL_STATUSES.includes(freshRun.status)) {
+          setIsAutoPolling(false);
+          // Refresh findings upon run completion
+          loadFindings(freshRun.run_id, includeMockFindings);
+        }
+      } else {
+        // Stop polling on error (e.g. unknown run 404 or backend shutdown)
+        setIsAutoPolling(false);
+        setErrorMessage(`Polling stopped: ${result.error}`);
+      }
+    }, 4000);
+
+    return () => {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
+    };
+  }, [currentRun?.run_id, currentRun?.status, isAutoPolling, includeMockFindings, loadFindings]);
+
+  // ---------------------------------------------------------------------------
+  // 8. Toggle Mock Findings (Day 15 testing both empty and populated states)
+  // ---------------------------------------------------------------------------
+  const handleToggleMockFindings = () => {
+    const nextValue = !includeMockFindings;
+    setIncludeMockFindings(nextValue);
+    if (currentRun?.run_id) {
+      loadFindings(currentRun.run_id, nextValue);
     }
   };
 
@@ -148,7 +272,7 @@ export default function App() {
       />
 
       <main className="dashboard-container">
-        {/* 6. Error & Success alert areas */}
+        {/* Error & Success alerts */}
         {errorMessage && (
           <Alert
             type="error"
@@ -170,14 +294,19 @@ export default function App() {
           isLoading={isRunLoading}
         />
 
-        {/* 3. Run status section */}
+        {/* 3. Run status section with polling, lookup & pipeline execution (Day 14 & 17) */}
         <RunStatusCard
           run={currentRun}
           onRefresh={handleRefreshRun}
           isRefreshing={isRunLoading}
+          isAutoPolling={isAutoPolling}
+          onToggleAutoPolling={() => setIsAutoPolling((prev) => !prev)}
+          onLookupRun={handleLookupRun}
+          onExecutePipeline={handleExecutePipeline}
+          isExecuting={isExecuting}
         />
 
-        {/* 4 & 5. Findings section and Screenshot / Evidence section in responsive grid */}
+        {/* 4 & 5. Findings section and Screenshot / Evidence section in responsive grid (Day 15) */}
         <div className="dashboard-split-grid">
           <FindingsSection
             findings={findings}
@@ -185,6 +314,10 @@ export default function App() {
             selectedFindingId={selectedFinding?.finding_id}
             onSelectFinding={(item) => setSelectedFinding(item)}
             runId={currentRun?.run_id}
+            includeMock={includeMockFindings}
+            onToggleMockFindings={handleToggleMockFindings}
+            onRefreshFindings={() => loadFindings(currentRun?.run_id, includeMockFindings)}
+            findingsError={findingsError}
           />
 
           <EvidenceSection

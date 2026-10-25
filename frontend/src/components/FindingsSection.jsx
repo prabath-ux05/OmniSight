@@ -6,6 +6,10 @@ export default function FindingsSection({
   selectedFindingId,
   onSelectFinding,
   runId,
+  includeMock,
+  onToggleMockFindings,
+  onRefreshFindings,
+  findingsError,
 }) {
   const getSeverityBadgeClass = (severity) => {
     switch (severity?.toLowerCase()) {
@@ -30,9 +34,12 @@ export default function FindingsSection({
       case 'broken_image':
         return 'Broken Image';
       default:
-        return category || 'Unknown';
+        return category || 'Unknown Category';
     }
   };
+
+  const isArray = Array.isArray(findings);
+  const count = isArray ? findings.length : 0;
 
   return (
     <section className="card findings-section">
@@ -40,45 +47,93 @@ export default function FindingsSection({
         <div>
           <h2 className="card-title">Defect Findings &amp; Visual Analysis</h2>
           <p className="card-description">
-            UI anomalies detected by multimodal screenshot and DOM inspection.
+            Retrieved from <code>GET /api/v1/runs/{'{run_id}'}/findings</code>.
           </p>
         </div>
-        {findings && (
-          <span className="findings-count-badge">
-            {findings.length} {findings.length === 1 ? 'Finding' : 'Findings'}
-          </span>
+
+        {runId && (
+          <div className="findings-header-actions">
+            <button
+              type="button"
+              className={`btn btn-sm ${includeMock ? 'btn-active-mock' : 'btn-secondary'}`}
+              onClick={onToggleMockFindings}
+              title={
+                includeMock
+                  ? 'Switch to clean inspection results (empty list)'
+                  : 'Load mock defect findings (?include_mock=true) for development testing'
+              }
+            >
+              {includeMock ? 'Mode: Mock Findings' : 'Mode: Clean Run'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={onRefreshFindings}
+              disabled={isLoading}
+              title="Refresh findings from backend"
+            >
+              {isLoading ? 'Loading...' : 'Refresh'}
+            </button>
+
+            <span className="findings-count-badge">
+              {count} {count === 1 ? 'Finding' : 'Findings'}
+            </span>
+          </div>
         )}
       </div>
 
+      {/* Loading Indicator */}
       {isLoading && (
         <div className="loading-container">
           <span className="spinner-md"></span>
-          <p className="loading-text">Loading findings for run {runId}...</p>
+          <p className="loading-text">Fetching defect findings for run {runId}...</p>
         </div>
       )}
 
-      {!isLoading && !runId && (
+      {/* Request or Malformed Response Error */}
+      {!isLoading && findingsError && (
+        <div className="alert alert-error" role="alert">
+          <div className="alert-content">
+            <span className="alert-message">{findingsError}</span>
+          </div>
+        </div>
+      )}
+
+      {/* No Run Selected */}
+      {!isLoading && !findingsError && !runId && (
         <div className="empty-state">
           <p className="empty-state-text">
-            No inspection run selected. Start an inspection to analyze UI defects.
+            No inspection run selected. Start an inspection or look up a Run ID to view detected UI defects.
           </p>
         </div>
       )}
 
-      {!isLoading && runId && (!findings || findings.length === 0) && (
+      {/* Clean Run: Zero Findings */}
+      {!isLoading && !findingsError && runId && isArray && count === 0 && (
         <div className="empty-state empty-state-clean">
           <div className="clean-check-icon">✓</div>
           <h3 className="clean-title">No UI Defects Detected</h3>
           <p className="empty-state-text">
             All visual elements and layouts passed inspection for run <code>{runId}</code>.
           </p>
+          <div className="test-hint-box">
+            <span className="test-hint-label">Testing Tip:</span>
+            <span className="test-hint-text">
+              To test the findings viewer layout with simulated defects, click the <strong>Mode: Clean Run</strong> button above to toggle mock findings.
+            </span>
+          </div>
         </div>
       )}
 
-      {!isLoading && findings && findings.length > 0 && (
+      {/* Non-empty Findings List */}
+      {!isLoading && !findingsError && isArray && count > 0 && (
         <div className="findings-list">
           {findings.map((item) => {
             const isSelected = selectedFindingId === item.finding_id;
+            const hasConfidence = typeof item.confidence === 'number';
+            const isMock = item.source === 'mock' || (item.description && item.description.includes('[MOCK]'));
+
             return (
               <div
                 key={item.finding_id}
@@ -100,15 +155,21 @@ export default function FindingsSection({
                     <span className="badge badge-category">
                       {getCategoryLabel(item.category)}
                     </span>
-                    {item.source === 'mock' && (
-                      <span className="badge badge-source-mock" title="Generated mock finding for early testing">
-                        MOCK DATA
+                    {isMock && (
+                      <span
+                        className="badge badge-source-mock"
+                        title="Simulated test finding — not real model output"
+                      >
+                        [MOCK DATA]
                       </span>
                     )}
                   </div>
-                  <span className="finding-confidence">
-                    Confidence: {item.confidence ? `${Math.round(item.confidence * 100)}%` : 'N/A'}
-                  </span>
+
+                  {hasConfidence && (
+                    <span className="finding-confidence">
+                      Confidence: {Math.round(item.confidence * 100)}%
+                    </span>
+                  )}
                 </div>
 
                 <div className="finding-body">
