@@ -7,6 +7,8 @@ export default function RunStatusCard({
   isAutoPolling,
   onToggleAutoPolling,
   onLookupRun,
+  onExecutePipeline,
+  isExecuting,
 }) {
   const [lookupId, setLookupId] = useState('');
   const [lookupError, setLookupError] = useState('');
@@ -57,6 +59,17 @@ export default function RunStatusCard({
         <div className="run-status-controls">
           {run && (
             <>
+              {run.status === 'queued' && onExecutePipeline && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => onExecutePipeline(run.run_id)}
+                  disabled={isExecuting || isRefreshing}
+                  title="Trigger integrated Browser Agent capture and Vision Engine analysis"
+                >
+                  {isExecuting ? 'Executing Pipeline...' : '▶ Execute Pipeline'}
+                </button>
+              )}
               <button
                 type="button"
                 className={`btn btn-sm ${isAutoPolling ? 'btn-active-polling' : 'btn-secondary'}`}

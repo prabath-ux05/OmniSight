@@ -10,6 +10,7 @@ import {
   createInspectionRun,
   fetchRun,
   fetchRunFindings,
+  executeRunPipeline,
 } from './services/api';
 import './App.css';
 
@@ -20,10 +21,11 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [isHealthLoading, setIsHealthLoading] = useState(false);
 
-  // Active run state (Day 14)
+  // Active run state (Day 14 & 17)
   const [currentRun, setCurrentRun] = useState(null);
   const [isRunLoading, setIsRunLoading] = useState(false);
   const [isAutoPolling, setIsAutoPolling] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   // Findings state (Day 15)
   const [findings, setFindings] = useState(null);
@@ -185,7 +187,27 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 6. Polling Lifecycle Effect (Day 14)
+  // 6. Execute Run Pipeline On Demand (Day 17)
+  // ---------------------------------------------------------------------------
+  const handleExecutePipeline = async (runId) => {
+    if (!runId) return;
+    setErrorMessage('');
+    setIsExecuting(true);
+
+    const result = await executeRunPipeline(runId);
+    if (result.ok) {
+      setCurrentRun(result.data);
+      setSuccessMessage(`Inspection pipeline dispatched for run '${runId}'.`);
+      setIsAutoPolling(true);
+    } else {
+      setErrorMessage(result.error);
+    }
+
+    setIsExecuting(false);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 7. Polling Lifecycle Effect (Day 14)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!currentRun?.run_id || !isAutoPolling) {
@@ -230,7 +252,7 @@ export default function App() {
   }, [currentRun?.run_id, currentRun?.status, isAutoPolling, includeMockFindings, loadFindings]);
 
   // ---------------------------------------------------------------------------
-  // 7. Toggle Mock Findings (Day 15 testing both empty and populated states)
+  // 8. Toggle Mock Findings (Day 15 testing both empty and populated states)
   // ---------------------------------------------------------------------------
   const handleToggleMockFindings = () => {
     const nextValue = !includeMockFindings;
@@ -272,7 +294,7 @@ export default function App() {
           isLoading={isRunLoading}
         />
 
-        {/* 3. Run status section with polling & lookup (Day 14) */}
+        {/* 3. Run status section with polling, lookup & pipeline execution (Day 14 & 17) */}
         <RunStatusCard
           run={currentRun}
           onRefresh={handleRefreshRun}
@@ -280,6 +302,8 @@ export default function App() {
           isAutoPolling={isAutoPolling}
           onToggleAutoPolling={() => setIsAutoPolling((prev) => !prev)}
           onLookupRun={handleLookupRun}
+          onExecutePipeline={handleExecutePipeline}
+          isExecuting={isExecuting}
         />
 
         {/* 4 & 5. Findings section and Screenshot / Evidence section in responsive grid (Day 15) */}
