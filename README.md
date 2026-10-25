@@ -29,25 +29,36 @@ OmniSight/
 │   ├── models.py
 │   ├── evidence_validator.py
 │   └── README.md
-├── backend/                       # Backend and API (team development)
-├── browser_agent/                 # Browser automation and evidence capture
+├── browser_agent/
 │   ├── navigation/                # Browser navigation and interactions
 │   ├── screenshots/               # Screenshot capture and artifacts
 │   ├── evidence/                  # DOM snapshots and execution evidence
 │   └── tests/                     # Browser Agent automated tests
+├── backend/                       # FastAPI backend and orchestration API
+│   ├── app/
+│   │   ├── api/                   # Route handlers (health, runs, findings)
+│   │   ├── core/                  # Safe logging and configurations
+│   │   ├── schemas/               # Pydantic models (health, runs, findings, errors)
+│   │   ├── services/              # Business logic and in-memory RunStore
+│   │   └── main.py                # FastAPI application entry point
+│   └── tests/                     # Automated backend test suites
 ├── self_healing/                  # Failure analysis and repair pipeline
 ├── github_integration/            # GitHub and Git workflow automation
-├── frontend/                      # Planned monitoring dashboard
-├── docs/                          # Project documentation
+├── frontend/                      # Monitoring dashboard
+├── docs/                          # Project and module documentation
+│   ├── backend_api.md             # Backend API guide and endpoint reference
+│   └── browser_agent_setup.md     # Browser Agent setup guide
 ├── tests/                         # Project-level and integration tests
-├── artifacts/                     # Generated browser execution artifacts (local)
+├── artifacts/                     # Generated browser execution artifacts
+├── pytest.ini                     # Pytest configuration
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 └── README.md
+
 ```
 
-The tree lists the implemented Vision Engine files and the Browser Agent module structure. The other project modules are shown at a high level and may contain additional files maintained by their respective team members.
+The tree lists the documented Vision Engine files and Browser Agent module structure. Other project modules may contain additional files maintained by their respective team members.
 
 ## 👥 Team Module Distribution
 
@@ -67,7 +78,7 @@ The tree lists the implemented Vision Engine files and the Browser Agent module 
 - Access to the OmniSight repository.
 - Playwright and its required browser installed for Browser Agent work.
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
 If you have not cloned the repository yet:
 
@@ -78,7 +89,7 @@ cd OmniSight
 
 If you already have the repository locally, open its root directory instead of cloning it again.
 
-### 2. Create and activate a virtual environment
+### 2. Create and Activate a Virtual Environment
 
 **Windows PowerShell:**
 
@@ -94,7 +105,7 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Python dependencies
+### 3. Install Python Dependencies
 
 Run from the repository root:
 
@@ -102,15 +113,15 @@ Run from the repository root:
 python -m pip install -r requirements.txt
 ```
 
-### 4. Install the Playwright Chromium browser
+### 4. Install the Playwright Chromium Browser
 
-For Browser Agent development, install Chromium using:
+For Browser Agent development, install Chromium:
 
 ```bash
 python -m playwright install chromium
 ```
 
-### 5. Configure environment variables
+### 5. Configure Environment Variables
 
 **Windows PowerShell:**
 
@@ -126,7 +137,7 @@ cp .env.example .env
 
 Configure only the environment variables required for your assigned work. Never commit `.env` files, API keys, passwords, or access tokens. External model integrations must use team-approved providers and authorized credentials.
 
-### 6. Run tests
+### 6. Run Tests
 
 Run the full test suite from the repository root:
 
@@ -140,11 +151,30 @@ To run only the Vision Engine tests:
 python -m pytest ./vision_engine/tests -q
 ```
 
+To run the Backend tests:
+
+```bash
+pytest backend/tests -v
+```
+
 Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
+
+### 7. Run the Backend API Server
+
+Start the local FastAPI development server using Uvicorn:
+
+```bash
+uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Once running, access the interactive API documentation in your browser:
+- **Swagger UI (Interactive)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc (Specification)**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 ## 📌 Development Status
 
-The following checklist reflects the documented Vision Engine development status. Features should only be marked complete when their implementation and tests have been verified.
+
+The following checklist reflects the documented development status. Features should only be marked complete when their implementation and tests have been verified.
 
 ### Vision Engine — Member 1: Vision & Intelligence
 
@@ -153,7 +183,7 @@ The following checklist reflects the documented Vision Engine development status
 - [x] Added input validation for required fields and evidence requirements.
 - [x] Implemented evidence file validation for existence, file type, readability, and empty files.
 - [x] Implemented a deterministic mock detector.
-- [x] Added a mock defect scenario for `layout_overflow` and `broken_image`.
+- [x] Added mock defect scenarios for `layout_overflow` and `broken_image`.
 - [x] Added a clean-page scenario that returns no findings.
 - [x] Added automated tests for input validation, evidence validation, and mock detection.
 - [x] Added static HTML DOM heuristics for missing or empty image sources.
@@ -170,7 +200,7 @@ The following checklist reflects the documented Vision Engine development status
 
 | File | Description |
 |---|---|
-| `vision_engine/models.py` | Defines the input, finding, evidence-reference, and bounding-box models. |
+| `vision_engine/models.py` | Defines input, finding, evidence-reference, and bounding-box models. |
 | `vision_engine/evidence_validator.py` | Checks evidence paths, file existence, file type, readability, and empty files. |
 | `vision_engine/detection/mock_detector.py` | Provides deterministic mock defect and clean-page scenarios. |
 | `vision_engine/tests/test_evidence_validator.py` | Covers evidence-validation behavior and failure cases. |
@@ -187,7 +217,7 @@ The following checklist reflects the documented Vision Engine development status
 - Produces example findings for `layout_overflow` and `broken_image` in the mock defect scenario.
 - Returns an empty findings list in the mock clean scenario.
 - Represents findings with category, severity, confidence, description, and evidence references.
-- Preserves the provided evidence references in mock findings.
+- Preserves provided evidence references in mock findings.
 - Scans saved HTML for image elements with missing or empty `src` attributes.
 - Identifies image elements with missing or empty `alt` text.
 - Flags form controls that may lack accessible labels.
@@ -195,11 +225,15 @@ The following checklist reflects the documented Vision Engine development status
 
 #### Current Limitations
 
-The mock detector generates deterministic example findings for testing and does not analyze real screenshot pixels to identify visual defects. The DOM detector performs static HTML analysis to identify potential issues, including missing or empty image sources, missing image alt text, and potentially unlabelled form controls. It recognizes common labeling mechanisms such as explicit labels, wrapping labels, `aria-label`, and `aria-labelledby`.
+The mock detector generates deterministic example findings for testing and does not analyze real screenshot pixels to identify visual defects.
 
-The DOM detector does not execute JavaScript, inspect the rendered page layout, fetch image URLs, or verify whether images load successfully. Its heuristic checks may produce false positives or miss issues in complex HTML structures. Evidence validation checks basic file accessibility and non-empty content but does not establish the semantic validity of image or DOM data. Real vision-language model integration is not yet implemented.
+The DOM detector performs static HTML analysis to identify potential issues, including missing or empty image sources, missing image alt text, and potentially unlabelled form controls. It recognizes common labeling mechanisms such as explicit labels, wrapping labels, `aria-label`, and `aria-labelledby`.
 
-The latest locally confirmed Vision Engine test result was **47 passed**. Rerun the Vision Engine tests to verify the current state.
+The DOM detector does not execute JavaScript, inspect the rendered page layout, fetch image URLs, or verify whether images load successfully. Its heuristic checks may produce false positives or miss issues in complex HTML structures.
+
+Evidence validation checks basic file accessibility and non-empty content but does not establish the semantic validity of image or DOM data. Real vision-language model integration is not yet implemented.
+
+A previous development note recorded **47 passed** for the Vision Engine tests. Rerun the tests to verify the current state rather than treating that earlier result as a fresh test run.
 
 ### Browser Agent — Member 2: RPA & Browser Agent
 
@@ -277,15 +311,64 @@ Automated tests cover:
 - Artifact existence and structured failure responses.
 - Safe browser cleanup.
 
-A local test page and temporary HTTP server support repeatable testing. The full test suite should be run before integration or release to verify the current state.
+A local test page and temporary HTTP server support repeatable testing. Run the full test suite before integration or release to verify the current state.
 
-The Browser Agent implementation and its automated tests have been completed according to the current development progress. Run the relevant test suite to verify the current state before integration or release.
+The Browser Agent implementation and its automated tests are documented as completed. Integration with the Vision Engine and Backend, along with full end-to-end validation, remains to be verified.
+
+### Backend & API Orchestration — Member 4: Backend Developer
+
+- [x] Initialized the FastAPI application entry point in `backend/app/main.py`.
+- [x] Implemented `GET /health` endpoint verifying backend server availability.
+- [x] Created `POST /api/v1/runs` endpoint with URL validation, whitespace stripping, and unique `run_id` generation.
+- [x] Implemented `GET /api/v1/runs/{run_id}` endpoint returning run status and metadata.
+- [x] Implemented `GET /api/v1/runs/{run_id}/findings` endpoint returning structured findings or empty lists.
+- [x] Implemented an in-memory `RunStore` repository for managing inspection runs and defect findings.
+- [x] Coordinated finding schemas (`FindingResponse`, `EvidenceReferences`) with the Vision Engine data contract.
+- [x] Added deterministic mock defect findings (`source="mock"`) for early milestone testing.
+- [x] Added centralized safe application logging without exposing secrets.
+- [x] Added standardized error response schemas and HTTP 400/404/422 validation handling.
+- [x] Configured `pytest.ini` with backend testpaths and pythonpath.
+- [x] Created 25 automated backend tests covering health, runs, findings, error handling, and lifecycle status consistency.
+- [ ] Connect the backend run lifecycle to the live Browser Agent Playwright runner.
+- [ ] Connect the backend findings retrieval to live Vision Engine inference.
+- [ ] Replace temporary in-memory `RunStore` with persistent database models and migrations.
+
+#### Backend Implementation Details
+
+| File | Description |
+|---|---|
+| `backend/app/main.py` | FastAPI application instance, router mounting, and OpenAPI metadata. |
+| `backend/app/api/health.py` | Health check endpoint controller (`GET /health`). |
+| `backend/app/api/runs.py` | Runs and findings route controllers (`POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/findings`). |
+| `backend/app/schemas/health.py` | Pydantic response schema for the `/health` endpoint. |
+| `backend/app/schemas/runs.py` | Pydantic schemas for run creation and run response metadata. |
+| `backend/app/schemas/findings.py` | Pydantic schemas for findings and evidence references matching the Vision Engine. |
+| `backend/app/schemas/errors.py` | Standardized error response model for 400/404 responses. |
+| `backend/app/services/run_store.py` | In-memory run and findings repository with mock findings generator. |
+| `backend/app/core/logging.py` | Centralized safe application logger. |
+| `backend/tests/test_health.py` | Automated unit and ASGI integration tests for `/health`. |
+| `backend/tests/test_runs.py` | Automated tests for run creation, retrieval, findings, error cases, and consistency. |
+| `docs/backend_api.md` | Comprehensive backend setup, endpoint documentation, and request/response examples. |
+
+#### Current Capabilities
+- Validates inspection URLs with automatic whitespace stripping and 2048-character length limit.
+- Generates unique run identifiers (`run_<hex>`) and initializes state to `"queued"`.
+- Communicates run status accurately without fabricating progress stages.
+- Returns structured findings matching the team's approved categories (`layout_overflow`, `missing_visible_element`, `broken_image`).
+- Rejects blank/whitespace run IDs with HTTP 400 and unknown run IDs with HTTP 404.
+- Provides interactive Swagger documentation at `/docs` and ReDoc at `/redoc`.
+
+#### Current Limitations
+- **In-Memory Storage**: Runs and findings are stored in RAM (`RunStore`) and will reset if the Uvicorn server restarts.
+- **Single-Process**: State is isolated to a single Uvicorn process and is not shared across multi-worker clusters.
+- **Mock Findings**: Findings currently use clearly labelled mock results (`source: "mock"`) until real VLM inference is connected.
 
 ### Other Project Modules
 
-The Self-Healing, Backend, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status should be updated by their respective team members based on their actual code and test results.
+The Self-Healing, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status will be updated by their respective team members based on their actual code and test results.
 
 ## 📋 Development Guidelines
+
 
 - Work on your assigned feature branch.
 - Keep commits focused and descriptive.
@@ -304,6 +387,7 @@ The Self-Healing, Backend, GitHub Integration, and Frontend modules are part of 
 - Develop the self-healing pipeline for candidate selector repairs.
 - Integrate backend APIs and GitHub workflows.
 - Develop the human-in-the-loop dashboard for reviewing findings and proposed repairs.
+- Complete integration testing across the Browser Agent, Vision Engine, and Backend.
 
 ## 🤝 Contribution
 
@@ -311,4 +395,8 @@ Contributions should follow the team's assigned module responsibilities and deve
 
 ## ⚖️ Current Project Limitations
 
-OmniSight is under active development. The Vision Engine currently provides validated data models, evidence-file checks, and deterministic mock detection. End-to-end visual analysis, automated repair generation, and full integration across all modules depend on further development and testing.
+OmniSight is under active development. The Vision Engine currently provides validated data models, evidence-file checks, deterministic mock detection, and static HTML DOM heuristics.
+
+The Browser Agent captures browser evidence and handles common execution failures. However, full integration across the Browser Agent, Vision Engine, Backend, and dashboard still requires verification.
+
+Real screenshot-based vision-language analysis, automated repair generation, and complete end-to-end self-healing workflows depend on further development and testing.

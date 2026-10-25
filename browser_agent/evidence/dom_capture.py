@@ -21,3 +21,4 @@ class DOMCapture:
             file.write(html_content)
 
         return str(dom_path)
+
