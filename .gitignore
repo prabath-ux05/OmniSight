@@ -85,3 +85,4 @@ logs/
 *.log
 browser_agent/screenshots/*
 !browser_agent/screenshots/.gitkeep
+artifacts/
