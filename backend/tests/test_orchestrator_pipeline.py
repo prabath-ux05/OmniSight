@@ -349,3 +349,57 @@ def test_orchestrator_handles_unsupported_finding_category_in_pipeline():
     assert updated is not None
     assert updated.status == "failed"
     assert "cannot be mapped" in updated.error
+
+
+def test_orchestrator_does_not_swallow_empty_string_exceptions_on_failure():
+    """Verify orchestrator records non-empty error and message when exception has empty string representation."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+
+    # NotImplementedError() without args has str(exc) == ""
+    with patch("navigation.navigator.BrowserNavigator.navigate", side_effect=NotImplementedError()):
+        run_orchestrator.execute_run(run.run_id, run.url)
+
+    updated = run_store.get(run.run_id)
+    assert updated is not None
+    assert updated.status == "failed"
+    assert updated.error, "Error must not be empty string"
+    assert updated.message, "Message must not be empty string"
+    assert "NotImplementedError" in updated.error or "execution failed" in updated.error
+    assert "NotImplementedError" in updated.message or "pipeline error" in updated.message
+
+
+def test_orchestrator_enforces_proactor_loop_policy_on_windows():
+    """Verify orchestrator ensures WindowsProactorEventLoopPolicy on Windows."""
+    import sys
+    import asyncio
+
+    if sys.platform != "win32":
+        pytest.skip("Windows-specific event loop policy test")
+
+    original_policy = asyncio.get_event_loop_policy()
+    try:
+        # Simulate Uvicorn setting SelectorEventLoopPolicy
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        assert isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsSelectorEventLoopPolicy)
+
+        run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+        mock_nav_result = NavigationResult(
+            run_id=run.run_id,
+            url=run.url,
+            page_title="OmniSight",
+            captured_at="2026-10-25T00:00:00Z",
+            viewport={"width": 1280, "height": 800},
+            screenshot_path="artifacts/test_sample_run/before.png",
+            dom_snapshot_path="artifacts/test_sample_run/dom.html",
+            status="success",
+        )
+
+        with patch("navigation.navigator.BrowserNavigator.navigate", return_value=mock_nav_result):
+            run_orchestrator.execute_run(run.run_id, run.url, detector=lambda vi: [])
+
+        # Proactor policy should now be restored/active
+        assert isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy)
+        updated = run_store.get(run.run_id)
+        assert updated.status == "completed"
+    finally:
+        asyncio.set_event_loop_policy(original_policy)

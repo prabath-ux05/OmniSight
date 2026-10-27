@@ -19,6 +19,7 @@ from integration.contracts import (
     Severity,
 )
 from integration.demo_runner import construct_demo_url
+from urllib.parse import parse_qsl, urlparse
 
 
 @dataclass
@@ -393,7 +394,25 @@ def execute_inspection_flow(
         )
 
     # Resolve target URL with query params for state if applicable
-    target_url = construct_demo_url(req.target_url, req.state)
+    parsed_req_url = urlparse(req.target_url)
+    req_query = dict(parse_qsl(parsed_req_url.query))
+    has_defect_param = any(
+        k in req_query
+        for k in (
+            "defect",
+            "defects",
+            "state",
+            "baseline",
+            "defect_overflow",
+            "defect_missing",
+            "defect_broken_image",
+        )
+    )
+
+    if has_defect_param and req.state == InspectionState.CLEAN:
+        target_url = req.target_url
+    else:
+        target_url = construct_demo_url(req.target_url, req.state)
 
     actual_run_id = run_id or f"run_{uuid.uuid4().hex[:10]}"
 
@@ -409,13 +428,15 @@ def execute_inspection_flow(
         nav_result = navigator.navigate(url=target_url, run_id=actual_run_id)
     except Exception as exc:
         failed_meta = dict(metadata or {})
-        failed_meta.update({"error": str(exc), "run_id": actual_run_id, "url": target_url})
+        err_msg = str(exc).strip() or f"{exc.__class__.__name__}: browser navigation failed"
+        failed_meta.update({"error": err_msg, "run_id": actual_run_id, "url": target_url})
         return PipelineResult(request=req, success=False, metadata=failed_meta)
 
     if getattr(nav_result, "status", "failed") != "success":
         failed_meta = dict(metadata or {})
+        nav_err = (getattr(nav_result, "error", None) or "").strip()
         failed_meta.update({
-            "error": getattr(nav_result, "error", "Navigation failed"),
+            "error": nav_err or "Navigation failed",
             "run_id": actual_run_id,
             "url": target_url,
             "status": getattr(nav_result, "status", "failed"),

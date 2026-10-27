@@ -16,6 +16,8 @@ Responsibilities:
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+import asyncio
 from typing import Optional
 
 try:
@@ -102,6 +104,10 @@ class BrowserNavigator:
             )
 
         try:
+            if sys.platform == "win32":
+                if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=self.headless)
                 page = browser.new_page()
@@ -158,6 +164,7 @@ class BrowserNavigator:
             )
 
         except Exception as exc:
+            error_str = str(exc).strip() or f"{exc.__class__.__name__}: browser navigation failed"
             return NavigationResult(
                 status="failed",
                 run_id=run_id,
@@ -167,7 +174,7 @@ class BrowserNavigator:
                 viewport={},
                 console_errors=console_errors,
                 page_errors=page_errors,
-                error=str(exc),
+                error=error_str,
             )
 
         finally:

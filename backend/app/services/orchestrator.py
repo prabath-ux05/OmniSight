@@ -1,5 +1,6 @@
 """Orchestration service coordinating Browser Agent capture and Vision Engine analysis via the integration pipeline."""
 
+import os
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 from backend.app.core.logging import logger
@@ -152,6 +153,12 @@ class RunOrchestrator:
         """
         logger.info("Starting orchestration for run %s (URL: %s)", run_id, url)
 
+        import sys
+        import asyncio
+        if sys.platform == "win32":
+            if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
         # ---------------------------------------------------------------------
         # Stage 1: Browser Navigation & Evidence Capture
         # ---------------------------------------------------------------------
@@ -171,8 +178,31 @@ class RunOrchestrator:
                 from browser_agent.navigation.navigator import BrowserNavigator
             navigator = BrowserNavigator(timeout_ms=15000, headless=True)
 
-        from vision_engine.detection.dom_detector import detect_dom_issues
-        raw_detector = detector or self.detector or detect_dom_issues
+        if detector or self.detector:
+            raw_detector = detector or self.detector
+        else:
+            # Check if real VLM provider is configured with credentials
+            provider_name = (
+                os.getenv("VISION_MODEL_PROVIDER")
+                or os.getenv("VLM_PROVIDER")
+                or ""
+            ).strip().lower()
+            gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+            openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+
+            vlm_ready = (
+                (provider_name == "gemini" and gemini_key)
+                or (provider_name == "openai" and openai_key)
+                or (not provider_name and (gemini_key or openai_key))
+            )
+            if vlm_ready:
+                from vision_engine.detection.vlm_detector import detect_vlm
+                raw_detector = lambda vi: detect_vlm(vi, allow_fallback=True)
+            else:
+                from vision_engine.detection.dom_detector import detect_dom_issues
+                raw_detector = detect_dom_issues
+
+
 
         def wrapped_detector(vision_input: Any) -> list[Any]:
             # Stage 2: Vision & Intelligence Analysis state update
@@ -195,8 +225,8 @@ class RunOrchestrator:
                 run_id=run_id,
             )
         except Exception as exc:
-            error_msg = str(exc)
-            logger.error("Run %s failed during pipeline execution: %s", run_id, error_msg)
+            error_msg = str(exc).strip() or f"{exc.__class__.__name__}: execution failed"
+            logger.exception("Run %s failed during pipeline execution: %s", run_id, error_msg)
             run_store.update_run(
                 run_id,
                 status="failed",
@@ -206,7 +236,8 @@ class RunOrchestrator:
             return
 
         if not pipeline_result.success:
-            error_msg = pipeline_result.metadata.get("error", "Inspection pipeline failed.")
+            raw_err = pipeline_result.metadata.get("error")
+            error_msg = (str(raw_err).strip() if raw_err else "") or "Inspection pipeline failed."
             logger.warning("Pipeline reported failure for run %s: %s", run_id, error_msg)
             run_store.update_run(
                 run_id,

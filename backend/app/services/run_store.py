@@ -20,12 +20,19 @@ from backend.app.schemas.findings import EvidenceReferences, FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
 
 
+from typing import Any, TYPE_CHECKING
+if TYPE_CHECKING:
+    from self_healing.models import RepairResult
+
+
 class RunStore:
     """In-memory repository managing inspection runs and defect findings."""
 
     def __init__(self) -> None:
         self._runs: dict[str, RunResponse] = {}
         self._findings: dict[str, list[FindingResponse]] = {}
+        self._repairs: dict[str, list[Any]] = {}
+        self._proposals: dict[str, list[Any]] = {}
 
     def create(self, request: RunCreateRequest) -> RunResponse:
         """Create and record a new run in the initial 'queued' status.
@@ -65,6 +72,37 @@ class RunStore:
         """Set findings for a run."""
         self._findings[run_id] = findings
 
+    def get_repairs(self, run_id: str) -> list[Any] | None:
+        """Retrieve repair results associated with a run. Returns None if run does not exist."""
+        if run_id not in self._runs:
+            return None
+        return self._repairs.get(run_id, [])
+
+    def set_repairs(self, run_id: str, repairs: list[Any]) -> None:
+        """Set repair results for a run."""
+        self._repairs[run_id] = repairs
+
+    def get_proposals(self, run_id: str) -> list[Any] | None:
+        """Retrieve repair proposals associated with a run. Returns None if run does not exist."""
+        if run_id not in self._runs:
+            return None
+        return self._proposals.get(run_id, [])
+
+    def set_proposals(self, run_id: str, proposals: list[Any]) -> None:
+        """Set repair proposals for a run."""
+        self._proposals[run_id] = proposals
+
+    def get_proposal(self, run_id: str, proposal_id: str) -> Any | None:
+        """Retrieve a specific proposal by run_id and proposal_id."""
+        proposals = self.get_proposals(run_id)
+        if not proposals:
+            return None
+        for p in proposals:
+            pid = getattr(p, "proposal_id", None) or (p.get("proposal_id") if isinstance(p, dict) else None)
+            if pid == proposal_id:
+                return p
+        return None
+
     def update_run(
         self,
         run_id: str,
@@ -91,9 +129,12 @@ class RunStore:
         return updated_run
 
     def clear(self) -> None:
-        """Clear all stored runs and findings (used for test isolation)."""
+        """Clear all stored runs, findings, repairs, and proposals (used for test isolation)."""
         self._runs.clear()
         self._findings.clear()
+        self._repairs.clear()
+        self._proposals.clear()
+
 
 
 # Global in-memory singleton
