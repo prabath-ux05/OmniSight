@@ -477,3 +477,42 @@ def test_pipeline_zero_findings_on_failure_does_not_mask_failed_status():
     assert updated.error == "Browser crashed immediately"
     findings = run_store.get_findings(run.run_id)
     assert len(findings) == 0
+
+
+def test_browser_navigator_enforces_proactor_loop_policy_on_windows():
+    """Verify BrowserNavigator enforces WindowsProactorEventLoopPolicy prior to sync_playwright launch."""
+    import sys
+    import asyncio
+
+    if sys.platform != "win32":
+        pytest.skip("Windows-specific event loop policy test")
+
+    original_policy = asyncio.get_event_loop_policy()
+    try:
+        # Simulate an external runner setting SelectorEventLoopPolicy
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        assert isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsSelectorEventLoopPolicy)
+
+        from navigation.navigator import BrowserNavigator
+        navigator = BrowserNavigator(timeout_ms=5000, headless=True)
+
+        with patch("navigation.navigator.sync_playwright") as mock_playwright:
+            mock_playwright.return_value.__enter__.return_value.chromium.launch.side_effect = RuntimeError("Mock launch stop")
+            res = navigator.navigate(url="http://127.0.0.1:8080/index.html?state=clean", run_id="test_nav_policy")
+            assert isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy)
+            assert res.status == "failed"
+            assert "Mock launch stop" in res.error
+    finally:
+        asyncio.set_event_loop_policy(original_policy)
+
+
+def test_browser_navigator_does_not_swallow_not_implemented_error():
+    """Verify BrowserNavigator captures non-empty error string even for parameterless NotImplementedError."""
+    from navigation.navigator import BrowserNavigator
+    navigator = BrowserNavigator(timeout_ms=5000, headless=True)
+
+    with patch("navigation.navigator.sync_playwright", side_effect=NotImplementedError()):
+        res = navigator.navigate(url="http://127.0.0.1:8080/index.html?state=clean", run_id="test_empty_err")
+        assert res.status == "failed"
+        assert res.error, "Error must not be empty string"
+        assert "NotImplementedError" in res.error
