@@ -1,7 +1,27 @@
 """Data schemas for OmniSight inspection runs."""
 
+import re
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+
+
+def mask_sensitive_strings(text: str) -> str:
+    """Mask credentials, tokens, or sensitive parameters in error/diagnostic strings."""
+    if not text:
+        return text
+    masked = re.sub(
+        r'((?:api[_-]?key|token|secret|password|access[_-]?token)\s*[:=]\s*["\']?)([^"\'\s&]+)(["\']?)',
+        r"\1***MASKED***\3",
+        text,
+        flags=re.IGNORECASE,
+    )
+    masked = re.sub(
+        r'(bearer\s+)([A-Za-z0-9_\-\.]{8,})',
+        r"\1***MASKED***",
+        masked,
+        flags=re.IGNORECASE,
+    )
+    return masked
 
 
 class RunCreateRequest(BaseModel):
@@ -57,3 +77,25 @@ class RunResponse(BaseModel):
         default=None,
         description="Error message if run failed or encountered an issue",
     )
+
+    @model_validator(mode="after")
+    def validate_failed_run_and_mask_secrets(self) -> "RunResponse":
+        """Ensure failed runs always have non-empty error and message, and mask secrets."""
+        if self.error:
+            self.error = mask_sensitive_strings(self.error)
+        if self.message:
+            self.message = mask_sensitive_strings(self.message)
+
+        if self.status == "failed":
+            if not self.error or not self.error.strip():
+                self.error = (
+                    self.message.strip()
+                    if (self.message and self.message.strip())
+                    else "Inspection run failed."
+                )
+            if not self.message or not self.message.strip():
+                self.message = self.error
+        elif self.error is not None and not self.error.strip():
+            self.error = None
+
+        return self

@@ -470,16 +470,22 @@ def execute_inspection_flow(
         return PipelineResult(request=req, success=False, metadata=failed_meta)
 
     # Step 3: Vision Engine detection
-    if detector is not None:
-        raw_vision_findings = detector(vision_input)
-    else:
-        from vision_engine.detection.mock_detector import detect_mock
+    try:
+        if detector is not None:
+            raw_vision_findings = detector(vision_input)
+        else:
+            from vision_engine.detection.mock_detector import detect_mock
 
-        scenario = "clean" if req.state == InspectionState.CLEAN else "defect"
-        raw_vision_findings = detect_mock(vision_input, scenario=scenario)
+            scenario = "clean" if req.state == InspectionState.CLEAN else "defect"
+            raw_vision_findings = detect_mock(vision_input, scenario=scenario)
 
-    # Step 4: Map Vision Engine findings to structured shared InspectionFindings
-    findings = [vision_finding_to_inspection_finding(vf) for vf in raw_vision_findings]
+        # Step 4: Map Vision Engine findings to structured shared InspectionFindings
+        findings = [vision_finding_to_inspection_finding(vf) for vf in raw_vision_findings]
+    except Exception as exc:
+        failed_meta = dict(metadata or {})
+        err_msg = str(exc).strip() or f"{exc.__class__.__name__}: vision detection failed"
+        failed_meta.update({"error": err_msg, "run_id": actual_run_id, "url": target_url})
+        return PipelineResult(request=req, success=False, metadata=failed_meta)
 
     run_meta = {
         "run_id": actual_run_id,

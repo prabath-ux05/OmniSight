@@ -403,3 +403,77 @@ def test_orchestrator_enforces_proactor_loop_policy_on_windows():
         assert updated.status == "completed"
     finally:
         asyncio.set_event_loop_policy(original_policy)
+
+
+def test_run_response_enforces_non_empty_error_and_message_on_failure():
+    """Verify RunResponse schema enforces actionable error and message when status='failed'."""
+    from backend.app.schemas.runs import RunResponse
+
+    resp = RunResponse(
+        run_id="run_fail_test",
+        url="http://127.0.0.1:8000/",
+        status="failed",
+        created_at="2026-10-27T00:00:00Z",
+        message="",
+        error="",
+    )
+    assert resp.error == "Inspection run failed."
+    assert resp.message == "Inspection run failed."
+
+
+def test_run_response_masks_credentials_in_error_and_message():
+    """Verify sensitive tokens and keys in error strings are masked."""
+    from backend.app.schemas.runs import RunResponse
+
+    resp = RunResponse(
+        run_id="run_secret_test",
+        url="http://127.0.0.1:8000/",
+        status="failed",
+        created_at="2026-10-27T00:00:00Z",
+        error="API call failed: api_key=AIzaSy123456789SecretKey",
+        message="Request authorized with Bearer ghp_9876543210TokenValue failed",
+    )
+    assert "AIzaSy123456789SecretKey" not in resp.error
+    assert "***MASKED***" in resp.error
+    assert "ghp_9876543210TokenValue" not in resp.message
+    assert "***MASKED***" in resp.message
+
+
+def test_orchestrator_catches_navigator_factory_exception_safely():
+    """Verify orchestrator top-level error handling catches navigator setup crashes."""
+    def broken_factory():
+        raise RuntimeError("Chromium binary missing or crashed during launch")
+
+    orch = RunOrchestrator(navigator_factory=broken_factory)
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+
+    orch.execute_run(run.run_id, run.url)
+    updated = run_store.get(run.run_id)
+    assert updated is not None
+    assert updated.status == "failed"
+    assert "Chromium binary missing or crashed" in updated.error
+    assert "Orchestration error" in updated.message
+
+
+def test_pipeline_zero_findings_on_failure_does_not_mask_failed_status():
+    """Verify a pipeline failure with 0 findings is recorded as failed, never completed."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    mock_nav_result = NavigationResult(
+        run_id=run.run_id,
+        url=run.url,
+        page_title="",
+        captured_at="2026-10-25T00:00:00Z",
+        viewport={},
+        status="failed",
+        error="Browser crashed immediately",
+    )
+
+    with patch("navigation.navigator.BrowserNavigator.navigate", return_value=mock_nav_result):
+        run_orchestrator.execute_run(run.run_id, run.url)
+
+    updated = run_store.get(run.run_id)
+    assert updated is not None
+    assert updated.status == "failed"
+    assert updated.error == "Browser crashed immediately"
+    findings = run_store.get_findings(run.run_id)
+    assert len(findings) == 0
