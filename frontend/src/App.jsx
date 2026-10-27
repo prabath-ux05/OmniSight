@@ -11,6 +11,7 @@ import {
   fetchRun,
   fetchRunFindings,
   executeRunPipeline,
+  repairRunFinding,
 } from './services/api';
 import './App.css';
 
@@ -34,9 +35,15 @@ export default function App() {
   const [selectedFinding, setSelectedFinding] = useState(null);
   const [includeMockFindings, setIncludeMockFindings] = useState(false);
 
+  // Self-healing repairs state
+  const [repairs, setRepairs] = useState({});
+  const [repairingFindingId, setRepairingFindingId] = useState(null);
+  const [repairError, setRepairError] = useState('');
+
   // Alerts & notifications
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
 
   // Ref to prevent overlapping polling intervals
   const pollingTimerRef = useRef(null);
@@ -95,25 +102,29 @@ export default function App() {
     setFindings(null);
     setSelectedFinding(null);
     setFindingsError('');
+    setRepairs({});
+    setRepairError('');
 
-    const result = await createInspectionRun(targetUrl);
+    // 1. Submit real POST /api/v1/runs?auto_execute=true
+    const result = await createInspectionRun(targetUrl, true);
+
 
     if (result.ok) {
       const runData = result.data;
       setCurrentRun(runData);
       setSuccessMessage(
-        `Run '${runData.run_id}' initiated successfully! Initial status: ${runData.status.toUpperCase()}.`
+        `Run '${runData.run_id}' dispatched! Automated inspection pipeline active...`
       );
 
-      // Start auto-polling if run is not terminal
+      // Start auto-polling until terminal status (completed/failed)
       if (!TERMINAL_STATUSES.includes(runData.status)) {
         setIsAutoPolling(true);
       } else {
         setIsAutoPolling(false);
       }
 
-      // Fetch initial findings (default to clean findings list)
-      await loadFindings(runData.run_id, includeMockFindings);
+      // Load initial findings (default to real findings)
+      await loadFindings(runData.run_id, false);
     } else {
       setCurrentRun(null);
       setIsAutoPolling(false);
@@ -162,6 +173,8 @@ export default function App() {
     setFindings(null);
     setSelectedFinding(null);
     setFindingsError('');
+    setRepairs({});
+    setRepairError('');
 
     const result = await fetchRun(runId);
     if (result.ok) {
@@ -207,6 +220,33 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
+  // 7. Self-Healing Locator Repair Suggestion
+  // ---------------------------------------------------------------------------
+  const handleSuggestRepair = async (findingId, verifyLive = false) => {
+    if (!currentRun?.run_id) return;
+    setRepairingFindingId(findingId);
+    setRepairError('');
+
+    const result = await repairRunFinding(currentRun.run_id, findingId, verifyLive);
+    if (result.ok && result.data) {
+      const repairsList = Array.isArray(result.data) ? result.data : (result.data.repairs || []);
+      const matched = repairsList.find((r) => r.finding_id === findingId) || repairsList[0];
+      if (matched) {
+        setRepairs((prev) => ({
+          ...prev,
+          [findingId]: matched,
+        }));
+      }
+    } else {
+      setRepairError(result.error || 'Failed to generate repair candidates.');
+    }
+
+    setRepairingFindingId(null);
+  };
+
+
+
+  // ---------------------------------------------------------------------------
   // 7. Polling Lifecycle Effect (Day 14)
   // ---------------------------------------------------------------------------
   useEffect(() => {
@@ -224,7 +264,7 @@ export default function App() {
       return;
     }
 
-    // Poll every 4 seconds
+    // Poll every 2.5 seconds
     pollingTimerRef.current = setInterval(async () => {
       const result = await fetchRun(currentRun.run_id);
       if (result.ok) {
@@ -233,15 +273,21 @@ export default function App() {
 
         if (TERMINAL_STATUSES.includes(freshRun.status)) {
           setIsAutoPolling(false);
-          // Refresh findings upon run completion
-          loadFindings(freshRun.run_id, includeMockFindings);
+          // Refresh findings upon run completion (real detector findings)
+          await loadFindings(freshRun.run_id, false);
+
+          if (freshRun.status === 'completed') {
+            setSuccessMessage(`Run '${freshRun.run_id}' completed successfully!`);
+          } else if (freshRun.status === 'failed') {
+            setErrorMessage(`Run '${freshRun.run_id}' failed: ${freshRun.error || freshRun.message || 'Inspection pipeline failure'}`);
+          }
         }
       } else {
         // Stop polling on error (e.g. unknown run 404 or backend shutdown)
         setIsAutoPolling(false);
         setErrorMessage(`Polling stopped: ${result.error}`);
       }
-    }, 4000);
+    }, 2500);
 
     return () => {
       if (pollingTimerRef.current) {
@@ -249,7 +295,7 @@ export default function App() {
         pollingTimerRef.current = null;
       }
     };
-  }, [currentRun?.run_id, currentRun?.status, isAutoPolling, includeMockFindings, loadFindings]);
+  }, [currentRun?.run_id, currentRun?.status, isAutoPolling, loadFindings]);
 
   // ---------------------------------------------------------------------------
   // 8. Toggle Mock Findings (Day 15 testing both empty and populated states)
@@ -318,14 +364,22 @@ export default function App() {
             onToggleMockFindings={handleToggleMockFindings}
             onRefreshFindings={() => loadFindings(currentRun?.run_id, includeMockFindings)}
             findingsError={findingsError}
+            repairs={repairs}
+            onSuggestRepair={handleSuggestRepair}
+            repairingFindingId={repairingFindingId}
           />
 
           <EvidenceSection
             finding={selectedFinding}
             runId={currentRun?.run_id}
+            repair={selectedFinding ? repairs[selectedFinding.finding_id] : null}
+            isRepairing={selectedFinding && repairingFindingId === selectedFinding.finding_id}
+            repairError={repairError}
+            onSuggestRepair={(verifyLive) => selectedFinding && handleSuggestRepair(selectedFinding.finding_id, verifyLive)}
           />
         </div>
       </main>
+
 
       <footer className="dashboard-footer">
         <p>OmniSight &mdash; Multimodal UI Self-Healing &amp; RPA Agent Orchestration</p>

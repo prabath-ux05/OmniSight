@@ -5,9 +5,70 @@
  * Uses environment configuration (VITE_API_BASE_URL) rather than hardcoded URLs.
  */
 
-const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const RAW_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || '';
 // Strip trailing slashes for predictable endpoint concatenation
 const API_BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
+
+export const DEFAULT_DEMO_BASE_URL = 'http://127.0.0.1:8080/index.html';
+
+export const DEMO_STATE_PARAMS = {
+  clean: { state: 'clean' },
+  overflow: { defect: 'overflow' },
+  missing: { defect: 'missing' },
+  image: { defect: 'image' },
+  all: { defects: 'all' },
+};
+
+export const DEMO_STATES = [
+  { id: 'clean', label: 'Clean', defect: 'clean', description: 'Baseline error-free target state (?state=clean)' },
+  { id: 'overflow', label: 'Overflow', defect: 'overflow', description: 'Horizontal layout text overflow (?defect=overflow)' },
+  { id: 'missing', label: 'Missing Element', defect: 'missing', description: 'Missing CTA button locator (?defect=missing)' },
+  { id: 'image', label: 'Broken Image', defect: 'image', description: 'Broken 404 topology diagram (?defect=image)' },
+  { id: 'all', label: 'All Defects', defect: 'all', description: 'Simultaneous combination of all defects (?defects=all)' },
+];
+
+/**
+ * Builds a demo site URL following the repository construct_demo_url convention.
+ *
+ * @param {string} baseUrl - Base URL or existing full URL
+ * @param {string} state - One of 'clean', 'overflow', 'missing', 'image', 'all'
+ * @returns {string} Fully qualified URL with corresponding demo query parameters
+ */
+export function constructDemoUrl(baseUrl, state = 'clean') {
+  let raw = (baseUrl || '').trim() || DEFAULT_DEMO_BASE_URL;
+
+  // Add scheme if omitted
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    raw = `http://${raw}`;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    parsed = new URL(DEFAULT_DEMO_BASE_URL);
+  }
+
+  // Clear existing state/defect parameters
+  const defectKeys = [
+    'defect',
+    'defects',
+    'state',
+    'baseline',
+    'defect_overflow',
+    'defect_missing',
+    'defect_broken_image',
+  ];
+  defectKeys.forEach((key) => parsed.searchParams.delete(key));
+
+  const stateKey = (state || 'clean').toLowerCase();
+  const params = DEMO_STATE_PARAMS[stateKey] || { state: 'clean' };
+  Object.entries(params).forEach(([k, v]) => {
+    parsed.searchParams.set(k, v);
+  });
+
+  return parsed.toString();
+}
 
 /**
  * Returns the effective backend URL description for user-facing diagnostic messages.
@@ -249,6 +310,223 @@ export async function fetchRunFindings(runId, includeMock = false) {
     const errData = await res.json().catch(() => null);
     const errorMsg = parseApiErrorDetail(errData, `Findings for run '${runId}' could not be retrieved.`);
     return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Request locator repair suggestions for a run finding (POST /api/v1/runs/{run_id}/repair)
+ *
+ * @param {string} runId - Run identifier
+ * @param {string} [findingId] - Optional specific finding ID
+ * @param {boolean} [verifyLive=false] - Whether to verify candidate locator against live target page
+ * @returns {Promise<{ ok: boolean, data?: object[], error?: string, status?: number }>}
+ */
+export async function repairRunFinding(runId, findingId = null, verifyLive = false) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+
+  const cleanRun = encodeURIComponent(runId.trim());
+  const params = new URLSearchParams();
+  if (findingId) params.set('finding_id', findingId.trim());
+  if (verifyLive) params.set('verify_live', 'true');
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${cleanRun}/repair${query}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+    });
+
+    if (res.ok) {
+      const repairData = await res.json();
+      return { ok: true, data: repairData };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(
+      errData,
+      `Failed to generate repair suggestions for run '${runId}'.`
+    );
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Inspect VLM provider configuration status (GET /api/v1/runs/vlm/config)
+ */
+export async function fetchVLMConfig(provider = null) {
+  const query = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+  const url = `${API_BASE_URL}/api/v1/runs/vlm/config${query}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `VLM config check failed with HTTP ${res.status}`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Inspect GitHub integration configuration status (GET /api/v1/github/config)
+ */
+export async function fetchGitHubConfig() {
+  const url = `${API_BASE_URL}/api/v1/github/config`;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `GitHub config check failed with HTTP ${res.status}`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Generate or fetch reviewable repair proposals (POST /api/v1/runs/{run_id}/proposals)
+ */
+export async function fetchRunProposals(runId, payload = null) {
+  if (!runId || typeof runId !== 'string' || !runId.trim()) {
+    return { ok: false, error: 'Cannot fetch proposals: invalid or empty run ID.' };
+  }
+  const cleanId = encodeURIComponent(runId.trim());
+  const url = `${API_BASE_URL}/api/v1/runs/${cleanId}/proposals`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Failed to generate proposals (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Generate a safe minimal diff patch for a proposal (POST /api/v1/runs/{run_id}/proposals/{proposal_id}/patch)
+ */
+export async function generateProposalPatch(runId, proposalId, targetFile, workspaceRoot = null) {
+  if (!runId || !proposalId || !targetFile) {
+    return { ok: false, error: 'runId, proposalId, and targetFile are required for patch generation.' };
+  }
+  const cleanRunId = encodeURIComponent(runId.trim());
+  const cleanPropId = encodeURIComponent(proposalId.trim());
+  const url = `${API_BASE_URL}/api/v1/runs/${cleanRunId}/proposals/${cleanPropId}/patch`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        target_file: targetFile.trim(),
+        workspace_root: workspaceRoot ? workspaceRoot.trim() : null,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Patch generation failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Submit an approved proposal to GitHub with user approval check (POST /api/v1/runs/{run_id}/proposals/{proposal_id}/pull-request)
+ */
+export async function submitProposalPR(runId, proposalId, options = {}) {
+  const { userApproved = false, targetFile = null, baseBranch = null, simulate = false } = options;
+  if (!userApproved) {
+    return {
+      ok: false,
+      error: 'Submission blocked by approval gate: explicit user confirmation is required.',
+      isApprovalBlocked: true,
+    };
+  }
+  const cleanRunId = encodeURIComponent(runId.trim());
+  const cleanPropId = encodeURIComponent(proposalId.trim());
+  const url = `${API_BASE_URL}/api/v1/runs/${cleanRunId}/proposals/${cleanPropId}/pull-request`;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        user_approved: true,
+        target_file: targetFile,
+        base_branch: baseBranch,
+        simulate: Boolean(simulate),
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Pull request creation failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
   } catch (err) {
     return {
       ok: false,
