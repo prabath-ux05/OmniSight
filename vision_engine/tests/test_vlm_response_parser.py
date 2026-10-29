@@ -84,3 +84,32 @@ def test_reject_finding_with_wrong_source():
 def test_reject_non_object_finding():
     with pytest.raises(ValueError, match="JSON object"):
         parse_vlm_response(json.dumps(["not a finding"]))
+
+
+def test_reject_duplicate_finding_ids():
+    first_finding = make_valid_finding()
+    second_finding = make_valid_finding()
+
+    second_finding["category"] = "layout_overflow"
+    second_finding["description"] = "A layout overflow was detected."
+
+    response = json.dumps([first_finding, second_finding])
+
+    with pytest.raises(ValueError, match="Duplicate finding_id"):
+        parse_vlm_response(response)
+
+
+def test_accept_findings_with_unique_ids():
+    first_finding = make_valid_finding()
+    second_finding = make_valid_finding()
+
+    second_finding["finding_id"] = "finding-002"
+    second_finding["category"] = "layout_overflow"
+
+    response = json.dumps([first_finding, second_finding])
+
+    findings = parse_vlm_response(response)
+
+    assert len(findings) == 2
+    assert findings[0].finding_id == "finding-001"
+    assert findings[1].finding_id == "finding-002"

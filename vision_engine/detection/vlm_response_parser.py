@@ -12,8 +12,8 @@ def parse_vlm_response(response: str) -> list[VisionFinding]:
 
     Raises:
         ValueError: If the response is invalid JSON, is not a JSON array,
-            contains malformed findings, or contains findings not marked
-            as originating from a VLM.
+            contains malformed findings, contains duplicate finding IDs,
+            or contains findings not marked as originating from a VLM.
     """
     try:
         data = json.loads(response)
@@ -24,6 +24,7 @@ def parse_vlm_response(response: str) -> list[VisionFinding]:
         raise ValueError("VLM response must be a JSON array.")
 
     findings: list[VisionFinding] = []
+    seen_finding_ids: set[str] = set()
 
     for index, item in enumerate(data):
         if not isinstance(item, dict):
@@ -43,6 +44,13 @@ def parse_vlm_response(response: str) -> list[VisionFinding]:
                 f"Finding at index {index} failed schema validation: {exc}"
             ) from exc
 
+        if finding.finding_id in seen_finding_ids:
+            raise ValueError(
+                f"Duplicate finding_id '{finding.finding_id}' "
+                f"at index {index}."
+            )
+
+        seen_finding_ids.add(finding.finding_id)
         findings.append(finding)
 
     return findings
