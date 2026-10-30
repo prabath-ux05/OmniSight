@@ -7,16 +7,35 @@ from pydantic import ValidationError
 from vision_engine.models import VisionFinding
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict:
+    """Build a dictionary while rejecting duplicate JSON object keys."""
+    result = {}
+
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(
+                f"VLM response contains duplicate JSON key '{key}'."
+            )
+
+        result[key] = value
+
+    return result
+
+
 def parse_vlm_response(response: str) -> list[VisionFinding]:
     """Parse a JSON array and validate every VLM finding.
 
     Raises:
-        ValueError: If the response is invalid JSON, is not a JSON array,
-            contains malformed findings, contains duplicate finding IDs,
-            or contains findings not marked as originating from a VLM.
+        ValueError: If the response is invalid JSON, contains duplicate
+            JSON keys, is not a JSON array, contains malformed findings,
+            contains duplicate finding IDs, or contains findings not
+            marked as originating from a VLM.
     """
     try:
-        data = json.loads(response)
+        data = json.loads(
+            response,
+            object_pairs_hook=_reject_duplicate_json_keys,
+        )
     except (json.JSONDecodeError, TypeError) as exc:
         raise ValueError("VLM response must contain valid JSON.") from exc
 

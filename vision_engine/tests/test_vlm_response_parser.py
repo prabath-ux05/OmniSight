@@ -113,3 +113,47 @@ def test_accept_findings_with_unique_ids():
     assert len(findings) == 2
     assert findings[0].finding_id == "finding-001"
     assert findings[1].finding_id == "finding-002"
+
+
+def test_reject_duplicate_json_keys():
+    response = """
+    [
+        {
+            "finding_id": "finding-001",
+            "finding_id": "finding-002",
+            "category": "broken_image",
+            "severity": "high",
+            "confidence": 0.95,
+            "description": "An image appears to be broken.",
+            "source": "vlm",
+            "evidence": {
+                "screenshot_path": "evidence/screenshot.png"
+            }
+        }
+    ]
+    """
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        parse_vlm_response(response)
+
+
+def test_reject_duplicate_nested_json_keys():
+    response = """
+    [
+        {
+            "finding_id": "finding-001",
+            "category": "broken_image",
+            "severity": "high",
+            "confidence": 0.95,
+            "description": "An image appears to be broken.",
+            "source": "vlm",
+            "evidence": {
+                "screenshot_path": "evidence/screenshot.png",
+                "screenshot_path": "evidence/other.png"
+            }
+        }
+    ]
+    """
+
+    with pytest.raises(ValueError, match="duplicate JSON key"):
+        parse_vlm_response(response)
