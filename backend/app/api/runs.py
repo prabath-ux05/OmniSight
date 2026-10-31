@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/v1", tags=["Runs"])
 
 
 def _validate_run_id(run_id: str) -> str:
-    """Validate run_id format and reject empty or whitespace identifiers."""
+    """Validate run_id format and reject empty, whitespace, or oversized identifiers."""
     cleaned = unquote(run_id).strip() if run_id else ""
     if not cleaned:
         logger.warning("Rejected invalid empty or whitespace run_id: %r", run_id)
@@ -18,9 +18,13 @@ def _validate_run_id(run_id: str) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid run_id: identifier must not be empty or whitespace.",
         )
+    if len(cleaned) > 128:
+        logger.warning("Rejected oversized run_id (%d characters)", len(cleaned))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid run_id: identifier exceeds maximum allowed length of 128 characters.",
+        )
     return cleaned
-
-
 
 
 @router.post(
@@ -68,6 +72,7 @@ def create_run(
         200: {"model": RunResponse, "description": "Run execution started"},
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "Run not found"},
+        409: {"model": ErrorResponse, "description": "Run is already executing"},
     },
 )
 def execute_run_pipeline(
@@ -81,6 +86,14 @@ def execute_run_pipeline(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
+        )
+
+    # Concurrency guard: prevent duplicate simultaneous pipeline runs
+    if run.status in ("capturing", "analyzing"):
+        logger.warning("Pipeline execution rejected: run '%s' is already in state '%s'", clean_id, run.status)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Run '{clean_id}' is already executing (status: {run.status}).",
         )
 
     from backend.app.services.orchestrator import run_orchestrator
@@ -151,5 +164,3 @@ def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingRes
         from backend.app.services.run_store import create_mock_findings
         return create_mock_findings(clean_id)
     return findings
-
-
