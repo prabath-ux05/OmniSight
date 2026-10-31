@@ -49,6 +49,10 @@ class RunResponse(BaseModel):
         ...,
         description="ISO-8601 UTC timestamp of run creation",
     )
+    completed_at: str | None = Field(
+        default=None,
+        description="ISO-8601 UTC timestamp of run completion or failure",
+    )
     message: str = Field(
         default="Run created successfully and queued for inspection.",
         description="Descriptive status message",
