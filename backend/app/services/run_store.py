@@ -19,6 +19,8 @@ import uuid
 from backend.app.schemas.findings import EvidenceReferences, FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
 
+_UNSET = object()
+
 
 class RunStore:
     """In-memory repository managing inspection runs and defect findings."""
@@ -41,6 +43,7 @@ class RunStore:
             url=str(request.url),
             status="queued",
             created_at=created_at,
+            completed_at=None,
             message="Run created successfully and queued for inspection.",
         )
         self._runs[run_id] = run
@@ -71,9 +74,10 @@ class RunStore:
         *,
         status: str | None = None,
         message: str | None = None,
-        error: str | None = None,
+        error: str | None | object = _UNSET,
+        completed_at: str | None | object = _UNSET,
     ) -> RunResponse | None:
-        """Update mutable status and message fields of an existing run."""
+        """Update mutable status, message, error, and timestamp fields of an existing run."""
         existing = self._runs.get(run_id)
         if not existing:
             return None
@@ -81,10 +85,15 @@ class RunStore:
         updated_dict = existing.model_dump()
         if status is not None:
             updated_dict["status"] = status
+            if status in ("completed", "failed", "cancelled") and completed_at is _UNSET and not updated_dict.get("completed_at"):
+                updated_dict["completed_at"] = datetime.now(timezone.utc).isoformat()
+
         if message is not None:
             updated_dict["message"] = message
-        if error is not None:
+        if error is not _UNSET:
             updated_dict["error"] = error
+        if completed_at is not _UNSET:
+            updated_dict["completed_at"] = completed_at
 
         updated_run = RunResponse(**updated_dict)
         self._runs[run_id] = updated_run
@@ -129,4 +138,3 @@ def create_mock_findings(run_id: str) -> list[FindingResponse]:
             source="mock",
         ),
     ]
-
