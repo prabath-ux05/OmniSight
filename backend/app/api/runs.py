@@ -1,6 +1,7 @@
 from urllib.parse import unquote
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from backend.app.core.logging import logger
+from backend.app.db.session import DatabaseConnectionError
 from backend.app.schemas.errors import ErrorResponse
 from backend.app.schemas.findings import FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
@@ -34,12 +35,13 @@ def _validate_run_id(run_id: str) -> str:
     summary="Create an inspection run",
     description=(
         "Validates the incoming run configuration, generates a unique run_id, "
-        "and registers the run in the initial 'queued' status. "
+        "and registers the run in the initial 'queued' status in PostgreSQL. "
         "Optionally schedules real browser capture and vision analysis."
     ),
     responses={
         201: {"model": RunResponse, "description": "Run created and queued successfully"},
         422: {"description": "Request payload validation error (e.g. missing or malformed URL)"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
 def create_run(
@@ -49,7 +51,15 @@ def create_run(
 ) -> RunResponse:
     """Validate request and create a new inspection run in 'queued' status."""
     logger.info("Received run creation request for URL: %s", payload.url)
-    run = run_store.create(payload)
+    try:
+        run = run_store.create(payload)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to persist run in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
     logger.info("Run created successfully with ID: %s (status=%s)", run.run_id, run.status)
 
     if auto_execute and background_tasks is not None:
@@ -73,6 +83,7 @@ def create_run(
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "Run not found"},
         409: {"model": ErrorResponse, "description": "Run is already executing"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
 def execute_run_pipeline(
@@ -81,7 +92,15 @@ def execute_run_pipeline(
 ) -> RunResponse:
     """Execute browser capture and vision engine analysis for an existing run."""
     clean_id = _validate_run_id(run_id)
-    run = run_store.get(clean_id)
+    try:
+        run = run_store.get(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query run in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
     if not run:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -103,7 +122,10 @@ def execute_run_pipeline(
     else:
         run_orchestrator.execute_run(run.run_id, run.url)
 
-    return run_store.get(clean_id) or run
+    try:
+        return run_store.get(clean_id) or run
+    except DatabaseConnectionError:
+        return run
 
 
 @router.get(
@@ -112,19 +134,28 @@ def execute_run_pipeline(
     status_code=status.HTTP_200_OK,
     summary="Get run status and metadata",
     description=(
-        "Retrieves the current status and relevant metadata for an existing inspection run. "
+        "Retrieves the current status and relevant metadata for an existing inspection run from PostgreSQL. "
         "Returns 404 if the run_id does not exist."
     ),
     responses={
         200: {"model": RunResponse, "description": "Run details retrieved successfully"},
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "Run not found"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
 def get_run(run_id: str) -> RunResponse:
-    """Retrieve run status and metadata by run_id."""
+    """Retrieve run status and metadata by run_id from PostgreSQL."""
     clean_id = _validate_run_id(run_id)
-    run = run_store.get(clean_id)
+    try:
+        run = run_store.get(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query run in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
     if not run:
         logger.warning("Run lookup failed: run_id '%s' not found.", clean_id)
         raise HTTPException(
@@ -140,7 +171,7 @@ def get_run(run_id: str) -> RunResponse:
     status_code=status.HTTP_200_OK,
     summary="Get findings for an inspection run",
     description=(
-        "Retrieves structured UI defect findings for an existing inspection run. "
+        "Retrieves structured UI defect findings for an existing inspection run from PostgreSQL. "
         "Returns an empty list if no defects were detected. "
         "Returns 404 if the run_id does not exist."
     ),
@@ -148,12 +179,21 @@ def get_run(run_id: str) -> RunResponse:
         200: {"description": "List of findings (empty array if no defects detected)"},
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "Run not found"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
 def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingResponse]:
-    """Retrieve structured defect findings by run_id."""
+    """Retrieve structured defect findings by run_id from PostgreSQL."""
     clean_id = _validate_run_id(run_id)
-    findings = run_store.get_findings(clean_id)
+    try:
+        findings = run_store.get_findings(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query findings in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
     if findings is None:
         logger.warning("Findings lookup failed: run_id '%s' not found.", clean_id)
         raise HTTPException(
