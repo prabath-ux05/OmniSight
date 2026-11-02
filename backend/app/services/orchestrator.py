@@ -71,6 +71,29 @@ class RunOrchestrator:
             )
             return
 
+        # Record generated evidence artifacts in database
+        if nav_result.screenshot_path and Path(nav_result.screenshot_path).is_file():
+            try:
+                run_store.record_artifact(
+                    run_id=run_id,
+                    artifact_type="screenshot",
+                    storage_path=nav_result.screenshot_path,
+                    content_type="image/png",
+                )
+            except Exception as art_err:
+                logger.warning("Could not persist screenshot artifact record: %s", str(art_err))
+
+        if nav_result.dom_snapshot_path and Path(nav_result.dom_snapshot_path).is_file():
+            try:
+                run_store.record_artifact(
+                    run_id=run_id,
+                    artifact_type="dom_snapshot",
+                    storage_path=nav_result.dom_snapshot_path,
+                    content_type="text/html",
+                )
+            except Exception as art_err:
+                logger.warning("Could not persist DOM snapshot artifact record: %s", str(art_err))
+
         # ---------------------------------------------------------------------
         # Stage 2: Vision & Intelligence Analysis (Jay's module)
         # ---------------------------------------------------------------------
