@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.api.artifacts import router as artifacts_router
 from backend.app.api.health import router as health_router
+from backend.app.api.proposals import router as proposals_router
 from backend.app.api.runs import router as runs_router
 from backend.app.core.logging import logger
 from backend.app.db.session import check_db_connection, init_db
@@ -58,3 +59,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(runs_router)
 app.include_router(artifacts_router)
+app.include_router(proposals_router)
