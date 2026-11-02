@@ -2,6 +2,7 @@ from urllib.parse import unquote
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from backend.app.core.logging import logger
 from backend.app.db.session import DatabaseConnectionError
+from backend.app.schemas.artifacts import ArtifactResponse
 from backend.app.schemas.errors import ErrorResponse
 from backend.app.schemas.findings import FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
@@ -204,3 +205,40 @@ def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingRes
         from backend.app.services.run_store import create_mock_findings
         return create_mock_findings(clean_id)
     return findings
+
+
+@router.get(
+    "/runs/{run_id}/artifacts",
+    response_model=list[ArtifactResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Get recorded artifacts for an inspection run",
+    description=(
+        "Retrieves metadata and download references for all visual and DOM artifacts "
+        "recorded in PostgreSQL for an existing inspection run."
+    ),
+    responses={
+        200: {"description": "List of recorded artifact records"},
+        400: {"model": ErrorResponse, "description": "Invalid run_id format"},
+        404: {"model": ErrorResponse, "description": "Run not found"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def get_run_artifacts(run_id: str) -> list[ArtifactResponse]:
+    """Retrieve recorded artifact metadata for a run."""
+    clean_id = _validate_run_id(run_id)
+    try:
+        artifacts = run_store.get_artifacts(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query artifacts in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+    if artifacts is None:
+        logger.warning("Artifacts lookup failed: run_id '%s' not found.", clean_id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_id}' not found.",
+        )
+    return artifacts
