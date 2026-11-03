@@ -70,6 +70,32 @@ def create_run(
     return run
 
 
+@router.get(
+    "/runs",
+    response_model=list[RunResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List all inspection runs",
+    description=(
+        "Retrieves all inspection runs recorded in PostgreSQL, ordered by creation time descending. "
+        "Returns an empty list if no runs have been initiated."
+    ),
+    responses={
+        200: {"description": "List of inspection runs"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def list_runs() -> list[RunResponse]:
+    """Retrieve all stored runs ordered by creation time descending."""
+    try:
+        return run_store.list_all()
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query runs in database: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+
 @router.post(
     "/runs/{run_id}/execute",
     response_model=RunResponse,
