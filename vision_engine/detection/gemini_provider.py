@@ -14,7 +14,7 @@ from google import genai
 
 from vision_engine.detection.vlm_response_parser import parse_vlm_response
 from vision_engine.image_processing import crop_screenshot
-from vision_engine.models import VisionFinding, VisionInput
+from vision_engine.models import EvidenceReferences, VisionFinding, VisionInput
 from vision_engine.prompting.vlm_prompt import build_vlm_prompt
 
 
@@ -27,7 +27,7 @@ class GeminiVLMDetector:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gemini-3.8-flash",
+        model: str = "gemini-3.5-flash-lite",
         timeout_seconds: float = 30.0,
         client: Any | None = None,
     ) -> None:
@@ -209,4 +209,12 @@ class GeminiVLMDetector:
         if not isinstance(response_text, str) or not response_text.strip():
             raise ValueError("Gemini returned an empty text response.")
 
-        return parse_vlm_response(response_text)
+        findings = parse_vlm_response(response_text)
+
+        for finding in findings:
+            finding.evidence = EvidenceReferences(
+                screenshot_path=input_data.screenshot_path,
+                dom_snapshot_path=input_data.dom_snapshot_path,
+            )
+
+        return findings
