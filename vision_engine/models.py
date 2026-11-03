@@ -1,3 +1,4 @@
+
 """Data models for the OmniSight Vision Engine."""
 
 from typing import Literal
@@ -18,12 +19,18 @@ class VisionInput(BaseModel):
         default=None, min_length=1, pattern=r".*\S.*"
     )
 
+    crop_box: "BoundingBox | None" = None
+
     @model_validator(mode="after")
     def require_some_evidence(self):
         if not self.screenshot_path and not self.dom_snapshot_path:
             raise ValueError(
                 "At least a screenshot path or DOM snapshot path is required."
             )
+
+        if self.crop_box is not None and not self.screenshot_path:
+            raise ValueError("A crop box requires a screenshot path.")
+
         return self
 
 
@@ -37,10 +44,10 @@ class EvidenceReferences(BaseModel):
 class BoundingBox(BaseModel):
     """Coordinates of a detected UI defect."""
 
-    x: float
-    y: float
-    width: float = Field(ge=0)
-    height: float = Field(ge=0)
+    x: float = Field(ge=0)
+    y: float = Field(ge=0)
+    width: float = Field(gt=0)
+    height: float = Field(gt=0)
 
 
 class VisionFinding(BaseModel):

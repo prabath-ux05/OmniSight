@@ -1,10 +1,13 @@
+from PIL import Image
+from vision_engine.models import BoundingBox
+
 import base64
 from types import SimpleNamespace
 
 import pytest
 
 from vision_engine.detection.gemini_provider import GeminiVLMDetector
-from vision_engine.models import VisionInput
+from vision_engine.models import BoundingBox, VisionInput
 
 
 class FakeInteractions:
@@ -240,3 +243,97 @@ def test_provider_does_not_retry_non_retryable_error(monkeypatch, tmp_path):
         detector.detect(input_data)
 
     assert client.interactions.calls == 1
+
+
+
+def test_provider_sends_cropped_screenshot_to_gemini(tmp_path):
+    client = FakeClient(output_text="[]")
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "screenshot.png"
+    Image.new("RGB", (200, 150), "white").save(screenshot_path)
+
+    input_data = VisionInput(
+        run_id="crop-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_box=BoundingBox(
+            x=50,
+            y=40,
+            width=60,
+            height=30,
+        ),
+    )
+
+    findings = detector.detect(input_data)
+
+    sent_image = client.interactions.received["input"][1]
+
+    assert findings == []
+    assert sent_image["type"] == "image"
+    assert sent_image["mime_type"] == "image/png"
+
+    decoded_image = base64.b64decode(sent_image["data"])
+
+    from io import BytesIO
+
+    with Image.open(BytesIO(decoded_image)) as image:
+        assert image.size == (100, 70)
+
+
+def test_provider_falls_back_to_original_when_cropping_fails(
+    tmp_path,
+    monkeypatch,
+):
+    client = FakeClient(output_text="[]")
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "screenshot.png"
+    screenshot_path.write_bytes(b"original-screenshot-data")
+
+    input_data = VisionInput(
+        run_id="crop-fallback-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_box=BoundingBox(
+            x=50,
+            y=40,
+            width=60,
+            height=30,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "vision_engine.detection.gemini_provider.crop_screenshot",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ValueError("Cropping failed")
+        ),
+    )
+
+    findings = detector.detect(input_data)
+
+    sent_image = client.interactions.received["input"][1]
+
+    assert findings == []
+    assert base64.b64decode(sent_image["data"]) == b"original-screenshot-data"
+
+
+def test_provider_sends_original_screenshot_without_crop_box(tmp_path):
+    client = FakeClient(output_text="[]")
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "screenshot.png"
+    screenshot_path.write_bytes(b"original-screenshot-data")
+
+    input_data = VisionInput(
+        run_id="original-image-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+    )
+
+    findings = detector.detect(input_data)
+
+    sent_image = client.interactions.received["input"][1]
+
+    assert findings == []
+    assert base64.b64decode(sent_image["data"]) == b"original-screenshot-data"

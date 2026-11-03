@@ -5,6 +5,7 @@ import base64
 import mimetypes
 import os
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from dotenv import load_dotenv
 from google import genai
 
 from vision_engine.detection.vlm_response_parser import parse_vlm_response
+from vision_engine.image_processing import crop_screenshot
 from vision_engine.models import VisionFinding, VisionInput
 from vision_engine.prompting.vlm_prompt import build_vlm_prompt
 
@@ -56,7 +58,7 @@ class GeminiVLMDetector:
 
     @staticmethod
     def _read_screenshot(path: str) -> dict:
-        """Read screenshot bytes and prepare an image input for Gemini."""
+        """Read the original screenshot for Gemini."""
         screenshot = Path(path)
 
         if not screenshot.is_file():
@@ -78,6 +80,28 @@ class GeminiVLMDetector:
             "type": "image",
             "data": base64.b64encode(image_data).decode("ascii"),
             "mime_type": mime_type,
+        }
+
+    @staticmethod
+    def _read_cropped_screenshot(
+        path: str,
+        crop_box: Any,
+    ) -> dict:
+        """Crop a screenshot and prepare the crop as PNG for Gemini."""
+        cropped_image = crop_screenshot(path, crop_box)
+
+        image_buffer = BytesIO()
+        cropped_image.save(image_buffer, format="PNG")
+
+        image_data = image_buffer.getvalue()
+
+        if not image_data:
+            raise ValueError("Cropped screenshot is empty.")
+
+        return {
+            "type": "image",
+            "data": base64.b64encode(image_data).decode("ascii"),
+            "mime_type": "image/png",
         }
 
     @staticmethod
@@ -118,9 +142,22 @@ class GeminiVLMDetector:
         ]
 
         if input_data.screenshot_path:
-            request_input.append(
-                self._read_screenshot(input_data.screenshot_path)
-            )
+            if input_data.crop_box is not None:
+                try:
+                    screenshot_input = self._read_cropped_screenshot(
+                        input_data.screenshot_path,
+                        input_data.crop_box,
+                    )
+                except Exception:
+                    screenshot_input = self._read_screenshot(
+                        input_data.screenshot_path
+                    )
+            else:
+                screenshot_input = self._read_screenshot(
+                    input_data.screenshot_path
+                )
+
+            request_input.append(screenshot_input)
 
         if input_data.dom_snapshot_path:
             dom_text = self._read_dom(input_data.dom_snapshot_path)
