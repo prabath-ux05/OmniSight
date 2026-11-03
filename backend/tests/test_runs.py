@@ -473,3 +473,25 @@ def test_validate_run_id_rejects_oversized_identifiers():
     assert findings_status == 400
     assert "detail" in findings_data
     assert "128 characters" in findings_data["detail"]
+
+
+def test_list_runs_endpoint():
+    """Verify GET /api/v1/runs retrieves all stored runs in descending order."""
+    # When empty
+    status_code, data = asyncio.run(dispatch_asgi_get("/api/v1/runs"))
+    assert status_code == 200
+    assert data == []
+
+    # Create two runs
+    run1 = run_store.create(RunCreateRequest(url="https://example.com/one"))
+    run2 = run_store.create(RunCreateRequest(url="https://example.com/two"))
+
+    status_code, data = asyncio.run(dispatch_asgi_get("/api/v1/runs"))
+    assert status_code == 200
+    assert len(data) == 2
+    # Check descending order: run2 was created after run1
+    assert data[0]["run_id"] == run2.run_id
+    assert data[0]["url"] == "https://example.com/two"
+    assert data[1]["run_id"] == run1.run_id
+    assert data[1]["url"] == "https://example.com/one"
+
