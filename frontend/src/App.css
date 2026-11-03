@@ -983,4 +983,459 @@
   border-radius: 4px;
 }
 
+/* ==========================================================================
+   Day 4: Navigation Tabs, Inspection History, & Repair Approval Workflow
+   ========================================================================== */
+
+/* Navigation Tabs */
+.dashboard-nav-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.nav-tab-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-main);
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab-active {
+  color: #c7d2fe;
+  background-color: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.35);
+  font-weight: 600;
+}
+
+/* Inspection History Table */
+.history-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.history-search-group {
+  flex: 1;
+  min-width: 260px;
+}
+
+.history-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.filter-select {
+  min-width: 150px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.history-table th {
+  padding: 0.75rem 1rem;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 0.8125rem;
+  vertical-align: middle;
+}
+
+.history-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.history-row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.history-row-selected {
+  background-color: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid #6366f1;
+}
+
+.history-url-cell {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  color: var(--text-main);
+}
+
+.timestamp-cell {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.run-id-pill {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  color: #93c5fd;
+}
+
+/* Repair Proposal Workflow & Governance */
+.proposals-workflow-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.proposal-header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.governance-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background-color: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+  padding: 0.875rem 1.125rem;
+  margin-bottom: 1.25rem;
+}
+
+.governance-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.governance-text {
+  font-size: 0.8125rem;
+  color: #bfdbfe;
+  line-height: 1.45;
+}
+
+.proposals-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.filter-pills {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.filter-pill {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  color: var(--text-main);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.filter-pill-active {
+  background-color: rgba(99, 102, 241, 0.2);
+  border-color: #6366f1;
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+/* Proposal Cards */
+.proposals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.proposal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 1.25rem;
+  transition: border-color 0.2s ease;
+}
+
+.proposal-pending {
+  border-left: 4px solid #f59e0b;
+}
+
+.proposal-approved {
+  border-left: 4px solid #10b981;
+}
+
+.proposal-rejected {
+  border-left: 4px solid #ef4444;
+}
+
+.proposal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.proposal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.proposal-id-tag {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.proposal-id-tag code {
+  color: #93c5fd;
+  font-family: var(--font-mono);
+}
+
+.proposal-finding-tag {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+
+.proposal-finding-tag code {
+  color: #c4b5fd;
+  font-family: var(--font-mono);
+}
+
+.proposal-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.badge-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge-caption {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.proposal-body {
+  margin-bottom: 1rem;
+}
+
+.proposal-body-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.patch-diff-box {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.875rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: #e2e8f0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.proposal-meta-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.proposal-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Proposal Review Actions */
+.proposal-review-section {
+  margin-top: 0.5rem;
+}
+
+.review-action-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.review-notes-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.review-notes-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.review-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-success {
+  background-color: #059669;
+  color: #ffffff;
+  border: 1px solid #10b981;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #047857;
+}
+
+.review-decision-recorded {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  padding: 0.625rem 0.875rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.decision-icon {
+  font-size: 1.125rem;
+}
+
+/* Proposal Create Form */
+.proposal-create-form {
+  margin-bottom: 1.5rem;
+  background-color: var(--bg-card);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  padding: 1.25rem;
+  border-radius: 8px;
+}
+
+.form-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.25rem;
+}
+
+.form-section-description {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Shortcut Card in Live Inspection */
+.proposals-shortcut-card {
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 8px;
+}
+
+.shortcut-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.shortcut-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #c7d2fe;
+  margin-bottom: 0.25rem;
+}
+
+.shortcut-desc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+
 
