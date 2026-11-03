@@ -257,3 +257,213 @@ export async function fetchRunFindings(runId, includeMock = false) {
     };
   }
 }
+
+/**
+ * Retrieve all historical inspection runs (GET /api/v1/runs)
+ */
+export async function fetchInspectionRuns() {
+  const endpoint = `${API_BASE_URL}/api/v1/runs`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const runs = await res.json();
+      return { ok: true, data: runs };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to fetch runs history (HTTP ${res.status}).`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Retrieve recorded artifact metadata for a run (GET /api/v1/runs/{run_id}/artifacts)
+ */
+export async function fetchRunArtifacts(runId) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/artifacts`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const artifacts = await res.json();
+      return { ok: true, data: artifacts };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Artifacts for run '${runId}' could not be retrieved.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Retrieve repair proposals for a run (GET /api/v1/runs/{run_id}/proposals)
+ */
+export async function fetchRunProposals(runId, findingId = null) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const query = findingId ? `?finding_id=${encodeURIComponent(findingId.trim())}` : '';
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals${query}`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const proposals = await res.json();
+      return { ok: true, data: proposals };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Proposals for run '${runId}' could not be retrieved.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Create a new repair proposal for a run (POST /api/v1/runs/{run_id}/proposals)
+ */
+export async function createRepairProposal(runId, payload) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 201) {
+      const proposal = await res.json();
+      return { ok: true, data: proposal };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to create proposal (HTTP ${res.status}).`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Approve a repair proposal (POST /api/v1/proposals/{proposal_id}/approve)
+ */
+export async function approveProposal(proposalId, reviewerNotes = '') {
+  if (!proposalId || !proposalId.trim()) {
+    return { ok: false, error: 'Proposal ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/approve`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ notes: reviewerNotes || null }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      return { ok: true, data: updated };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to approve proposal '${proposalId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Reject a repair proposal (POST /api/v1/proposals/{proposal_id}/reject)
+ */
+export async function rejectProposal(proposalId, reviewerNotes = '') {
+  if (!proposalId || !proposalId.trim()) {
+    return { ok: false, error: 'Proposal ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/reject`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ notes: reviewerNotes || null }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      return { ok: true, data: updated };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to reject proposal '${proposalId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Retrieve status summary of a repair proposal (GET /api/v1/proposals/{proposal_id}/status)
+ */
+export async function fetchProposalStatus(proposalId) {
+  if (!proposalId || !proposalId.trim()) {
+    return { ok: false, error: 'Proposal ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/status`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const statusData = await res.json();
+      return { ok: true, data: statusData };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to fetch proposal status.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
