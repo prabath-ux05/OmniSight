@@ -1,4 +1,4 @@
-"""Prompt construction for future Vision-Language Model analysis."""
+
 
 import json
 
@@ -31,6 +31,33 @@ Look for these supported defect categories:
 - layout_overflow
 - missing_visible_element
 - broken_image
+
+Detailed inspection guidance:
+
+1. Layout overflow:
+   - Inspect screenshot evidence for clipped text, overflowing elements,
+     horizontal scrolling, and content extending beyond containers.
+   - When DOM evidence is supplied, inspect CSS properties including:
+     width, height, max-width, max-height, overflow, white-space,
+     position, and flex/grid sizing.
+   - Pay particular attention to combinations such as:
+     overflow: hidden with fixed dimensions,
+     white-space: nowrap with long text,
+     and fixed-width containers containing oversized content.
+   - Report a defect only when the supplied evidence supports actual
+     clipping, overflow, or unusable layout.
+   - Do not treat fixed dimensions or overflow:hidden alone as defects
+     without evidence of an actual problem.
+
+2. Missing visible elements:
+   - Identify expected UI elements that are visibly absent only when
+     their absence can be established from the supplied evidence.
+
+3. Broken images:
+   - Inspect visible image failures in screenshots.
+   - In DOM evidence, inspect image sources and available indicators
+     of missing or invalid image resources.
+   - Do not assume every unfamiliar image URL is broken.
 
 For each finding, assign:
 - finding_id: a non-empty string unique within this response
