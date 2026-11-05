@@ -1,4 +1,98 @@
+
+"""
+DOM Capture
+
+Responsibilities:
+- Capture website HTML
+- Save DOM snapshots
+- Collect DOM element information
+- Collect image, form, and interactive element details
+- Save DOM metadata as JSON
+- Verify evidence files
+"""
+
 from pathlib import Path
+from datetime import datetime, timezone
+from html.parser import HTMLParser
+import json
+
+
+class DOMMetadataParser(HTMLParser):
+
+    def __init__(self):
+        super().__init__()
+
+        self.total_elements = 0
+        self.tag_counts = {}
+
+        self.images = []
+        self.forms = []
+        self.interactive_elements = []
+
+        self.current_form = None
+
+    def handle_starttag(self, tag, attrs):
+
+        attributes = dict(attrs)
+
+        self.total_elements += 1
+
+        self.tag_counts[tag] = (
+            self.tag_counts.get(tag, 0) + 1
+        )
+
+        # Collect image information
+        if tag == "img":
+            self.images.append({
+                "alt": attributes.get("alt", ""),
+                "has_alt": bool(attributes.get("alt"))
+            })
+
+        # Collect form information
+        if tag == "form":
+            self.current_form = {
+                "method": attributes.get("method", "get").lower(),
+                "field_types": []
+            }
+            self.forms.append(self.current_form)
+
+        # Collect form field types without their values
+        if tag in ("input", "textarea", "select"):
+            if self.current_form is not None:
+                field_type = (
+                    attributes.get("type", "text")
+                    if tag == "input"
+                    else tag
+                )
+
+                self.current_form["field_types"].append(
+                    field_type
+                )
+
+        # Collect buttons, links, and interactive elements
+        if tag in ("button", "a", "select", "textarea"):
+            self.interactive_elements.append({
+                "tag": tag,
+                "type": attributes.get("type"),
+                "role": attributes.get("role"),
+                "aria_label": attributes.get("aria-label")
+            })
+
+        # Also collect elements with explicit interactive roles
+        elif attributes.get("role") in (
+            "button", "link", "checkbox",
+            "radio", "tab", "menuitem"
+        ):
+            self.interactive_elements.append({
+                "tag": tag,
+                "type": attributes.get("type"),
+                "role": attributes.get("role"),
+                "aria_label": attributes.get("aria-label")
+            })
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self.current_form = None
 
 
 class DOMCapture:
@@ -10,14 +104,71 @@ class DOMCapture:
         artifact_root: str = "artifacts"
     ) -> str:
 
+        # Validate run ID
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id is required")
+
+        # Create run directory
         run_dir = Path(artifact_root) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         dom_path = run_dir / "dom.html"
 
+        # Capture HTML
         html_content = page.content()
 
+        if not html_content:
+            raise ValueError("DOM snapshot is empty")
+
+        # Save HTML snapshot
         with open(dom_path, "w", encoding="utf-8") as file:
             file.write(html_content)
+
+        # Verify HTML file
+        if not dom_path.exists() or dom_path.stat().st_size == 0:
+            raise FileNotFoundError(
+                "DOM snapshot file was not created"
+            )
+
+        # Parse DOM information
+        parser = DOMMetadataParser()
+        parser.feed(html_content)
+        parser.close()
+
+        # Collect page metadata
+        metadata = {
+            "run_id": run_id,
+            "url": getattr(page, "url", ""),
+            "page_title": "",
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "dom_snapshot_path": str(dom_path),
+            "total_elements": parser.total_elements,
+            "tag_counts": parser.tag_counts,
+            "total_images": len(parser.images),
+            "images": parser.images,
+            "total_forms": len(parser.forms),
+            "forms": parser.forms,
+            "total_interactive_elements": len(
+                parser.interactive_elements
+            ),
+            "interactive_elements": parser.interactive_elements
+        }
+
+        # Capture page title safely
+        try:
+            metadata["page_title"] = page.title()
+        except Exception:
+            metadata["page_title"] = ""
+
+        # Save metadata JSON
+        metadata_path = run_dir / "dom_metadata.json"
+
+        with open(metadata_path, "w", encoding="utf-8") as file:
+            json.dump(
+                metadata,
+                file,
+                indent=4,
+                ensure_ascii=False
+            )
 
         return str(dom_path)
