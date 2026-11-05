@@ -2,25 +2,25 @@
   {
     "scenario": "clean",
     "status": "success",
-    "response_time_seconds": 18.948,
+    "response_time_seconds": 16.998,
     "findings": []
   },
   {
     "scenario": "overflow",
     "status": "success",
-    "response_time_seconds": 20.253,
+    "response_time_seconds": 61.743,
     "findings": [
       {
         "finding_id": "defect-overflow-1",
         "category": "layout_overflow",
         "severity": "medium",
         "confidence": 0.95,
-        "description": "The element with class 'overflow' has fixed dimensions (width: 220px, height: 55px), 'overflow: hidden', and 'white-space: nowrap' applied to a long text string ('This text is intentionally too long and will be clipped by its container.'), which causes the content to be clipped and rendered unusable.",
+        "description": "The element with class 'overflow' has a fixed width of 220px, a height of 55px, overflow: hidden, and white-space: nowrap, containing text that is too long to fit within these dimensions, resulting in clipped content.",
         "selector": ".overflow",
         "bounding_box": null,
         "evidence": {
           "screenshot_path": null,
-          "dom_snapshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\overflow.html"
+          "dom_snapshot_path": "vision_engine/demo_tests/evidence/overflow.html"
         },
         "source": "vlm"
       }

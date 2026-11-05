@@ -2,9 +2,9 @@
   "model": "gemini-3.5-flash-lite",
   "test_type": "live Gemini screenshot-only and DOM-only validation",
   "total_tests": 6,
-  "successful_requests": 4,
-  "failed_requests": 2,
-  "matched_expectations": 4,
+  "successful_requests": 6,
+  "failed_requests": 0,
+  "matched_expectations": 6,
   "results": [
     {
       "scenario": "clean",
@@ -15,16 +15,20 @@
       "total_findings": 0,
       "matched_expectation": true,
       "unexpected_categories": [],
-      "response_time_seconds": 16.807,
+      "response_time_seconds": 8.49,
       "findings": []
     },
     {
       "scenario": "clean",
       "evidence_mode": "dom_only",
-      "status": "error",
-      "response_time_seconds": 30.018,
-      "error_type": "RuntimeError",
-      "error_message": "Gemini analysis request failed: APITimeoutError"
+      "status": "success",
+      "expected_category": null,
+      "found_categories": [],
+      "total_findings": 0,
+      "matched_expectation": true,
+      "unexpected_categories": [],
+      "response_time_seconds": 4.913,
+      "findings": []
     },
     {
       "scenario": "overflow",
@@ -37,23 +41,23 @@
       "total_findings": 1,
       "matched_expectation": true,
       "unexpected_categories": [],
-      "response_time_seconds": 17.085,
+      "response_time_seconds": 103.73,
       "findings": [
         {
-          "finding_id": "defect-overflow-01",
+          "finding_id": "defect-overflow-1",
           "category": "layout_overflow",
           "severity": "medium",
           "confidence": 0.95,
-          "description": "Text content exceeds the boundaries of its container box, causing visual overflow.",
+          "description": "Text content is overflowing the right border of the red container box under Scenario 2.",
           "selector": null,
           "bounding_box": {
-            "x": 37.0,
+            "x": 36.0,
             "y": 195.0,
-            "width": 164.0,
+            "width": 165.0,
             "height": 65.0
           },
           "evidence": {
-            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\overflow.png",
+            "screenshot_path": "vision_engine/demo_tests/evidence/overflow.png",
             "dom_snapshot_path": null
           },
           "source": "vlm"
@@ -63,10 +67,31 @@
     {
       "scenario": "overflow",
       "evidence_mode": "dom_only",
-      "status": "error",
-      "response_time_seconds": 30.041,
-      "error_type": "RuntimeError",
-      "error_message": "Gemini analysis request failed: APITimeoutError"
+      "status": "success",
+      "expected_category": "layout_overflow",
+      "found_categories": [
+        "layout_overflow"
+      ],
+      "total_findings": 1,
+      "matched_expectation": true,
+      "unexpected_categories": [],
+      "response_time_seconds": 6.452,
+      "findings": [
+        {
+          "finding_id": "finding-001",
+          "category": "layout_overflow",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "The element with class 'overflow' has a fixed width (220px) and height (55px) combined with 'overflow: hidden' and 'white-space: nowrap', which causes long text ('This text is intentionally too long and will be clipped by its container.') to be clipped and cut off vertically and horizontally.",
+          "selector": ".overflow",
+          "bounding_box": null,
+          "evidence": {
+            "screenshot_path": null,
+            "dom_snapshot_path": "vision_engine/demo_tests/evidence/overflow.html"
+          },
+          "source": "vlm"
+        }
+      ]
     },
     {
       "scenario": "broken_image",
@@ -79,14 +104,14 @@
       "total_findings": 1,
       "matched_expectation": true,
       "unexpected_categories": [],
-      "response_time_seconds": 25.969,
+      "response_time_seconds": 8.088,
       "findings": [
         {
           "finding_id": "defect-broken-image-1",
           "category": "broken_image",
           "severity": "medium",
           "confidence": 0.95,
-          "description": "The product preview image is broken, displaying a missing image icon and alt text instead of the actual image.",
+          "description": "The product preview image is broken and displaying the alt text 'Product preview' instead of the image graphic.",
           "selector": null,
           "bounding_box": {
             "x": 36.0,
@@ -95,7 +120,7 @@
             "height": 20.0
           },
           "evidence": {
-            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\broken_image.png",
+            "screenshot_path": "vision_engine/demo_tests/evidence/broken_image.png",
             "dom_snapshot_path": null
           },
           "source": "vlm"
@@ -113,19 +138,19 @@
       "total_findings": 1,
       "matched_expectation": true,
       "unexpected_categories": [],
-      "response_time_seconds": 26.243,
+      "response_time_seconds": 15.257,
       "findings": [
         {
           "finding_id": "defect-broken-image-1",
           "category": "broken_image",
           "severity": "medium",
           "confidence": 0.9,
-          "description": "An image element references a potentially missing or broken resource ('missing-image-omnisight.png').",
+          "description": "An image element references a likely missing or invalid source file ('missing-image-omnisight.png').",
           "selector": "section.card img",
           "bounding_box": null,
           "evidence": {
             "screenshot_path": null,
-            "dom_snapshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\broken_image.html"
+            "dom_snapshot_path": "vision_engine/demo_tests/evidence/broken_image.html"
           },
           "source": "vlm"
         }

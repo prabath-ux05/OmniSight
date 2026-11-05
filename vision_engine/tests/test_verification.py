@@ -147,3 +147,33 @@ def test_repair_is_unverifiable_when_after_evidence_is_missing(tmp_path):
     assert result.status == "unverifiable"
     assert result.before_evidence is True
     assert result.after_evidence is False
+
+
+def test_repair_is_unresolved_when_any_matching_finding_keeps_high_severity(
+    tmp_path,
+):
+    before_file = tmp_path / "before.png"
+    after_file = tmp_path / "after.png"
+    before_file.write_bytes(b"before screenshot")
+    after_file.write_bytes(b"after screenshot")
+
+    original = create_finding(severity="high")
+
+    reduced = create_finding(
+        finding_id="finding-2",
+        severity="medium",
+    )
+    unchanged = create_finding(
+        finding_id="finding-3",
+        severity="high",
+    )
+
+    result = verify_repair(
+        original,
+        create_input("before-run", before_file),
+        create_input("after-run", after_file),
+        [reduced, unchanged],
+    )
+
+    assert result.status == "unresolved"
+    assert result.matched_finding_ids == ["finding-2", "finding-3"]

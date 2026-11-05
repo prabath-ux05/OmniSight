@@ -92,26 +92,26 @@ def verify_repair(
 
     original_severity = severity_order[original_finding.severity]
 
-    less_severe_findings = [
-        finding
-        for finding in matching_findings
-        if severity_order[finding.severity] < original_severity
-    ]
-
     matched_ids = [
         finding.finding_id for finding in matching_findings
     ]
 
-    if less_severe_findings:
+    all_less_severe = all(
+        severity_order[finding.severity] < original_severity
+        for finding in matching_findings
+    )
+
+    if all_less_severe:
         status: VerificationStatus = "partially_resolved"
         explanation = (
-            "The original defect is still detected, but its reported "
-            "severity has decreased."
+            "All remaining matching findings have lower reported "
+            "severity than the original defect."
         )
     else:
         status = "unresolved"
         explanation = (
-            "The original defect is still detected after the repair."
+            "At least one matching finding remains at the same or "
+            "higher severity after the repair."
         )
 
     return VerificationResult(
