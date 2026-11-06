@@ -2,13 +2,14 @@
 """
 DOM Capture
 
-Responsibilities:
+Features:
 - Capture website HTML
-- Save DOM snapshots
+- Save before and after DOM snapshots
 - Collect DOM element information
 - Collect image, form, and interactive element details
 - Save DOM metadata as JSON
 - Verify evidence files
+- Maintain backward compatibility
 """
 
 from pathlib import Path
@@ -24,11 +25,9 @@ class DOMMetadataParser(HTMLParser):
 
         self.total_elements = 0
         self.tag_counts = {}
-
         self.images = []
         self.forms = []
         self.interactive_elements = []
-
         self.current_form = None
 
     def handle_starttag(self, tag, attrs):
@@ -41,24 +40,24 @@ class DOMMetadataParser(HTMLParser):
             self.tag_counts.get(tag, 0) + 1
         )
 
-        # Collect image information
         if tag == "img":
             self.images.append({
                 "alt": attributes.get("alt", ""),
                 "has_alt": bool(attributes.get("alt"))
             })
 
-        # Collect form information
         if tag == "form":
             self.current_form = {
-                "method": attributes.get("method", "get").lower(),
+                "method": attributes.get(
+                    "method", "get"
+                ).lower(),
                 "field_types": []
             }
             self.forms.append(self.current_form)
 
-        # Collect form field types without their values
         if tag in ("input", "textarea", "select"):
             if self.current_form is not None:
+
                 field_type = (
                     attributes.get("type", "text")
                     if tag == "input"
@@ -69,7 +68,6 @@ class DOMMetadataParser(HTMLParser):
                     field_type
                 )
 
-        # Collect buttons, links, and interactive elements
         if tag in ("button", "a", "select", "textarea"):
             self.interactive_elements.append({
                 "tag": tag,
@@ -78,7 +76,6 @@ class DOMMetadataParser(HTMLParser):
                 "aria_label": attributes.get("aria-label")
             })
 
-        # Also collect elements with explicit interactive roles
         elif attributes.get("role") in (
             "button", "link", "checkbox",
             "radio", "tab", "menuitem"
@@ -101,18 +98,42 @@ class DOMCapture:
     def save_dom_snapshot(
         page,
         run_id: str,
-        artifact_root: str = "artifacts"
+        artifact_root: str = "artifacts",
+        stage: str = None
     ) -> str:
 
         # Validate run ID
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id is required")
 
+        # Validate stage
+        if stage not in (None, "before", "after"):
+            raise ValueError(
+                "stage must be 'before', 'after', or None"
+            )
+
+        if (
+            run_id in (".", "..")
+            or Path(run_id).name != run_id
+            or "/" in run_id
+            or "\\" in run_id
+            or ":" in run_id
+        ):
+            raise ValueError("Invalid run_id")
+
         # Create run directory
         run_dir = Path(artifact_root) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        dom_path = run_dir / "dom.html"
+        # Preserve old filenames when stage is not supplied
+        if stage is None:
+            dom_filename = "dom.html"
+            metadata_filename = "dom_metadata.json"
+        else:
+            dom_filename = f"{stage}_dom.html"
+            metadata_filename = f"{stage}_dom_metadata.json"
+
+        dom_path = run_dir / dom_filename
 
         # Capture HTML
         html_content = page.content()
@@ -138,9 +159,12 @@ class DOMCapture:
         # Collect page metadata
         metadata = {
             "run_id": run_id,
+            "stage": stage or "default",
             "url": getattr(page, "url", ""),
             "page_title": "",
-            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "captured_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
             "dom_snapshot_path": str(dom_path),
             "total_elements": parser.total_elements,
             "tag_counts": parser.tag_counts,
@@ -161,9 +185,13 @@ class DOMCapture:
             metadata["page_title"] = ""
 
         # Save metadata JSON
-        metadata_path = run_dir / "dom_metadata.json"
+        metadata_path = run_dir / metadata_filename
 
-        with open(metadata_path, "w", encoding="utf-8") as file:
+        with open(
+            metadata_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
             json.dump(
                 metadata,
                 file,

@@ -2,13 +2,13 @@
 """
 Screenshot Management
 
-Responsibilities:
-- Create artifact directories
-- Capture full-page screenshots
+Features:
+- Create run-based artifact directories
+- Capture before and after screenshots
 - Verify screenshot files
-- Capture screenshot dimensions
+- Read screenshot dimensions
 - Save screenshot metadata
-- Return saved screenshot path
+- Maintain backward compatibility
 """
 
 from pathlib import Path
@@ -28,29 +28,47 @@ class ScreenshotManager:
         if not isinstance(run_id, str) or not run_id.strip():
             raise ValueError("run_id is required")
 
+        # Prevent run IDs from escaping the artifact directory
+        if (
+            run_id in (".", "..")
+            or Path(run_id).name != run_id
+            or "/" in run_id
+            or "\\" in run_id
+            or ":" in run_id
+        ):
+            raise ValueError("Invalid run_id")
+
         run_dir = Path(artifact_root) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         return run_dir
 
     @staticmethod
-    def get_screenshot_dimensions(screenshot_path: str) -> dict:
-        """
-        Read the actual width and height from a PNG file.
-        """
+    def get_screenshot_dimensions(
+        screenshot_path: str
+    ) -> dict:
 
         path = Path(screenshot_path)
 
-        if not path.exists():
-            raise FileNotFoundError("Screenshot file not found")
+        if not path.is_file():
+            raise FileNotFoundError(
+                "Screenshot file not found"
+            )
 
         with open(path, "rb") as file:
             header = file.read(24)
 
-        if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        if (
+            len(header) < 24
+            or header[:8] != b"\x89PNG\r\n\x1a\n"
+            or header[12:16] != b"IHDR"
+        ):
             raise ValueError("Invalid PNG screenshot")
 
-        width, height = struct.unpack(">II", header[16:24])
+        width, height = struct.unpack(
+            ">II",
+            header[16:24]
+        )
 
         return {
             "width": width,
@@ -61,15 +79,22 @@ class ScreenshotManager:
     def save_screenshot(
         page,
         run_id: str,
-        artifact_root: str = "artifacts"
+        artifact_root: str = "artifacts",
+        stage: str = "before"
     ) -> str:
+
+        # Only allow known capture stages
+        if stage not in ("before", "after"):
+            raise ValueError(
+                "stage must be 'before' or 'after'"
+            )
 
         run_dir = ScreenshotManager.create_run_directory(
             run_id,
             artifact_root
         )
 
-        screenshot_path = run_dir / "before.png"
+        screenshot_path = run_dir / f"{stage}.png"
 
         # Capture full-page screenshot
         page.screenshot(
@@ -77,26 +102,31 @@ class ScreenshotManager:
             full_page=True
         )
 
-        # Verify screenshot creation
-        if not screenshot_path.exists():
+        # Verify screenshot file
+        if not screenshot_path.is_file():
             raise FileNotFoundError(
                 "Screenshot file was not created"
             )
 
         if screenshot_path.stat().st_size == 0:
-            raise ValueError("Screenshot file is empty")
+            raise ValueError(
+                "Screenshot file is empty"
+            )
 
-        # Get actual screenshot dimensions
-        dimensions = ScreenshotManager.get_screenshot_dimensions(
-            str(screenshot_path)
+        dimensions = (
+            ScreenshotManager.get_screenshot_dimensions(
+                str(screenshot_path)
+            )
         )
 
-        # Collect page metadata
         metadata = {
             "run_id": run_id,
+            "stage": stage,
             "url": page.url,
             "page_title": page.title(),
-            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "captured_at": datetime.now(
+                timezone.utc
+            ).isoformat(),
             "screenshot_path": str(screenshot_path),
             "screenshot_width": dimensions["width"],
             "screenshot_height": dimensions["height"],
@@ -104,10 +134,15 @@ class ScreenshotManager:
             "viewport": page.viewport_size
         }
 
-        # Save metadata as JSON
-        metadata_path = run_dir / "before_metadata.json"
+        metadata_path = (
+            run_dir / f"{stage}_metadata.json"
+        )
 
-        with open(metadata_path, "w", encoding="utf-8") as file:
+        with open(
+            metadata_path,
+            "w",
+            encoding="utf-8"
+        ) as file:
             json.dump(
                 metadata,
                 file,
