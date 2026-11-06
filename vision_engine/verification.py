@@ -25,6 +25,10 @@ class VerificationResult(BaseModel):
     explanation: str = Field(min_length=1)
     before_evidence: bool
     after_evidence: bool
+    before_screenshot_path: str | None = None
+    before_dom_snapshot_path: str | None = None
+    after_screenshot_path: str | None = None
+    after_dom_snapshot_path: str | None = None
     matched_finding_ids: list[str] = Field(default_factory=list)
 
 
@@ -57,6 +61,10 @@ def verify_repair(
             ),
             before_evidence=not before_errors,
             after_evidence=not after_errors,
+            before_screenshot_path=before_input.screenshot_path,
+            before_dom_snapshot_path=before_input.dom_snapshot_path,
+            after_screenshot_path=after_input.screenshot_path,
+            after_dom_snapshot_path=after_input.dom_snapshot_path,
         )
 
     # Match findings using category and, when available, CSS selector.
@@ -81,6 +89,10 @@ def verify_repair(
             ),
             before_evidence=True,
             after_evidence=True,
+            before_screenshot_path=before_input.screenshot_path,
+            before_dom_snapshot_path=before_input.dom_snapshot_path,
+            after_screenshot_path=after_input.screenshot_path,
+            after_dom_snapshot_path=after_input.dom_snapshot_path,
         )
 
     severity_order = {
@@ -121,5 +133,9 @@ def verify_repair(
         explanation=explanation,
         before_evidence=True,
         after_evidence=True,
+        before_screenshot_path=before_input.screenshot_path,
+        before_dom_snapshot_path=before_input.dom_snapshot_path,
+        after_screenshot_path=after_input.screenshot_path,
+        after_dom_snapshot_path=after_input.dom_snapshot_path,
         matched_finding_ids=matched_ids,
     )

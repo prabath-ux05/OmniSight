@@ -177,3 +177,44 @@ def test_repair_is_unresolved_when_any_matching_finding_keeps_high_severity(
 
     assert result.status == "unresolved"
     assert result.matched_finding_ids == ["finding-2", "finding-3"]
+
+
+def test_verification_preserves_before_and_after_evidence_paths(tmp_path):
+    before_file = tmp_path / "before.png"
+    after_file = tmp_path / "after.png"
+    before_file.write_bytes(b"before screenshot")
+    after_file.write_bytes(b"after screenshot")
+
+    original = create_finding()
+    before_input = create_input("before-run", before_file)
+    after_input = create_input("after-run", after_file)
+
+    result = verify_repair(
+        original,
+        before_input,
+        after_input,
+        [],
+    )
+
+    assert result.before_screenshot_path == str(before_file)
+    assert result.after_screenshot_path == str(after_file)
+    assert result.before_dom_snapshot_path is None
+    assert result.after_dom_snapshot_path is None
+
+
+def test_unverifiable_result_preserves_available_evidence_paths(tmp_path):
+    before_file = tmp_path / "before.png"
+    before_file.write_bytes(b"before screenshot")
+
+    missing_after_file = tmp_path / "missing-after.png"
+
+    result = verify_repair(
+        create_finding(),
+        create_input("before-run", before_file),
+        create_input("after-run", missing_after_file),
+        [],
+    )
+
+    assert result.status == "unverifiable"
+    assert result.before_screenshot_path == str(before_file)
+    assert result.after_screenshot_path == str(missing_after_file)
