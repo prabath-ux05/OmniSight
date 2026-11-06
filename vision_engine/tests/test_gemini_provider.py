@@ -460,3 +460,152 @@ def test_provider_keeps_coordinates_unchanged_when_crop_fails(
         width=40,
         height=25,
     )
+
+
+
+def test_provider_analyzes_multiple_crops_and_translates_coordinates(
+    tmp_path,
+):
+    first_response = """
+    [
+        {
+            "finding_id": "first-crop-defect",
+            "category": "layout_overflow",
+            "severity": "high",
+            "confidence": 0.95,
+            "description": "Overflow in first region.",
+            "repair_recommendation": null,
+            "selector": "#first",
+            "bounding_box": {
+                "x": 5,
+                "y": 6,
+                "width": 20,
+                "height": 15
+            },
+            "evidence": {
+                "screenshot_path": null,
+                "dom_snapshot_path": null
+            },
+            "source": "vlm"
+        }
+    ]
+    """
+
+    second_response = """
+    [
+        {
+            "finding_id": "second-crop-defect",
+            "category": "broken_image",
+            "severity": "medium",
+            "confidence": 0.90,
+            "description": "Broken image in second region.",
+            "repair_recommendation": null,
+            "selector": "#second",
+            "bounding_box": {
+                "x": 7,
+                "y": 8,
+                "width": 30,
+                "height": 25
+            },
+            "evidence": {
+                "screenshot_path": null,
+                "dom_snapshot_path": null
+            },
+            "source": "vlm"
+        }
+    ]
+    """
+
+    client = SequenceClient([
+        SimpleNamespace(output_text=first_response),
+        SimpleNamespace(output_text=second_response),
+    ])
+
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "multiple-crops.png"
+    Image.new("RGB", (400, 300), "white").save(screenshot_path)
+
+    input_data = VisionInput(
+        run_id="multiple-crops-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_boxes=[
+            BoundingBox(x=50, y=40, width=60, height=30),
+            BoundingBox(x=200, y=150, width=60, height=30),
+        ],
+    )
+
+    findings = detector.detect(input_data)
+
+    assert client.interactions.calls == 2
+    assert len(findings) == 2
+
+    assert findings[0].bounding_box == BoundingBox(
+        x=35,
+        y=26,
+        width=20,
+        height=15,
+    )
+
+    assert findings[1].bounding_box == BoundingBox(
+        x=187,
+        y=138,
+        width=30,
+        height=25,
+    )
+
+
+
+def test_provider_falls_back_to_original_if_any_crop_fails(
+    tmp_path,
+    monkeypatch,
+):
+    client = FakeClient(output_text="[]")
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "multiple-crop-fallback.png"
+    Image.new("RGB", (400, 300), "white").save(screenshot_path)
+    original_data = screenshot_path.read_bytes()
+
+    input_data = VisionInput(
+        run_id="multiple-crop-fallback",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_boxes=[
+            BoundingBox(x=50, y=40, width=60, height=30),
+            BoundingBox(x=200, y=150, width=60, height=30),
+        ],
+    )
+
+    from vision_engine.detection import gemini_provider
+
+    original_crop_function = (
+        gemini_provider.crop_screenshot_with_origin
+    )
+
+    calls = {"count": 0}
+
+    def fail_second_crop(path, box):
+        calls["count"] += 1
+
+        if calls["count"] == 2:
+            raise ValueError("Second crop failed")
+
+        return original_crop_function(path, box)
+
+    monkeypatch.setattr(
+        gemini_provider,
+        "crop_screenshot_with_origin",
+        fail_second_crop,
+    )
+
+    findings = detector.detect(input_data)
+
+    assert findings == []
+    assert calls["count"] == 2
+    assert client.interactions.calls == 1
+
+    sent_image = client.interactions.received["input"][1]
+
+    assert base64.b64decode(sent_image["data"]) == original_data

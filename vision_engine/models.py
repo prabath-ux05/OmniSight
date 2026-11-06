@@ -20,6 +20,10 @@ class VisionInput(BaseModel):
     )
 
     crop_box: "BoundingBox | None" = None
+    crop_boxes: "list[BoundingBox] | None" = Field(
+        default=None,
+        min_length=1,
+    )
 
     @model_validator(mode="after")
     def require_some_evidence(self):
@@ -28,8 +32,15 @@ class VisionInput(BaseModel):
                 "At least a screenshot path or DOM snapshot path is required."
             )
 
-        if self.crop_box is not None and not self.screenshot_path:
-            raise ValueError("A crop box requires a screenshot path.")
+        if (
+            self.crop_box is not None or self.crop_boxes is not None
+        ) and not self.screenshot_path:
+            raise ValueError("Crop boxes require a screenshot path.")
+
+        if self.crop_box is not None and self.crop_boxes is not None:
+            raise ValueError(
+                "Use either crop_box or crop_boxes, not both."
+            )
 
         return self
 

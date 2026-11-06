@@ -17,13 +17,14 @@ from vision_engine.image_processing import (
     crop_screenshot,
     crop_screenshot_with_origin,
 )
-from vision_engine.prompting.vlm_prompt import build_vlm_prompt
 from vision_engine.models import (
     BoundingBox,
     EvidenceReferences,
     VisionFinding,
     VisionInput,
 )
+from vision_engine.prompting.vlm_prompt import build_vlm_prompt
+
 
 class GeminiVLMDetector:
     """Analyze screenshot and DOM evidence using Google's Gemini API."""
@@ -140,67 +141,14 @@ class GeminiVLMDetector:
         except (TypeError, ValueError):
             return None
 
-    def detect(self, input_data: VisionInput) -> list[VisionFinding]:
-        """Analyze supplied evidence and return validated VLM findings."""
-        prompt = build_vlm_prompt(input_data)
-
-        request_input = [
-            {"type": "text", "text": prompt},
-        ]
-
-        crop_origin = None
-
-        if input_data.screenshot_path:
-            if input_data.crop_box is not None:
-                try:
-                    cropped_image, crop_origin = crop_screenshot_with_origin(
-                        input_data.screenshot_path,
-                        input_data.crop_box,
-                    )
-
-                    image_buffer = BytesIO()
-                    cropped_image.save(image_buffer, format="PNG")
-                    image_data = image_buffer.getvalue()
-
-                    if not image_data:
-                        raise ValueError("Cropped screenshot is empty.")
-
-                    screenshot_input = {
-                        "type": "image",
-                        "data": base64.b64encode(image_data).decode("ascii"),
-                        "mime_type": "image/png",
-                    }
-
-                except Exception:
-                    crop_origin = None
-                    screenshot_input = self._read_screenshot(
-                        input_data.screenshot_path
-                    )
-            else:
-                screenshot_input = self._read_screenshot(
-                    input_data.screenshot_path
-                )
-
-            request_input.append(screenshot_input)
-
-        if input_data.dom_snapshot_path:
-            dom_text = self._read_dom(input_data.dom_snapshot_path)
-            request_input.append(
-                {
-                    "type": "text",
-                    "text": "DOM snapshot contents:\n" + dom_text,
-                }
-            )
-
-        interaction = None
-
+    def _create_interaction(self, request_input: list) -> Any:
+        """Send one Gemini request with retry handling."""
         for attempt in range(self.MAX_ATTEMPTS):
             try:
-                interaction = self.client.interactions.create(
+                return self.client.interactions.create(
                     model=self.model,
                     input=request_input,
                 )
-                break
 
             except Exception as exc:
                 status_code = self._get_status_code(exc)
@@ -211,8 +159,7 @@ class GeminiVLMDetector:
                 )
 
                 if should_retry:
-                    delay = 2 ** attempt
-                    time.sleep(delay)
+                    time.sleep(2 ** attempt)
                     continue
 
                 if status_code is not None:
@@ -227,6 +174,17 @@ class GeminiVLMDetector:
                     )
 
                 raise RuntimeError(message) from exc
+
+        raise RuntimeError("Gemini analysis failed unexpectedly.")
+
+    def _analyze_request(
+        self,
+        request_input: list,
+        input_data: VisionInput,
+        crop_origin: tuple[int, int] | None,
+    ) -> list[VisionFinding]:
+        """Analyze one image region and translate its findings."""
+        interaction = self._create_interaction(request_input)
 
         response_text = getattr(interaction, "output_text", None)
 
@@ -250,3 +208,104 @@ class GeminiVLMDetector:
             )
 
         return findings
+
+    def detect(self, input_data: VisionInput) -> list[VisionFinding]:
+        """Analyze supplied evidence and return validated VLM findings."""
+        prompt = build_vlm_prompt(input_data)
+
+        dom_text = None
+
+        if input_data.dom_snapshot_path:
+            dom_text = self._read_dom(input_data.dom_snapshot_path)
+
+        crop_boxes = []
+
+        if input_data.crop_box is not None:
+            crop_boxes = [input_data.crop_box]
+        elif input_data.crop_boxes is not None:
+            crop_boxes = input_data.crop_boxes
+
+        image_requests = []
+
+        if input_data.screenshot_path:
+            if crop_boxes:
+                try:
+                    for crop_box in crop_boxes:
+                        cropped_image, crop_origin = (
+                            crop_screenshot_with_origin(
+                                input_data.screenshot_path,
+                                crop_box,
+                            )
+                        )
+
+                        image_buffer = BytesIO()
+                        cropped_image.save(image_buffer, format="PNG")
+                        image_data = image_buffer.getvalue()
+
+                        if not image_data:
+                            raise ValueError("Cropped screenshot is empty.")
+
+                        screenshot_input = {
+                            "type": "image",
+                            "data": base64.b64encode(
+                                image_data
+                            ).decode("ascii"),
+                            "mime_type": "image/png",
+                        }
+
+                        image_requests.append(
+                            (screenshot_input, crop_origin)
+                        )
+
+                except Exception:
+                    # If any crop cannot be prepared, analyze the
+                    # original screenshot instead of partial crop results.
+                    image_requests = [
+                        (
+                            self._read_screenshot(
+                                input_data.screenshot_path
+                            ),
+                            None,
+                        )
+                    ]
+            else:
+                image_requests = [
+                    (
+                        self._read_screenshot(
+                            input_data.screenshot_path
+                        ),
+                        None,
+                    )
+                ]
+
+        else:
+            # DOM-only analysis still uses one Gemini request.
+            image_requests = [(None, None)]
+
+        all_findings = []
+
+        for screenshot_input, crop_origin in image_requests:
+            request_input = [
+                {"type": "text", "text": prompt},
+            ]
+
+            if screenshot_input is not None:
+                request_input.append(screenshot_input)
+
+            if dom_text is not None:
+                request_input.append(
+                    {
+                        "type": "text",
+                        "text": "DOM snapshot contents:\n" + dom_text,
+                    }
+                )
+
+            findings = self._analyze_request(
+                request_input,
+                input_data,
+                crop_origin,
+            )
+
+            all_findings.extend(findings)
+
+        return all_findings
