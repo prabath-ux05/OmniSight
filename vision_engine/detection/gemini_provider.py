@@ -148,8 +148,7 @@ class GeminiVLMDetector:
             {"type": "text", "text": prompt},
         ]
 
-        if input_data.screenshot_path:
-                   crop_origin = None
+        crop_origin = None
 
         if input_data.screenshot_path:
             if input_data.crop_box is not None:
