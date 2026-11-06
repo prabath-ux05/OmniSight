@@ -65,6 +65,12 @@ For each finding, assign:
 - severity: low, medium, high, or critical
 - confidence: a number between 0.0 and 1.0
 - description: a concise explanation grounded in evidence
+- repair_recommendation: an object containing:
+    - summary: a short description of the proposed correction
+    - suggested_action: a practical corrective action
+    - rationale: why this action addresses the observed defect
+  Set repair_recommendation to null if the evidence is insufficient
+  to recommend a specific correction.
 - selector: a CSS selector if it can be identified, otherwise null
 - bounding_box: an object with x, y, width, and height if measurable,
   otherwise null
@@ -72,11 +78,17 @@ For each finding, assign:
   use the supplied paths where relevant and null when unavailable
 - source: "vlm" (the JSON key must be named "source" and its value must be "vlm")
 
+Repair recommendation rules:
+- Recommendations must directly address the detected defect.
+- Do not claim that a recommendation has been applied or verified.
+- Do not invent selectors, CSS properties, URLs, or implementation details.
+- Prefer minimal, targeted corrections.
+- Return null when the evidence does not support a reliable recommendation.
+
 Return only a valid JSON array of findings.
 Return an empty array [] if no supported defects are found.
 Do not include Markdown fences, comments, or extra explanatory text.
 Do not invent coordinates, selectors, or evidence references.
-
 Evidence metadata:
 {evidence_description}
 

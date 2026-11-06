@@ -16,6 +16,11 @@ def make_valid_finding() -> dict:
         "severity": "high",
         "confidence": 0.95,
         "description": "An image appears to be broken.",
+        "repair_recommendation": {
+            "summary": "Replace the broken image with a valid image.",
+            "suggested_action": "Update the src attribute to point to an existing image.",
+            "rationale": "The current image resource appears to be unavailable.",
+        },
         "selector": "img.hero",
         "bounding_box": {
             "x": 10,
@@ -157,3 +162,41 @@ def test_reject_duplicate_nested_json_keys():
 
     with pytest.raises(ValueError, match="duplicate JSON key"):
         parse_vlm_response(response)
+
+
+def test_parse_finding_with_repair_recommendation():
+    response = json.dumps([make_valid_finding()])
+
+    findings = parse_vlm_response(response)
+
+    recommendation = findings[0].repair_recommendation
+
+    assert recommendation is not None
+    assert recommendation.summary == "Replace the broken image with a valid image."
+    assert recommendation.suggested_action == (
+        "Update the src attribute to point to an existing image."
+    )
+    assert recommendation.rationale == (
+        "The current image resource appears to be unavailable."
+    )
+
+
+def test_parse_finding_with_null_repair_recommendation():
+    finding = make_valid_finding()
+    finding["repair_recommendation"] = None
+
+    findings = parse_vlm_response(json.dumps([finding]))
+
+    assert len(findings) == 1
+    assert findings[0].repair_recommendation is None
+
+
+def test_reject_incomplete_repair_recommendation():
+    finding = make_valid_finding()
+    finding["repair_recommendation"] = {
+        "summary": "Replace the broken image.",
+        "suggested_action": "Update the image source.",
+    }
+
+    with pytest.raises(ValueError, match="schema validation"):
+        parse_vlm_response(json.dumps([finding]))

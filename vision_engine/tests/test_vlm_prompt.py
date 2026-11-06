@@ -56,3 +56,19 @@ def test_prompt_warns_against_inventing_findings():
     assert "Return an empty array []" in prompt
     assert "does not load evidence" in build_vlm_prompt.__doc__
     assert "call a model, or perform inference" in build_vlm_prompt.__doc__
+
+
+def test_prompt_requests_structured_repair_recommendations():
+    input_data = VisionInput(
+        run_id="repair-prompt-test",
+        url="https://example.com",
+        screenshot_path="screenshot.png",
+    )
+
+    prompt = build_vlm_prompt(input_data)
+
+    assert "repair_recommendation" in prompt
+    assert "suggested_action" in prompt
+    assert "rationale" in prompt
+    assert "Set repair_recommendation to null" in prompt
+    assert "Do not claim that a recommendation has been applied or verified" in prompt

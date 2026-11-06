@@ -50,6 +50,14 @@ class BoundingBox(BaseModel):
     height: float = Field(gt=0)
 
 
+class RepairRecommendation(BaseModel):
+    """A suggested correction for a detected UI defect."""
+
+    summary: str = Field(min_length=1)
+    suggested_action: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+
+
 class VisionFinding(BaseModel):
     """A structured UI defect finding."""
 
@@ -66,6 +74,8 @@ class VisionFinding(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
     description: str = Field(min_length=1)
+
+    repair_recommendation: RepairRecommendation | None = None
 
     selector: str | None = None
 
