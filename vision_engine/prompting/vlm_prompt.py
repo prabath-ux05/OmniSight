@@ -72,8 +72,10 @@ For each finding, assign:
   Set repair_recommendation to null if the evidence is insufficient
   to recommend a specific correction.
 - selector: a CSS selector if it can be identified, otherwise null
-- bounding_box: an object with x, y, width, and height if measurable,
-  otherwise null
+- bounding_box: an object with x, y, width, and height if measurable.
+  Coordinates must be relative to the screenshot image actually supplied
+  in this request, starting at its top-left corner. If no screenshot is
+  supplied or the defect cannot be measured, return null.
 - evidence: an object containing screenshot_path and dom_snapshot_path;
   use the supplied paths where relevant and null when unavailable
 - source: "vlm" (the JSON key must be named "source" and its value must be "vlm")
@@ -89,6 +91,7 @@ Return only a valid JSON array of findings.
 Return an empty array [] if no supported defects are found.
 Do not include Markdown fences, comments, or extra explanatory text.
 Do not invent coordinates, selectors, or evidence references.
+
 Evidence metadata:
 {evidence_description}
 

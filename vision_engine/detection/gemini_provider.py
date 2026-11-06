@@ -13,10 +13,17 @@ from dotenv import load_dotenv
 from google import genai
 
 from vision_engine.detection.vlm_response_parser import parse_vlm_response
-from vision_engine.image_processing import crop_screenshot
-from vision_engine.models import EvidenceReferences, VisionFinding, VisionInput
+from vision_engine.image_processing import (
+    crop_screenshot,
+    crop_screenshot_with_origin,
+)
 from vision_engine.prompting.vlm_prompt import build_vlm_prompt
-
+from vision_engine.models import (
+    BoundingBox,
+    EvidenceReferences,
+    VisionFinding,
+    VisionInput,
+)
 
 class GeminiVLMDetector:
     """Analyze screenshot and DOM evidence using Google's Gemini API."""
@@ -142,13 +149,31 @@ class GeminiVLMDetector:
         ]
 
         if input_data.screenshot_path:
+                   crop_origin = None
+
+        if input_data.screenshot_path:
             if input_data.crop_box is not None:
                 try:
-                    screenshot_input = self._read_cropped_screenshot(
+                    cropped_image, crop_origin = crop_screenshot_with_origin(
                         input_data.screenshot_path,
                         input_data.crop_box,
                     )
+
+                    image_buffer = BytesIO()
+                    cropped_image.save(image_buffer, format="PNG")
+                    image_data = image_buffer.getvalue()
+
+                    if not image_data:
+                        raise ValueError("Cropped screenshot is empty.")
+
+                    screenshot_input = {
+                        "type": "image",
+                        "data": base64.b64encode(image_data).decode("ascii"),
+                        "mime_type": "image/png",
+                    }
+
                 except Exception:
+                    crop_origin = None
                     screenshot_input = self._read_screenshot(
                         input_data.screenshot_path
                     )
@@ -212,6 +237,14 @@ class GeminiVLMDetector:
         findings = parse_vlm_response(response_text)
 
         for finding in findings:
+            if crop_origin is not None and finding.bounding_box is not None:
+                finding.bounding_box = BoundingBox(
+                    x=finding.bounding_box.x + crop_origin[0],
+                    y=finding.bounding_box.y + crop_origin[1],
+                    width=finding.bounding_box.width,
+                    height=finding.bounding_box.height,
+                )
+
             finding.evidence = EvidenceReferences(
                 screenshot_path=input_data.screenshot_path,
                 dom_snapshot_path=input_data.dom_snapshot_path,

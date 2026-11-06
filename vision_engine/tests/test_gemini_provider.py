@@ -304,7 +304,7 @@ def test_provider_falls_back_to_original_when_cropping_fails(
     )
 
     monkeypatch.setattr(
-        "vision_engine.detection.gemini_provider.crop_screenshot",
+        "vision_engine.detection.gemini_provider.crop_screenshot_with_origin",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             ValueError("Cropping failed")
         ),
@@ -337,3 +337,126 @@ def test_provider_sends_original_screenshot_without_crop_box(tmp_path):
 
     assert findings == []
     assert base64.b64decode(sent_image["data"]) == b"original-screenshot-data"
+
+
+
+def test_provider_translates_cropped_bounding_box_to_original_coordinates(
+    tmp_path,
+):
+    response = """
+    [
+        {
+            "finding_id": "crop-defect",
+            "category": "layout_overflow",
+            "severity": "high",
+            "confidence": 0.95,
+            "description": "Content overflows its container.",
+            "repair_recommendation": null,
+            "selector": "#content",
+            "bounding_box": {
+                "x": 20,
+                "y": 30,
+                "width": 40,
+                "height": 25
+            },
+            "evidence": {
+                "screenshot_path": null,
+                "dom_snapshot_path": null
+            },
+            "source": "vlm"
+        }
+    ]
+    """
+
+    client = FakeClient(output_text=response)
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "coordinate-test.png"
+    Image.new("RGB", (200, 150), "white").save(screenshot_path)
+
+    input_data = VisionInput(
+        run_id="coordinate-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_box=BoundingBox(
+            x=50,
+            y=40,
+            width=60,
+            height=30,
+        ),
+    )
+
+    findings = detector.detect(input_data)
+
+    assert len(findings) == 1
+    assert findings[0].bounding_box == BoundingBox(
+        x=50,
+        y=50,
+        width=40,
+        height=25,
+    )
+
+
+def test_provider_keeps_coordinates_unchanged_when_crop_fails(
+    tmp_path,
+    monkeypatch,
+):
+    response = """
+    [
+        {
+            "finding_id": "fallback-defect",
+            "category": "layout_overflow",
+            "severity": "high",
+            "confidence": 0.95,
+            "description": "Content overflows its container.",
+            "repair_recommendation": null,
+            "selector": "#content",
+            "bounding_box": {
+                "x": 20,
+                "y": 30,
+                "width": 40,
+                "height": 25
+            },
+            "evidence": {
+                "screenshot_path": null,
+                "dom_snapshot_path": null
+            },
+            "source": "vlm"
+        }
+    ]
+    """
+
+    client = FakeClient(output_text=response)
+    detector = GeminiVLMDetector(client=client)
+
+    screenshot_path = tmp_path / "fallback-coordinate-test.png"
+    screenshot_path.write_bytes(b"original-screenshot-data")
+
+    input_data = VisionInput(
+        run_id="fallback-coordinate-test",
+        url="https://example.com",
+        screenshot_path=str(screenshot_path),
+        crop_box=BoundingBox(
+            x=50,
+            y=40,
+            width=60,
+            height=30,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "vision_engine.detection.gemini_provider.crop_screenshot_with_origin",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ValueError("Cropping failed")
+        ),
+    )
+
+    findings = detector.detect(input_data)
+
+    assert len(findings) == 1
+    assert findings[0].bounding_box == BoundingBox(
+        x=20,
+        y=30,
+        width=40,
+        height=25,
+    )

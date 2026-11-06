@@ -8,20 +8,12 @@ from PIL import Image, ImageOps
 from vision_engine.models import BoundingBox
 
 
-def crop_screenshot(
+def crop_screenshot_with_origin(
     screenshot_path: str,
     bounding_box: BoundingBox,
     padding: int = 20,
-) -> Image.Image:
-    """
-    Crop a screenshot around a detected bounding box.
-
-    Adds padding around the target region and clamps coordinates
-    to the image boundaries.
-
-    Raises ValueError if the screenshot or bounding box is invalid.
-    The original screenshot file is never modified.
-    """
+) -> tuple[Image.Image, tuple[int, int]]:
+    """Crop a screenshot and return the crop's origin in the original image."""
     if padding < 0:
         raise ValueError("Padding cannot be negative.")
 
@@ -61,4 +53,18 @@ def crop_screenshot(
     if right <= left or bottom <= top:
         raise ValueError("Calculated crop area is invalid.")
 
-    return image.crop((left, top, right, bottom))
+    return image.crop((left, top, right, bottom)), (left, top)
+
+
+def crop_screenshot(
+    screenshot_path: str,
+    bounding_box: BoundingBox,
+    padding: int = 20,
+) -> Image.Image:
+    """Crop a screenshot while preserving the original function interface."""
+    cropped_image, _ = crop_screenshot_with_origin(
+        screenshot_path,
+        bounding_box,
+        padding,
+    )
+    return cropped_image
