@@ -152,6 +152,30 @@ Expected response:
 }
 ```
 
+### How to Verify Persistence After Restarting the Backend
+To confirm that data remains permanently stored across backend restarts and process terminations:
+
+1. **Create an inspection run and record data**:
+   ```powershell
+   # Create a run via curl
+   curl -X POST "http://127.0.0.1:8000/api/v1/runs" -H "Content-Type: application/json" -d "{\"url\": \"http://127.0.0.1:8080/index.html\"}"
+   ```
+   Note the returned `run_id` (e.g. `run_9fa35601`).
+
+2. **Terminate the backend server**:
+   Press `Ctrl + C` in the backend terminal to completely kill the Uvicorn process.
+
+3. **Restart the backend server**:
+   ```powershell
+   .\.venv\Scripts\uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+
+4. **Query the run again**:
+   ```powershell
+   curl "http://127.0.0.1:8000/api/v1/runs/run_9fa35601"
+   ```
+   The run record, status, timestamps, findings, and repair proposals will be fully preserved from PostgreSQL.
+
 ### Running Test Suite
 ```powershell
 # Execute database integration tests

@@ -378,41 +378,30 @@ The Browser Agent changes have been merged into the main branch through GitHub P
 - [x] Added standardized error response schemas and HTTP 400/404/422 validation handling.
 - [x] Configured `pytest.ini` with backend testpaths and pythonpath.
 - [x] Created 25 automated backend tests covering health, runs, findings, error handling, and lifecycle status consistency.
-- [ ] Connect the backend run lifecycle to the live Browser Agent Playwright runner.
-- [ ] Connect the backend findings retrieval to live Vision Engine inference.
-- [ ] Replace temporary in-memory `RunStore` with persistent database models and migrations.
+- [x] Connected the backend run lifecycle to the live Browser Agent Playwright runner.
+- [x] Connected the backend findings retrieval to live Vision Engine inference.
+- [x] Replaced temporary in-memory `RunStore` with PostgreSQL 18 database persistence (`runs`, `findings`, `artifacts`, `repair_proposals`) and Alembic migrations.
+- [x] Developed React 18 / Vite dashboard with live inspection, run history audit table, and Human-in-the-Loop repair approval workflow.
+- [x] Verified full integration across all 152 backend tests and 17 frontend tests.
 
-#### Backend Implementation Details
+#### Backend & Dashboard Documentation
 
-| File | Description |
+| Document | Description |
 |---|---|
-| `backend/app/main.py` | FastAPI application instance, router mounting, and OpenAPI metadata. |
-| `backend/app/api/health.py` | Health check endpoint controller (`GET /health`). |
-| `backend/app/api/runs.py` | Runs and findings route controllers (`POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/findings`). |
-| `backend/app/schemas/health.py` | Pydantic response schema for the `/health` endpoint. |
-| `backend/app/schemas/runs.py` | Pydantic schemas for run creation and run response metadata. |
-| `backend/app/schemas/findings.py` | Pydantic schemas for findings and evidence references matching the Vision Engine. |
-| `backend/app/schemas/errors.py` | Standardized error response model for 400/404 responses. |
-| `backend/app/services/run_store.py` | In-memory run and findings repository with mock findings generator. |
-| `backend/app/core/logging.py` | Centralized safe application logger. |
-| `backend/tests/test_health.py` | Automated unit and ASGI integration tests for `/health`. |
-| `backend/tests/test_runs.py` | Automated tests for run creation, retrieval, findings, error cases, and consistency. |
-| `docs/backend_api.md` | Comprehensive backend setup, endpoint documentation, and request/response examples. |
+| [`docs/backend_api.md`](docs/backend_api.md) | Complete backend architecture, all 17 REST endpoints, request/response examples, and error codes. |
+| [`docs/postgresql_setup.md`](docs/postgresql_setup.md) | PostgreSQL 18 setup guide, SQLAlchemy 2.0 ORM models, Alembic migrations, and persistence verification. |
+| [`docs/artifact_storage.md`](docs/artifact_storage.md) | Screenshot and DOM snapshot storage structure, security path traversal guards, and HTTP retrieval APIs. |
+| [`docs/frontend_dashboard.md`](docs/frontend_dashboard.md) | React dashboard component architecture, auto-polling lifecycle, and Human-in-the-Loop review/approval workflow. |
+| [`docs/browser_agent_setup.md`](docs/browser_agent_setup.md) | Browser Agent Playwright automation, headless Chromium execution, and evidence capture. |
 
-#### Current Capabilities
+#### Backend & Dashboard Capabilities
 
-- Validates inspection URLs with automatic whitespace stripping and 2048-character length limit.
-- Generates unique run identifiers (`run_<hex>`) and initializes state to `"queued"`.
-- Communicates run status accurately without fabricating progress stages.
-- Returns structured findings matching the team's approved categories (`layout_overflow`, `missing_visible_element`, `broken_image`).
-- Rejects blank/whitespace run IDs with HTTP 400 and unknown run IDs with HTTP 404.
-- Provides interactive Swagger documentation at `/docs` and ReDoc at `/redoc`.
-
-#### Current Limitations
-
-- **In-Memory Storage:** Runs and findings are stored in RAM (`RunStore`) and will reset if the Uvicorn server restarts.
-- **Single-Process:** State is isolated to a single Uvicorn process and is not shared across multi-worker clusters.
-- **Mock Findings:** Findings currently use clearly labelled mock results (`source: "mock"`) until real VLM inference is connected.
+- **PostgreSQL 18 Persistence:** Permanent storage for all inspection runs, defect findings, artifact references, and repair proposals. Survives process and server restarts.
+- **Automated Pipeline Coordination:** Orchestrates headless browser navigation via Playwright and defect detection via Vision Engine.
+- **Artifact Serving:** Securely streams screenshots and DOM HTML snapshots over HTTP at `/api/v1/artifacts/{run_id}/{filename}` with path traversal protection.
+- **Human-in-the-Loop Governance:** Tri-stage lifecycle badges separating Review authorization (`PENDING`/`APPROVED`/`REJECTED`), patch execution (`UNAPPLIED`/`APPLIED`/`FAILED`), and visual verification (`UNVERIFIED`/`VERIFIED_SUCCESS`/`VERIFIED_FAILURE`).
+- **Interactive API Documentation:** Full Swagger UI available at `http://127.0.0.1:8000/docs` and ReDoc at `http://127.0.0.1:8000/redoc`.
+- **React Frontend Dashboard:** Running on Vite (`http://localhost:5173`) with live inspection progress, defect findings, DOM/screenshot viewer, PostgreSQL history audit log, and proposal approval controls.
 
 ### Other Project Modules
 
