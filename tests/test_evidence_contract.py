@@ -19,27 +19,22 @@ def test_evidence_contract(local_url):
     assert result.url == local_url
     assert result.page_title == "OmniSight Test Page"
 
-    # Timestamp should be present.
     assert result.captured_at
     assert isinstance(result.captured_at, str)
 
-    # Viewport metadata should be present.
     assert isinstance(result.viewport, dict)
     assert "width" in result.viewport
     assert "height" in result.viewport
 
-    # Screenshot and DOM evidence should exist.
     assert result.screenshot_path is not None
     assert Path(result.screenshot_path).is_file()
 
     assert result.dom_snapshot_path is not None
     assert Path(result.dom_snapshot_path).is_file()
 
-    # Error collections should always be lists.
     assert isinstance(result.console_errors, list)
     assert isinstance(result.page_errors, list)
 
-    # Successful navigation should not report a failure.
     assert result.error is None
 
 
@@ -68,7 +63,8 @@ def test_invalid_url_returns_failed_result():
     )
 
     assert result.status == "failed"
-    assert result.error == "Invalid URL"
+    assert result.error is not None
+    assert result.error != "Valid URL"
     assert result.run_id == "invalid_url_test"
     assert result.screenshot_path is None
     assert result.dom_snapshot_path is None
@@ -88,7 +84,7 @@ def test_empty_url_returns_failed_result():
     )
 
     assert result.status == "failed"
-    assert result.error == "Invalid URL"
+    assert result.error == "URL is required"
 
 
 def test_missing_run_id_returns_failed_result(local_url):

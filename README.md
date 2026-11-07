@@ -2,7 +2,7 @@
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing project. It aims to combine vision-language models, browser automation, and Git workflows to detect UI changes, diagnose broken selectors and workflows, generate candidate test repairs, and submit changes for human review.
 
-The project includes a Playwright-based Browser Agent for browser navigation, screenshot capture, DOM snapshot generation, metadata collection, browser error monitoring, and automated testing. The Vision Engine provides input and finding models, evidence validation, deterministic mock defect detection, and static HTML DOM heuristics for identifying selected image and form-label issues. Other components are under active development.
+The project includes a Playwright-based Browser Agent for browser navigation, screenshot capture, DOM snapshot generation, metadata collection, browser error monitoring, and automated testing. The Vision Engine provides validated input and finding models, evidence validation, deterministic mock detection, static HTML DOM heuristics, Gemini-powered vision-language analysis, screenshot cropping, evaluation metrics, and post-repair verification. It can analyze screenshot and DOM evidence, produce structured findings, and compare full-image and cropped-image detection workflows. Other components are under active development.
 
 ## 🚀 Project Objective
 
@@ -21,41 +21,65 @@ OmniSight/
 ├── vision_engine/
 │   ├── detection/
 │   │   ├── dom_detector.py
-│   │   └── mock_detector.py
+│   │   ├── mock_detector.py
+│   │   ├── gemini_provider.py
+│   │   ├── vlm_interface.py
+│   │   └── vlm_response_parser.py
+│   ├── prompting/
+│   │   └── vlm_prompt.py
+│   ├── demo_tests/
+│   │   ├── evidence/
+│   │   │   ├── broken_image.html
+│   │   │   ├── broken_image.png
+│   │   │   ├── clean.html
+│   │   │   ├── clean.png
+│   │   │   ├── overflow.html
+│   │   │   ├── overflow.png
+│   │   │   ├── crop_comparison_results.json
+│   │   │   ├── dom_timeout_check_results.json
+│   │   │   └── live_validation_results.json
+│   │   ├── benchmark_crop_modes.py
+│   │   ├── capture_evidence.py
+│   │   ├── demo_site.html
+│   │   ├── run_dom_timeout_check.py
+│   │   ├── run_gemini_tests.py
+│   │   └── README.md
 │   ├── tests/
-│   │   ├── test_dom_detector.py
-│   │   ├── test_evidence_validator.py
-│   │   └── test_mock_detector.py
-│   ├── models.py
+│   ├── evaluation.py
 │   ├── evidence_validator.py
+│   ├── image_processing.py
+│   ├── models.py
+│   ├── verification.py
 │   └── README.md
+│
 ├── browser_agent/
 │   ├── navigation/                # Browser navigation and interactions
 │   ├── screenshots/               # Screenshot capture and artifacts
 │   ├── evidence/                  # DOM snapshots and execution evidence
 │   └── tests/                     # Browser Agent automated tests
+│
 ├── backend/                       # FastAPI backend and orchestration API
 │   ├── app/
-│   │   ├── api/                   # Route handlers (health, runs, findings)
-│   │   ├── core/                  # Safe logging and configurations
-│   │   ├── schemas/               # Pydantic models (health, runs, findings, errors)
-│   │   ├── services/              # Business logic and in-memory RunStore
-│   │   └── main.py                # FastAPI application entry point
-│   └── tests/                     # Automated backend test suites
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   └── main.py
+│   └── tests/
+│
 ├── self_healing/                  # Failure analysis and repair pipeline
 ├── github_integration/            # GitHub and Git workflow automation
 ├── frontend/                      # Monitoring dashboard
 ├── docs/                          # Project and module documentation
-│   ├── backend_api.md             # Backend API guide and endpoint reference
-│   └── browser_agent_setup.md     # Browser Agent setup guide
+│   ├── backend_api.md
+│   └── browser_agent_setup.md
 ├── tests/                         # Project-level and integration tests
 ├── artifacts/                     # Generated browser execution artifacts
-├── pytest.ini                     # Pytest configuration
+├── pytest.ini
 ├── .gitignore
 ├── .env.example
 ├── requirements.txt
 └── README.md
-
 ```
 
 The tree lists the documented Vision Engine files and Browser Agent module structure. Other project modules may contain additional files maintained by their respective team members.
@@ -79,8 +103,6 @@ The tree lists the documented Vision Engine files and Browser Agent module struc
 - Playwright and its required browser installed for Browser Agent work.
 
 ### 1. Clone the Repository
-
-If you have not cloned the repository yet:
 
 ```bash
 git clone https://github.com/prabath-ux05/OmniSight.git
@@ -168,11 +190,11 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Once running, access the interactive API documentation in your browser:
-- **Swagger UI (Interactive)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc (Specification)**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+- **Swagger UI (Interactive):** http://127.0.0.1:8000/docs
+- **ReDoc (Specification):** http://127.0.0.1:8000/redoc
 
 ## 📌 Development Status
-
 
 The following checklist reflects the documented development status. Features should only be marked complete when their implementation and tests have been verified.
 
@@ -190,9 +212,16 @@ The following checklist reflects the documented development status. Features sho
 - [x] Added detection of missing or empty image alt text.
 - [x] Added heuristics for form controls that may lack accessible labels.
 - [x] Added automated DOM detector regression tests.
-- [ ] Refine defect categories and finding-output validation.
-- [ ] Integrate an approved vision-language model when provider access is available.
-- [ ] Validate real model responses and expand failure-handling tests.
+- [x] Refined defect categories and finding-output validation.
+- [x] Integrated a Gemini vision-language model provider.
+- [x] Added VLM response parsing, validation, and failure handling.
+- [x] Added screenshot preprocessing, cropping, and bounding-box coordinate translation.
+- [x] Added fallback handling when screenshot crop preparation fails.
+- [x] Added evaluation metrics for precision, recall, and F1 score.
+- [x] Added post-repair verification support.
+- [x] Added demo evidence capture and live Gemini testing scripts.
+- [x] Added screenshot crop benchmarking for full-image, single-crop, and multi-crop modes.
+- [x] Updated Vision Engine documentation and benchmark reports.
 
 ### Vision Engine Implementation Details
 
@@ -201,39 +230,48 @@ The following checklist reflects the documented development status. Features sho
 | File | Description |
 |---|---|
 | `vision_engine/models.py` | Defines input, finding, evidence-reference, and bounding-box models. |
-| `vision_engine/evidence_validator.py` | Checks evidence paths, file existence, file type, readability, and empty files. |
+| `vision_engine/evidence_validator.py` | Validates evidence paths, file existence, file type, readability, and empty files. |
 | `vision_engine/detection/mock_detector.py` | Provides deterministic mock defect and clean-page scenarios. |
-| `vision_engine/tests/test_evidence_validator.py` | Covers evidence-validation behavior and failure cases. |
-| `vision_engine/tests/test_mock_detector.py` | Covers mock detection scenarios and evidence-validation failures. |
-| `vision_engine/README.md` | Documents the Vision Engine module and its current capabilities. |
-| `vision_engine/detection/dom_detector.py` | Uses static HTML heuristics to identify selected image and form-label issues. |
-| `vision_engine/tests/test_dom_detector.py` | Tests DOM issue detection, label recognition, input edge cases, and evidence references. |
+| `vision_engine/detection/dom_detector.py` | Uses static HTML heuristics to identify image and form-label issues. |
+| `vision_engine/detection/gemini_provider.py` | Integrates Gemini for screenshot-based defect detection. |
+| `vision_engine/detection/vlm_interface.py` | Defines the vision-language model interface. |
+| `vision_engine/detection/vlm_response_parser.py` | Parses and validates structured VLM responses. |
+| `vision_engine/prompting/vlm_prompt.py` | Contains prompts and instructions for VLM-based detection. |
+| `vision_engine/image_processing.py` | Handles screenshot preprocessing, cropping, and coordinate translation. |
+| `vision_engine/evaluation.py` | Provides evaluation metrics, including precision, recall, and F1 score. |
+| `vision_engine/verification.py` | Supports post-repair verification. |
+| `vision_engine/demo_tests/` | Contains evidence capture, live Gemini testing, and benchmark scripts. |
+| `vision_engine/tests/` | Contains automated regression and integration tests for Vision Engine components. |
+| `vision_engine/README.md` | Documents Vision Engine architecture, setup, capabilities, and limitations. |
 
 #### Current Capabilities
 
-- Accepts a run identifier, URL, and optional screenshot and DOM snapshot paths, requiring at least one evidence path.
-- Validates required input fields and rejects blank `run_id` and `url` values.
-- Checks whether supplied evidence files exist, are regular files, can be opened, and are non-empty.
-- Produces example findings for `layout_overflow` and `broken_image` in the mock defect scenario.
-- Returns an empty findings list in the mock clean scenario.
-- Represents findings with category, severity, confidence, description, and evidence references.
-- Preserves provided evidence references in mock findings.
-- Scans saved HTML for image elements with missing or empty `src` attributes.
-- Identifies image elements with missing or empty `alt` text.
-- Flags form controls that may lack accessible labels.
-- Recognizes common label indicators, including explicit `<label for="...">` references, wrapping labels, `aria-label`, and `aria-labelledby`.
+- Accepts run identifiers, URLs, and screenshot or DOM evidence paths.
+- Validates required input fields and evidence files.
+- Generates deterministic mock findings for `layout_overflow` and `broken_image`.
+- Detects selected image and form-label accessibility issues through static HTML analysis.
+- Uses Gemini as a vision-language model provider to analyze screenshot evidence.
+- Validates and parses model responses into structured findings.
+- Handles selected temporary provider failures through retry logic.
+- Preprocesses screenshots and supports full-image, single-crop, and multi-crop detection.
+- Translates bounding-box coordinates from cropped images back to the original screenshot.
+- Falls back to full-screenshot processing if crop preparation fails.
+- Calculates precision, recall, and F1 score for detection evaluation.
+- Supports post-repair verification.
+- Includes demo scripts for capturing evidence and testing the live Gemini integration.
+- Includes benchmark scripts comparing screenshot processing modes.
 
 #### Current Limitations
 
-The mock detector generates deterministic example findings for testing and does not analyze real screenshot pixels to identify visual defects.
+The mock detector generates deterministic example findings and is intended for testing rather than real visual analysis.
 
-The DOM detector performs static HTML analysis to identify potential issues, including missing or empty image sources, missing image alt text, and potentially unlabelled form controls. It recognizes common labeling mechanisms such as explicit labels, wrapping labels, `aria-label`, and `aria-labelledby`.
+The DOM detector performs static HTML analysis. It does not execute JavaScript, inspect the rendered page layout, fetch image URLs, or verify whether images load successfully. Its heuristic checks may produce false positives or miss issues in complex HTML structures.
 
-The DOM detector does not execute JavaScript, inspect the rendered page layout, fetch image URLs, or verify whether images load successfully. Its heuristic checks may produce false positives or miss issues in complex HTML structures.
+Gemini-based detection depends on provider availability, valid API credentials, and model responses. Detection accuracy can vary depending on screenshot quality, prompt interpretation, and the visual complexity of the page.
 
-Evidence validation checks basic file accessibility and non-empty content but does not establish the semantic validity of image or DOM data. Real vision-language model integration is not yet implemented.
+The screenshot crop benchmark covered two defect scenarios across six runs. All expected defects were detected. Single-crop processing reduced image payload size by approximately **58–60%** compared with full-image processing in the tested scenarios. These results are preliminary and should not be treated as a comprehensive accuracy or performance evaluation.
 
-A previous development note recorded **47 passed** for the Vision Engine tests. Rerun the tests to verify the current state rather than treating that earlier result as a fresh test run.
+The latest recorded full-project regression test result was **119 passed**. Rerun the test suite after further changes to verify the current state.
 
 ### Browser Agent — Member 2: RPA & Browser Agent
 
@@ -244,18 +282,22 @@ A previous development note recorded **47 passed** for the Vision Engine tests. 
 - [x] Implemented metadata collection, including URL, page title, ISO-8601 timestamp, and viewport dimensions.
 - [x] Added browser console error collection and JavaScript page exception tracking.
 - [x] Implemented invalid URL validation and navigation timeout handling.
+- [x] Added HTTP response status and navigation duration tracking.
+- [x] Added failed network request tracking.
 - [x] Added structured success and failure responses.
 - [x] Implemented safe browser cleanup on success and failure.
-- [x] Standardized the evidence contract, including run ID, artifact paths, metadata, errors, status, and failure details.
+- [x] Added before-and-after screenshot and DOM evidence capture.
+- [x] Added DOM metadata collection, including image details, element counts, form details, and interactive elements.
+- [x] Added backward compatibility for existing DOM artifact filenames.
+- [x] Added Windows Proactor event-loop compatibility.
 - [x] Added automated tests for navigation, screenshots, DOM capture, metadata, and evidence validation.
-- [x] Added tests for invalid URLs, missing run IDs, timeout handling, and artifact existence.
+- [x] Added tests for invalid URLs, missing run IDs, timeout handling, and artifact creation.
 - [x] Added a local HTML test page and temporary HTTP server for repeatable browser testing.
 - [x] Updated Git ignore rules to exclude generated browser artifacts from version control.
 - [x] Documented Playwright installation, usage, testing, evidence structure, and integration requirements.
-- [ ] Integrate the Browser Agent with the Vision Engine.
-- [ ] Integrate browser execution and evidence collection with the Backend.
-- [ ] Complete end-to-end testing across the integrated modules.
-- [ ] Perform final integration review and project handover.
+- [x] Merged Browser Agent changes into the main branch through GitHub PR #9.
+- [ ] Complete further cross-module integration validation with the Vision Engine and Backend.
+- [ ] Complete final end-to-end integration review and project handover.
 
 #### Browser Agent Implementation Details
 
@@ -265,19 +307,20 @@ The Browser Agent provides a Playwright-based browser automation module that cap
 
 - **Browser Navigation:** Launches Chromium and navigates to target URLs.
 - **Screenshot Capture:** Captures full-page screenshots and stores artifacts organized by run.
-- **DOM Snapshot Generation:** Captures DOM evidence for further inspection by the Vision Engine.
+- **DOM Snapshot Generation:** Captures before-and-after DOM evidence for further inspection.
 - **Metadata Collection:** Records the current URL, page title, viewport information, and ISO-8601 timestamps.
-- **Error Monitoring:** Collects browser console errors and JavaScript page exceptions.
+- **Error Monitoring:** Collects browser console errors, JavaScript page exceptions, and failed network requests.
+- **HTTP Diagnostics:** Records HTTP response status and navigation duration.
 - **Failure Handling:** Validates URLs, handles navigation timeouts, returns structured failure information, and safely closes browser resources.
-- **Evidence Contract:** Standardizes browser execution results for integration with other modules.
+- **DOM Analysis Metadata:** Collects image information, element counts, form details, and interactive element information.
+- **Evidence Management:** Organizes screenshots, DOM snapshots, and metadata using unique run IDs.
 - **Automated Testing:** Covers navigation, screenshots, DOM capture, metadata, artifact creation, evidence validation, invalid URLs, timeout handling, and browser cleanup.
-- **Local Test Environment:** Includes a local HTML test page and temporary HTTP server for repeatable browser tests without relying on external websites.
-- **Generated Artifacts:** Excludes generated browser evidence from Git tracking to keep the repository clean.
+- **Windows Compatibility:** Includes Windows Proactor event-loop policy handling for Playwright execution.
 - **Documentation:** Includes Playwright installation, test execution, evidence structure, and integration guidelines.
 
 #### Standardized Evidence Contract
 
-The Browser Agent defines a structured evidence contract containing:
+The Browser Agent provides structured evidence containing:
 
 | Field | Description |
 |---|---|
@@ -290,6 +333,9 @@ The Browser Agent defines a structured evidence contract containing:
 | `dom_snapshot_path` | Reference to the generated DOM snapshot |
 | `console_errors` | Collected browser console errors |
 | `page_errors` | Captured JavaScript page exceptions |
+| `response_status` | HTTP response status code |
+| `navigation_duration_ms` | Time taken for navigation |
+| `failed_requests` | Details of failed network requests |
 | `status` | Outcome of browser execution |
 | `error` | Failure details, when applicable |
 
@@ -301,19 +347,22 @@ Automated tests cover:
 
 - Browser launch and navigation.
 - Screenshot capture and artifact creation.
-- DOM snapshot generation.
+- Before-and-after DOM snapshot generation.
 - Metadata collection.
 - Evidence contract validation.
 - Console error and JavaScript exception collection.
+- Failed network request tracking.
+- HTTP response status handling.
 - Invalid URL and missing run ID handling.
 - Navigation timeout handling.
 - Successful capture when the page contains a broken image.
 - Artifact existence and structured failure responses.
 - Safe browser cleanup.
+- Windows event-loop compatibility.
 
-A local test page and temporary HTTP server support repeatable testing. Run the full test suite before integration or release to verify the current state.
+The complete test suite passed after resolving integration and compatibility issues.
 
-The Browser Agent implementation and its automated tests are documented as completed. Integration with the Vision Engine and Backend, along with full end-to-end validation, remains to be verified.
+The Browser Agent changes have been merged into the main branch through GitHub PR #9. Further cross-module integration validation and end-to-end testing remain part of the project's ongoing development.
 
 ### Backend & API Orchestration — Member 4: Backend Developer
 
@@ -351,6 +400,7 @@ The Browser Agent implementation and its automated tests are documented as compl
 | `docs/backend_api.md` | Comprehensive backend setup, endpoint documentation, and request/response examples. |
 
 #### Current Capabilities
+
 - Validates inspection URLs with automatic whitespace stripping and 2048-character length limit.
 - Generates unique run identifiers (`run_<hex>`) and initializes state to `"queued"`.
 - Communicates run status accurately without fabricating progress stages.
@@ -359,16 +409,16 @@ The Browser Agent implementation and its automated tests are documented as compl
 - Provides interactive Swagger documentation at `/docs` and ReDoc at `/redoc`.
 
 #### Current Limitations
-- **In-Memory Storage**: Runs and findings are stored in RAM (`RunStore`) and will reset if the Uvicorn server restarts.
-- **Single-Process**: State is isolated to a single Uvicorn process and is not shared across multi-worker clusters.
-- **Mock Findings**: Findings currently use clearly labelled mock results (`source: "mock"`) until real VLM inference is connected.
+
+- **In-Memory Storage:** Runs and findings are stored in RAM (`RunStore`) and will reset if the Uvicorn server restarts.
+- **Single-Process:** State is isolated to a single Uvicorn process and is not shared across multi-worker clusters.
+- **Mock Findings:** Findings currently use clearly labelled mock results (`source: "mock"`) until real VLM inference is connected.
 
 ### Other Project Modules
 
 The Self-Healing, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status will be updated by their respective team members based on their actual code and test results.
 
 ## 📋 Development Guidelines
-
 
 - Work on your assigned feature branch.
 - Keep commits focused and descriptive.
@@ -381,8 +431,9 @@ The Self-Healing, GitHub Integration, and Frontend modules are part of the overa
 
 ## 🗺️ Future Roadmap
 
-- Integrate an approved vision-language model into the Vision Engine.
 - Improve visual defect classification and finding validation.
+- Expand evaluation using more defect categories and real-world test scenarios.
+- Improve screenshot preprocessing and crop-selection strategies.
 - Connect screenshot and DOM evidence from the Browser Agent to visual inspection.
 - Develop the self-healing pipeline for candidate selector repairs.
 - Integrate backend APIs and GitHub workflows.
@@ -395,8 +446,10 @@ Contributions should follow the team's assigned module responsibilities and deve
 
 ## ⚖️ Current Project Limitations
 
-OmniSight is under active development. The Vision Engine currently provides validated data models, evidence-file checks, deterministic mock detection, and static HTML DOM heuristics.
+OmniSight is under active development. The Vision Engine provides validated data models, evidence-file checks, deterministic mock detection, static HTML DOM heuristics, and Gemini-powered vision-language analysis.
+
+Gemini-based detection depends on provider availability, valid API credentials, and model response quality. Its detection accuracy and performance require further evaluation across a wider range of real-world UI defects.
 
 The Browser Agent captures browser evidence and handles common execution failures. However, full integration across the Browser Agent, Vision Engine, Backend, and dashboard still requires verification.
 
-Real screenshot-based vision-language analysis, automated repair generation, and complete end-to-end self-healing workflows depend on further development and testing.
+Automated repair generation, complete end-to-end self-healing workflows, and production-level integration remain under development.
