@@ -109,14 +109,8 @@ def get_run_dom(run_id: str):
 )
 def get_artifact(run_id: str, filename: str):
     """Serve a screenshot or DOM artifact file for a specific run."""
-    clean_run_id = os.path.basename(run_id.strip()) if run_id else ""
-    clean_filename = os.path.basename(filename.strip()) if filename else ""
-
-    if not clean_run_id or not clean_filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="run_id and filename are required.",
-        )
+    clean_run_id = _sanitize_path_component(run_id, "run_id")
+    clean_filename = _sanitize_path_component(filename, "filename")
 
     target_file = (ARTIFACTS_ROOT / clean_run_id / clean_filename).resolve()
 
@@ -125,7 +119,7 @@ def get_artifact(run_id: str, filename: str):
         logger.warning("Blocked directory traversal attempt: %s", target_file)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid artifact path.",
+            detail="Invalid artifact path: directory traversal attempt blocked.",
         )
 
     if not target_file.is_file():
