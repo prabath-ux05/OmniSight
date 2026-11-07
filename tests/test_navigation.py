@@ -27,3 +27,16 @@ def test_invalid_url():
     assert result.status == "failed"
     assert result.error is not None
     assert result.error != "Valid URL"
+
+
+def test_http_404_response(local_server):
+    navigator = BrowserNavigator()
+
+    result = navigator.navigate(
+        url=f"{local_server}/missing-page",
+        run_id="http_error_test",
+    )
+
+    assert result.status == "failed"
+    assert result.response_status == 404
+    assert "404" in result.error

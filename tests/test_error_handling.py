@@ -41,7 +41,7 @@ def test_console_error_structure(local_url):
 
 
 def test_timeout_handling(slow_url):
-    navigator = BrowserNavigator(timeout_ms=1)
+    navigator = BrowserNavigator(timeout_ms=100)
 
     result = navigator.navigate(
         url=slow_url,

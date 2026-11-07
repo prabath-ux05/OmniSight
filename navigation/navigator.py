@@ -7,7 +7,7 @@ from typing import Optional
 
 from playwright.sync_api import (
     sync_playwright,
-    TimeoutError as PlaywrightTimeoutError
+    TimeoutError as PlaywrightTimeoutError,
 )
 
 from evidence.dom_capture import DOMCapture
@@ -45,7 +45,7 @@ class BrowserNavigator:
         headless=True,
         viewport_width=1280,
         viewport_height=720,
-        render_wait_ms=500
+        render_wait_ms=500,
     ):
         if timeout_ms <= 0:
             raise ValueError("timeout_ms must be greater than zero")
@@ -80,7 +80,7 @@ class BrowserNavigator:
         failed_requests=None,
         response_status=None,
         console_errors=None,
-        page_errors=None
+        page_errors=None,
     ):
         timestamp = BrowserNavigator._current_timestamp()
 
@@ -95,7 +95,7 @@ class BrowserNavigator:
             response_status=response_status,
             console_errors=list(console_errors or []),
             page_errors=list(page_errors or []),
-            error=error
+            error=error,
         )
 
     def navigate(self, url: str, run_id: str) -> NavigationResult:
@@ -138,7 +138,7 @@ class BrowserNavigator:
                     page = browser.new_page(
                         viewport={
                             "width": self.viewport_width,
-                            "height": self.viewport_height
+                            "height": self.viewport_height,
                         }
                     )
 
@@ -147,13 +147,13 @@ class BrowserNavigator:
                         "console",
                         lambda message: console_errors.append(
                             message.text
-                        ) if message.type == "error" else None
+                        ) if message.type == "error" else None,
                     )
 
                     # Step 4: Capture JavaScript errors
                     page.on(
                         "pageerror",
-                        lambda error: page_errors.append(str(error))
+                        lambda error: page_errors.append(str(error)),
                     )
 
                     # Step 5: Capture failed network requests
@@ -164,12 +164,12 @@ class BrowserNavigator:
                             "url": request.url,
                             "method": request.method,
                             "failure": str(failure)
-                            if failure else "Request failed"
+                            if failure else "Request failed",
                         })
 
                     page.on(
                         "requestfailed",
-                        capture_failed_request
+                        capture_failed_request,
                     )
 
                     try:
@@ -177,7 +177,7 @@ class BrowserNavigator:
                         response = page.goto(
                             url,
                             wait_until="domcontentloaded",
-                            timeout=self.timeout_ms
+                            timeout=self.timeout_ms,
                         )
 
                         # Step 7: Capture HTTP response status
@@ -200,7 +200,7 @@ class BrowserNavigator:
                             ScreenshotManager.save_screenshot(
                                 page,
                                 run_id,
-                                stage="before"
+                                stage="before",
                             )
                         )
 
@@ -209,7 +209,7 @@ class BrowserNavigator:
                             DOMCapture.save_dom_snapshot(
                                 page,
                                 run_id,
-                                stage="before"
+                                stage="before",
                             )
                         )
 
@@ -227,12 +227,24 @@ class BrowserNavigator:
                         # Step 13: Calculate navigation duration
                         duration = round(
                             (perf_counter() - start_time) * 1000,
-                            2
+                            2,
                         )
 
-                        # Step 14: Return structured result
+                        # Step 14: Identify HTTP errors
+                        http_error = (
+                            response_status is not None
+                            and response_status >= 400
+                        )
+
+                        error_message = (
+                            f"HTTP error: {response_status}"
+                            if http_error
+                            else None
+                        )
+
+                        # Step 15: Return structured result
                         return NavigationResult(
-                            status="success",
+                            status="failed" if http_error else "success",
                             url=page.url,
                             run_id=run_id,
                             page_title=page_title,
@@ -246,13 +258,13 @@ class BrowserNavigator:
                             response_status=response_status,
                             navigation_duration_ms=duration,
                             failed_requests=list(failed_requests),
-                            error=None
+                            error=error_message,
                         )
 
                     except PlaywrightTimeoutError:
                         duration = round(
                             (perf_counter() - start_time) * 1000,
-                            2
+                            2,
                         )
 
                         return self._failed_result(
@@ -263,24 +275,24 @@ class BrowserNavigator:
                             failed_requests=failed_requests,
                             response_status=response_status,
                             console_errors=console_errors,
-                            page_errors=page_errors
+                            page_errors=page_errors,
                         )
 
                     except Exception as error:
                         duration = round(
                             (perf_counter() - start_time) * 1000,
-                            2
+                            2,
                         )
 
                         return self._failed_result(
                             url,
                             run_id,
-                            str(error),
+                            str(error) or type(error).__name__,
                             navigation_duration_ms=duration,
                             failed_requests=failed_requests,
                             response_status=response_status,
                             console_errors=console_errors,
-                            page_errors=page_errors
+                            page_errors=page_errors,
                         )
 
                 finally:
@@ -289,16 +301,16 @@ class BrowserNavigator:
         except Exception as error:
             duration = round(
                 (perf_counter() - start_time) * 1000,
-                2
+                2,
             )
 
             return self._failed_result(
                 url,
                 run_id,
-                str(error),
+                str(error) or type(error).__name__,
                 navigation_duration_ms=duration,
                 failed_requests=failed_requests,
                 response_status=response_status,
                 console_errors=console_errors,
-                page_errors=page_errors
+                page_errors=page_errors,
             )
