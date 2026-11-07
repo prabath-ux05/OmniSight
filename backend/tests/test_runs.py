@@ -411,3 +411,87 @@ def test_consistent_run_ids_and_lifecycle_status_values():
 
 
 
+
+
+# =============================================================================
+# Day 1: Backend Improvements Regression Tests
+# =============================================================================
+
+def test_run_store_clears_error_when_none_passed():
+    """Verify that update_run with error=None clears a previously set error."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    updated = run_store.update_run(run.run_id, error="Transient connection failure")
+    assert updated is not None
+    assert updated.error == "Transient connection failure"
+
+    cleared = run_store.update_run(run.run_id, error=None)
+    assert cleared is not None
+    assert cleared.error is None
+
+
+def test_run_store_sets_completed_at_on_terminal_statuses():
+    """Verify that completed_at is automatically stamped when transitioning to terminal status."""
+    run1 = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    assert run1.completed_at is None
+
+    # Transition to non-terminal
+    run_store.update_run(run1.run_id, status="capturing")
+    assert run_store.get(run1.run_id).completed_at is None
+
+    # Transition to terminal status: completed
+    run_store.update_run(run1.run_id, status="completed")
+    completed_run = run_store.get(run1.run_id)
+    assert completed_run.completed_at is not None
+    assert "T" in completed_run.completed_at
+
+    # Transition to terminal status: failed
+    run2 = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    run_store.update_run(run2.run_id, status="failed", error="Browser crashed")
+    failed_run = run_store.get(run2.run_id)
+    assert failed_run.completed_at is not None
+
+    # Transition to terminal status: cancelled
+    run3 = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    run_store.update_run(run3.run_id, status="cancelled")
+    cancelled_run = run_store.get(run3.run_id)
+    assert cancelled_run.completed_at is not None
+
+
+def test_validate_run_id_rejects_oversized_identifiers():
+    """Verify that run_id exceeding 128 characters returns 400 Bad Request."""
+    oversized_id = "run_" + "x" * 130
+    status_code, data = asyncio.run(dispatch_asgi_get(f"/api/v1/runs/{oversized_id}"))
+
+    assert status_code == 400
+    assert "detail" in data
+    assert "128 characters" in data["detail"]
+
+    # Also check findings endpoint
+    findings_status, findings_data = asyncio.run(
+        dispatch_asgi_get(f"/api/v1/runs/{oversized_id}/findings")
+    )
+    assert findings_status == 400
+    assert "detail" in findings_data
+    assert "128 characters" in findings_data["detail"]
+
+
+def test_list_runs_endpoint():
+    """Verify GET /api/v1/runs retrieves all stored runs in descending order."""
+    # When empty
+    status_code, data = asyncio.run(dispatch_asgi_get("/api/v1/runs"))
+    assert status_code == 200
+    assert data == []
+
+    # Create two runs
+    run1 = run_store.create(RunCreateRequest(url="https://example.com/one"))
+    run2 = run_store.create(RunCreateRequest(url="https://example.com/two"))
+
+    status_code, data = asyncio.run(dispatch_asgi_get("/api/v1/runs"))
+    assert status_code == 200
+    assert len(data) == 2
+    # Check descending order: run2 was created after run1
+    assert data[0]["run_id"] == run2.run_id
+    assert data[0]["url"] == "https://example.com/two"
+    assert data[1]["run_id"] == run1.run_id
+    assert data[1]["url"] == "https://example.com/one"
+

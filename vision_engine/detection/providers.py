@@ -303,8 +303,8 @@ def check_vlm_configuration(provider_name: str | None = None) -> dict[str, Any]:
     """Inspect and report VLM configuration status without exposing credentials."""
     target_provider = (
         provider_name
-        or os.getenv("VISION_MODEL_PROVIDER")
         or os.getenv("VLM_PROVIDER")
+        or os.getenv("VISION_MODEL_PROVIDER")
         or "gemini"
     ).strip().lower()
 

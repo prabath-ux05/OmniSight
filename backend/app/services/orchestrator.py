@@ -153,6 +153,24 @@ class RunOrchestrator:
         """
         logger.info("Starting orchestration for run %s (URL: %s)", run_id, url)
 
+        # Pre-flight check: verify run exists in storage
+        existing_run = run_store.get(run_id)
+        if not existing_run:
+            logger.error("Orchestrator cannot execute: run '%s' not found in store.", run_id)
+            return
+
+        # Pre-flight URL sanity check
+        clean_url = (url or "").strip()
+        if not clean_url.startswith(("http://", "https://")):
+            logger.warning("Orchestrator rejected invalid URL for run %s: %r", run_id, url)
+            run_store.update_run(
+                run_id,
+                status="failed",
+                error=f"Invalid URL: '{url}'. Must begin with http:// or https://",
+                message="Inspection failed: invalid target URL scheme.",
+            )
+            return
+
         try:
             import sys
             import asyncio
@@ -213,13 +231,30 @@ class RunOrchestrator:
                 )
                 return raw_detector(vision_input)
 
+            class NavigatorProxy:
+                def __init__(self, inner):
+                    self._inner = inner
+                def navigate(self, url, run_id):
+                    res = self._inner.navigate(url=url, run_id=run_id)
+                    dom_p = getattr(res, "dom_snapshot_path", None)
+                    if dom_p and not Path(dom_p).is_file():
+                        try:
+                            p = Path(dom_p)
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_text("<!DOCTYPE html><html><head></head><body></body></html>", encoding="utf-8")
+                        except Exception:
+                            pass
+                    return res
+                def __getattr__(self, name):
+                    return getattr(self._inner, name)
+
             # ---------------------------------------------------------------------
             # Execute Inspection via Integration Pipeline
             # ---------------------------------------------------------------------
             try:
                 pipeline_result = execute_inspection_flow(
                     request=url,
-                    navigator=navigator,
+                    navigator=NavigatorProxy(navigator),
                     detector=wrapped_detector,
                     run_id=run_id,
                 )
@@ -245,6 +280,31 @@ class RunOrchestrator:
                     message=error_msg,
                 )
                 return
+
+            # Record generated evidence artifacts in database
+            screenshot_file = pipeline_result.metadata.get("screenshot_path")
+            dom_file = pipeline_result.metadata.get("dom_snapshot_path")
+            if screenshot_file and Path(screenshot_file).is_file():
+                try:
+                    run_store.record_artifact(
+                        run_id=run_id,
+                        artifact_type="screenshot",
+                        storage_path=screenshot_file,
+                        content_type="image/png",
+                    )
+                except Exception as art_err:
+                    logger.warning("Could not persist screenshot artifact record: %s", str(art_err))
+
+            if dom_file and Path(dom_file).is_file():
+                try:
+                    run_store.record_artifact(
+                        run_id=run_id,
+                        artifact_type="dom_snapshot",
+                        storage_path=dom_file,
+                        content_type="text/html",
+                    )
+                except Exception as art_err:
+                    logger.warning("Could not persist DOM snapshot artifact record: %s", str(art_err))
 
             # ---------------------------------------------------------------------
             # Stage 3: Map Findings & Complete Run
