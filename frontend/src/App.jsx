@@ -18,6 +18,7 @@ import {
   createRepairProposal,
   approveProposal,
   rejectProposal,
+  repairRunFinding,
 } from './services/api';
 import './App.css';
 
@@ -31,7 +32,7 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [isHealthLoading, setIsHealthLoading] = useState(false);
 
-  // Active run state (Day 14 & 17)
+  // Active run state
   const [currentRun, setCurrentRun] = useState(null);
   const [isRunLoading, setIsRunLoading] = useState(false);
   const [isAutoPolling, setIsAutoPolling] = useState(false);
@@ -42,16 +43,21 @@ export default function App() {
   const [isRunsLoading, setIsRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState('');
 
-  // Findings state (Day 15)
+  // Findings state
   const [findings, setFindings] = useState(null);
   const [isFindingsLoading, setIsFindingsLoading] = useState(false);
   const [findingsError, setFindingsError] = useState('');
   const [selectedFinding, setSelectedFinding] = useState(null);
   const [includeMockFindings, setIncludeMockFindings] = useState(false);
 
-  // Repair Proposals state (Day 4: Review & Approval Workflow)
+  // Repair Proposals state (Day 4 & 5: Review & Approval Workflow)
   const [proposalsList, setProposalsList] = useState([]);
   const [isProposalsLoading, setIsProposalsLoading] = useState(false);
+
+  // Self-healing repairs state
+  const [repairs, setRepairs] = useState({});
+  const [repairingFindingId, setRepairingFindingId] = useState(null);
+  const [repairError, setRepairError] = useState('');
 
   // Alerts & notifications
   const [errorMessage, setErrorMessage] = useState('');
@@ -98,7 +104,7 @@ export default function App() {
   }, [loadRunsList]);
 
   // ---------------------------------------------------------------------------
-  // 3. Fetch Repair Proposals for Run (Day 4)
+  // 3. Fetch Repair Proposals for Run (Day 4 & 5)
   // ---------------------------------------------------------------------------
   const loadProposals = useCallback(async (runId) => {
     if (!runId) {
@@ -116,7 +122,7 @@ export default function App() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 4. Fetch Findings (Day 15)
+  // 4. Fetch Findings
   // ---------------------------------------------------------------------------
   const loadFindings = useCallback(async (runId, useMock) => {
     if (!runId) return;
@@ -142,7 +148,7 @@ export default function App() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // 5. Initiate a New Inspection Run (Day 13 & 14)
+  // 5. Initiate a New Inspection Run
   // ---------------------------------------------------------------------------
   const handleStartInspection = async (targetUrl) => {
     setErrorMessage('');
@@ -152,24 +158,26 @@ export default function App() {
     setSelectedFinding(null);
     setFindingsError('');
     setProposalsList([]);
+    setRepairs({});
+    setRepairError('');
 
-    const result = await createInspectionRun(targetUrl);
+    // Submit real POST /api/v1/runs?auto_execute=true
+    const result = await createInspectionRun(targetUrl, true);
 
     if (result.ok) {
       const runData = result.data;
       setCurrentRun(runData);
       setSuccessMessage(
-        `Run '${runData.run_id}' initiated successfully! Initial status: ${runData.status.toUpperCase()}.`
+        `Run '${runData.run_id}' dispatched! Automated inspection pipeline active...`
       );
 
-      // Start auto-polling if run is not terminal
+      // Start auto-polling until terminal status (completed/failed)
       if (!TERMINAL_STATUSES.includes(runData.status)) {
         setIsAutoPolling(true);
       } else {
         setIsAutoPolling(false);
       }
 
-      // Fetch initial findings, proposals, and refresh history
       await loadFindings(runData.run_id, includeMockFindings);
       await loadProposals(runData.run_id);
       loadRunsList();
@@ -183,7 +191,7 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 6. Poll / Refresh Run Status (Day 14)
+  // 6. Poll / Refresh Run Status
   // ---------------------------------------------------------------------------
   const handleRefreshRun = async (runId) => {
     if (!runId) return;
@@ -211,7 +219,7 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 7. Look up an existing or unknown run ID (Day 14)
+  // 7. Look up an existing or unknown run ID
   // ---------------------------------------------------------------------------
   const handleLookupRun = async (runId) => {
     setErrorMessage('');
@@ -221,6 +229,8 @@ export default function App() {
     setSelectedFinding(null);
     setFindingsError('');
     setProposalsList([]);
+    setRepairs({});
+    setRepairError('');
 
     const result = await fetchRun(runId);
     if (result.ok) {
@@ -247,7 +257,7 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 8. Execute Run Pipeline On Demand (Day 17)
+  // 8. Execute Run Pipeline On Demand
   // ---------------------------------------------------------------------------
   const handleExecutePipeline = async (runId) => {
     if (!runId) return;
@@ -287,7 +297,7 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 10. Repair Proposal Decision Handlers (Day 4)
+  // 10. Repair Proposal Decision Handlers (Day 4 & 5)
   // ---------------------------------------------------------------------------
   const handleApproveProposal = async (proposalId, notes) => {
     setErrorMessage('');
@@ -339,7 +349,32 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 11. Polling Lifecycle Effect (Day 14)
+  // 11. Self-Healing Locator Repair Suggestion
+  // ---------------------------------------------------------------------------
+  const handleSuggestRepair = async (findingId, verifyLive = false) => {
+    if (!currentRun?.run_id) return;
+    setRepairingFindingId(findingId);
+    setRepairError('');
+
+    const result = await repairRunFinding(currentRun.run_id, findingId, verifyLive);
+    if (result.ok && result.data) {
+      const repairsList = Array.isArray(result.data) ? result.data : (result.data.repairs || []);
+      const matched = repairsList.find((r) => r.finding_id === findingId) || repairsList[0];
+      if (matched) {
+        setRepairs((prev) => ({
+          ...prev,
+          [findingId]: matched,
+        }));
+      }
+    } else {
+      setRepairError(result.error || 'Failed to generate repair candidates.');
+    }
+
+    setRepairingFindingId(null);
+  };
+
+  // ---------------------------------------------------------------------------
+  // 12. Polling Lifecycle Effect
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!currentRun?.run_id || !isAutoPolling) {
@@ -355,6 +390,7 @@ export default function App() {
       return;
     }
 
+    // Poll every 2.5 seconds
     pollingTimerRef.current = setInterval(async () => {
       const result = await fetchRun(currentRun.run_id);
       if (result.ok) {
@@ -363,15 +399,21 @@ export default function App() {
 
         if (TERMINAL_STATUSES.includes(freshRun.status)) {
           setIsAutoPolling(false);
-          loadFindings(freshRun.run_id, includeMockFindings);
-          loadProposals(freshRun.run_id);
+          await loadFindings(freshRun.run_id, includeMockFindings);
+          await loadProposals(freshRun.run_id);
           loadRunsList();
+
+          if (freshRun.status === 'completed') {
+            setSuccessMessage(`Run '${freshRun.run_id}' completed successfully!`);
+          } else if (freshRun.status === 'failed') {
+            setErrorMessage(`Run '${freshRun.run_id}' failed: ${freshRun.error || freshRun.message || 'Inspection pipeline failure'}`);
+          }
         }
       } else {
         setIsAutoPolling(false);
         setErrorMessage(`Polling stopped: ${result.error}`);
       }
-    }, 4000);
+    }, 2500);
 
     return () => {
       if (pollingTimerRef.current) {
@@ -382,7 +424,7 @@ export default function App() {
   }, [currentRun?.run_id, currentRun?.status, isAutoPolling, includeMockFindings, loadFindings, loadProposals, loadRunsList]);
 
   // ---------------------------------------------------------------------------
-  // 12. Toggle Mock Findings
+  // 13. Toggle Mock Findings
   // ---------------------------------------------------------------------------
   const handleToggleMockFindings = () => {
     const nextValue = !includeMockFindings;
@@ -484,11 +526,18 @@ export default function App() {
                 onToggleMockFindings={handleToggleMockFindings}
                 onRefreshFindings={() => loadFindings(currentRun?.run_id, includeMockFindings)}
                 findingsError={findingsError}
+                repairs={repairs}
+                onSuggestRepair={handleSuggestRepair}
+                repairingFindingId={repairingFindingId}
               />
 
               <EvidenceSection
                 finding={selectedFinding}
                 runId={currentRun?.run_id}
+                repair={selectedFinding ? repairs[selectedFinding.finding_id] : null}
+                isRepairing={selectedFinding && repairingFindingId === selectedFinding.finding_id}
+                repairError={repairError}
+                onSuggestRepair={(verifyLive) => selectedFinding && handleSuggestRepair(selectedFinding.finding_id, verifyLive)}
               />
             </div>
 

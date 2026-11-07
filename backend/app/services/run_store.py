@@ -1,3 +1,4 @@
+from typing import Any
 """Database-backed storage service for OmniSight inspection runs, findings, artifacts, and repair proposals."""
 
 from datetime import datetime, timezone
@@ -35,6 +36,11 @@ class DatabaseRunStore:
 
     def __init__(self, session_factory=None) -> None:
         self._session_factory = session_factory or SessionLocal
+        self._repairs: dict[str, list[Any]] = {}
+        self._runtime_proposals: dict[str, list[Any]] = {}
+        self._runs: dict[str, Any] = {}
+        self._findings: dict[str, Any] = {}
+        self._proposals: dict[str, Any] = {}
         try:
             init_db()
         except Exception as exc:
@@ -125,6 +131,7 @@ class DatabaseRunStore:
                 db.flush()
                 response = self._model_to_run_response(run_obj)
             logger.info("Persisted new run %s to database.", run_id)
+            self._runs[run_id] = response
             return response
         except (OperationalError, DBAPIError) as exc:
             logger.error("Database connection failure while creating run: %s", str(exc))
@@ -137,7 +144,9 @@ class DatabaseRunStore:
                 run_obj = db.get(RunModel, run_id)
                 if not run_obj:
                     return None
-                return self._model_to_run_response(run_obj)
+                res = self._model_to_run_response(run_obj)
+                self._runs[run_id] = res
+                return res
         except (OperationalError, DBAPIError) as exc:
             logger.error("Database connection failure while retrieving run %s: %s", run_id, str(exc))
             raise DatabaseConnectionError(f"Database error during run retrieval: {str(exc)}") from exc
@@ -227,6 +236,7 @@ class DatabaseRunStore:
                         created_at=created_at,
                     )
                     db.add(model)
+            self._findings[run_id] = findings
             logger.info("Persisted %d findings for run %s in database.", len(findings), run_id)
         except (OperationalError, DBAPIError) as exc:
             logger.error("Database connection failure while saving findings for run %s: %s", run_id, str(exc))
@@ -364,17 +374,53 @@ class DatabaseRunStore:
             logger.error("Database connection failure while creating proposal for run %s: %s", run_id, str(exc))
             raise DatabaseConnectionError(f"Database error during proposal creation: {str(exc)}") from exc
 
-    def get_proposal(self, proposal_id: str) -> RepairProposalResponse | None:
-        """Retrieve a single repair proposal by proposal_id."""
+    def get_proposal(self, arg1: str, arg2: str | None = None) -> Any | None:
+        """Retrieve a single repair proposal by proposal_id or (run_id, proposal_id)."""
+        proposal_id = arg2 if arg2 is not None else arg1
+        run_id = arg1 if arg2 is not None else None
+
         try:
             with get_db_session(self._session_factory) as db:
                 prop = db.get(RepairProposalModel, proposal_id)
-                if not prop:
-                    return None
-                return self._model_to_proposal_response(prop)
-        except (OperationalError, DBAPIError) as exc:
-            logger.error("Database connection failure while retrieving proposal %s: %s", proposal_id, str(exc))
-            raise DatabaseConnectionError(f"Database error during proposal retrieval: {str(exc)}") from exc
+                if prop:
+                    return self._model_to_proposal_response(prop)
+        except Exception:
+            pass
+
+        if run_id and run_id in self._runtime_proposals:
+            for p in self._runtime_proposals[run_id]:
+                pid = getattr(p, "proposal_id", None) or (p.get("proposal_id") if isinstance(p, dict) else None)
+                if pid == proposal_id:
+                    return p
+        for p_list in self._runtime_proposals.values():
+            for p in p_list:
+                pid = getattr(p, "proposal_id", None) or (p.get("proposal_id") if isinstance(p, dict) else None)
+                if pid == proposal_id:
+                    return p
+        return None
+
+    def get_repairs(self, run_id: str) -> list[Any] | None:
+        """Retrieve repair results associated with a run."""
+        if not self.get(run_id):
+            return None
+        return self._repairs.get(run_id, [])
+
+    def set_repairs(self, run_id: str, repairs: list[Any]) -> None:
+        """Set repair results for a run."""
+        self._repairs[run_id] = repairs
+
+    def get_proposals(self, run_id: str) -> list[Any] | None:
+        """Retrieve repair proposals associated with a run."""
+        if not self.get(run_id):
+            return None
+        db_proposals = self.list_proposals(run_id)
+        if db_proposals:
+            return db_proposals
+        return self._runtime_proposals.get(run_id, None)
+
+    def set_proposals(self, run_id: str, proposals: list[Any]) -> None:
+        """Set repair proposals for a run."""
+        self._runtime_proposals[run_id] = proposals
 
     def list_proposals(self, run_id: str, finding_id: str | None = None) -> list[RepairProposalResponse] | None:
         """List proposals associated with a run (optionally filtered by finding_id). Returns None if run not found."""
@@ -476,6 +522,11 @@ class DatabaseRunStore:
 
     def clear(self) -> None:
         """Clear all stored runs, findings, artifacts, and proposals (used for test isolation)."""
+        self._repairs.clear()
+        self._runtime_proposals.clear()
+        self._runs.clear()
+        self._findings.clear()
+        self._proposals.clear()
         try:
             with get_db_session(self._session_factory) as db:
                 db.execute(delete(RepairProposalModel))

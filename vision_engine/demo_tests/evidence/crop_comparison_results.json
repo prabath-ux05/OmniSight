@@ -1,0 +1,276 @@
+{
+  "model": "gemini-3.5-flash-lite",
+  "test_type": "Full-image vs single-crop vs multi-crop comparison",
+  "crop_coordinates": {
+    "defect_region": {
+      "x": 0.0,
+      "y": 140.0,
+      "width": 900.0,
+      "height": 450.0
+    },
+    "context_region": {
+      "x": 0.0,
+      "y": 0.0,
+      "width": 1365.0,
+      "height": 120.0
+    }
+  },
+  "total_runs": 6,
+  "successful_runs": 6,
+  "failed_runs": 0,
+  "expected_defects_detected": 6,
+  "results": [
+    {
+      "scenario": "overflow",
+      "mode": "full_image",
+      "status": "success",
+      "expected_category": "layout_overflow",
+      "found_categories": [
+        "layout_overflow"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 7.37,
+      "planned_image_requests": 1,
+      "original_png_bytes": 17157,
+      "analyzed_png_payload_bytes": 17157,
+      "findings": [
+        {
+          "finding_id": "defect-overflow-1",
+          "category": "layout_overflow",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "Text content inside the bordered container extends past the right edge and is clipped.",
+          "repair_recommendation": {
+            "summary": "Allow text to wrap or expand container width",
+            "suggested_action": "Remove strict width constraints or enable text wrapping using CSS properties like word-wrap or flex adjustments.",
+            "rationale": "Enables the full text to remain readable without being cut off by the container boundary."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 36.0,
+            "y": 196.0,
+            "width": 165.0,
+            "height": 65.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\overflow.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    },
+    {
+      "scenario": "overflow",
+      "mode": "single_crop",
+      "status": "success",
+      "expected_category": "layout_overflow",
+      "found_categories": [
+        "layout_overflow"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 6.305,
+      "planned_image_requests": 1,
+      "original_png_bytes": 17157,
+      "analyzed_png_payload_bytes": 6810,
+      "findings": [
+        {
+          "finding_id": "defect-overflow-1",
+          "category": "layout_overflow",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "The text inside the red-bordered container is clipped and overflows past the right border of the fixed container box.",
+          "repair_recommendation": {
+            "summary": "Allow container to wrap text or adjust dimensions",
+            "suggested_action": "Remove fixed height/width constraints or allow overflow wrapping (e.g., word-wrap, overflow: visible) to prevent text clipping.",
+            "rationale": "Ensures all text remains fully visible and readable within its container."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 54.0,
+            "y": 233.0,
+            "width": 244.0,
+            "height": 122.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\overflow.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    },
+    {
+      "scenario": "overflow",
+      "mode": "multi_crop",
+      "status": "success",
+      "expected_category": "layout_overflow",
+      "found_categories": [
+        "layout_overflow"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 13.199,
+      "planned_image_requests": 2,
+      "original_png_bytes": 17157,
+      "analyzed_png_payload_bytes": 14958,
+      "findings": [
+        {
+          "finding_id": "defect-overflow-01",
+          "category": "layout_overflow",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "Text inside the bounded container is clipped or extends beyond the right border of the red-outlined box, causing truncation of the text string.",
+          "repair_recommendation": {
+            "summary": "Adjust container dimensions or text wrapping",
+            "suggested_action": "Increase the width of the container or allow text wrapping and proper overflow handling so all text remains visible.",
+            "rationale": "Ensures that content fits inside its container without being clipped by fixed boundaries."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 55.0,
+            "y": 235.0,
+            "width": 243.0,
+            "height": 120.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\overflow.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    },
+    {
+      "scenario": "broken_image",
+      "mode": "full_image",
+      "status": "success",
+      "expected_category": "broken_image",
+      "found_categories": [
+        "broken_image"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 5.144,
+      "planned_image_requests": 1,
+      "original_png_bytes": 17792,
+      "analyzed_png_payload_bytes": 17792,
+      "findings": [
+        {
+          "finding_id": "defect-broken-image-1",
+          "category": "broken_image",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "The product preview image is failing to load, displaying only the broken image icon and alternative text.",
+          "repair_recommendation": {
+            "summary": "Fix or replace the broken image source",
+            "suggested_action": "Verify the image file path or URL and ensure the resource is accessible.",
+            "rationale": "Correcting the image source will allow the graphic to render properly instead of showing a broken image placeholder."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 36.0,
+            "y": 196.0,
+            "width": 133.0,
+            "height": 20.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\broken_image.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    },
+    {
+      "scenario": "broken_image",
+      "mode": "single_crop",
+      "status": "success",
+      "expected_category": "broken_image",
+      "found_categories": [
+        "broken_image"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 5.464,
+      "planned_image_requests": 1,
+      "original_png_bytes": 17792,
+      "analyzed_png_payload_bytes": 7432,
+      "findings": [
+        {
+          "finding_id": "defect-broken-image-1",
+          "category": "broken_image",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "The product preview image is broken, displaying a missing image icon alongside the 'Product preview' alt text.",
+          "repair_recommendation": {
+            "summary": "Fix or replace the broken image source",
+            "suggested_action": "Verify the image file path or URL and update the 'src' attribute to point to a valid resource.",
+            "rationale": "Ensures the product preview image renders correctly for users instead of showing a broken image placeholder."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 53.0,
+            "y": 235.0,
+            "width": 145.0,
+            "height": 33.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\broken_image.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    },
+    {
+      "scenario": "broken_image",
+      "mode": "multi_crop",
+      "status": "success",
+      "expected_category": "broken_image",
+      "found_categories": [
+        "broken_image"
+      ],
+      "expected_category_detected": true,
+      "total_findings": 1,
+      "duplicate_category_findings": 0,
+      "response_time_seconds": 13.006,
+      "planned_image_requests": 2,
+      "original_png_bytes": 17792,
+      "analyzed_png_payload_bytes": 15365,
+      "findings": [
+        {
+          "finding_id": "defect-broken-image-1",
+          "category": "broken_image",
+          "severity": "medium",
+          "confidence": 0.95,
+          "description": "The product preview image is failing to load, displaying the alt text 'Product preview' with a broken image icon instead of the actual graphic resource.",
+          "repair_recommendation": {
+            "summary": "Fix the broken image source URL or restore the image asset",
+            "suggested_action": "Verify and correct the image file path or URL in the markup.",
+            "rationale": "Correcting the source attribute will allow the image to load successfully and display the intended visual content to users."
+          },
+          "selector": null,
+          "bounding_box": {
+            "x": 52.0,
+            "y": 234.0,
+            "width": 147.0,
+            "height": 33.0
+          },
+          "evidence": {
+            "screenshot_path": "C:\\Users\\jaypa\\Documents\\OmniSight\\vision_engine\\demo_tests\\evidence\\broken_image.png",
+            "dom_snapshot_path": null
+          },
+          "source": "vlm"
+        }
+      ]
+    }
+  ]
+}

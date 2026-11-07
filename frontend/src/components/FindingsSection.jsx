@@ -10,6 +10,9 @@ export default function FindingsSection({
   onToggleMockFindings,
   onRefreshFindings,
   findingsError,
+  repairs = {},
+  onSuggestRepair,
+  repairingFindingId,
 }) {
   const getSeverityBadgeClass = (severity) => {
     switch (severity?.toLowerCase()) {
@@ -134,6 +137,10 @@ export default function FindingsSection({
             const hasConfidence = typeof item.confidence === 'number';
             const isMock = item.source === 'mock' || (item.description && item.description.includes('[MOCK]'));
 
+            const isEligibleForRepair = item.category === 'missing_visible_element';
+            const findingRepair = repairs ? repairs[item.finding_id] : null;
+            const isRepairingThis = repairingFindingId === item.finding_id;
+
             return (
               <div
                 key={item.finding_id}
@@ -155,6 +162,21 @@ export default function FindingsSection({
                     <span className="badge badge-category">
                       {getCategoryLabel(item.category)}
                     </span>
+                    {isEligibleForRepair && (
+                      findingRepair?.repaired ? (
+                        <span className="badge badge-repair-success" title="Verified alternative locator found in DOM">
+                          ✓ Healed Locator
+                        </span>
+                      ) : findingRepair && !findingRepair.repaired ? (
+                        <span className="badge badge-repair-failed" title="No unique candidate found in DOM">
+                          ⚠️ Checked
+                        </span>
+                      ) : (
+                        <span className="badge badge-repair-eligible" title="Eligible for Autonomous Locator Repair">
+                          ⚡ Healable
+                        </span>
+                      )
+                    )}
                     {isMock && (
                       <span
                         className="badge badge-source-mock"
@@ -184,9 +206,26 @@ export default function FindingsSection({
 
                 <div className="finding-footer">
                   <span className="finding-id-tag">ID: {item.finding_id}</span>
-                  <span className="finding-view-evidence-hint">
-                    {isSelected ? 'Viewing Evidence' : 'Click to inspect evidence →'}
-                  </span>
+                  <div className="finding-footer-actions">
+                    {isEligibleForRepair && onSuggestRepair && (
+                      <button
+                        type="button"
+                        className="btn btn-repair-action btn-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectFinding(item);
+                          onSuggestRepair(item.finding_id);
+                        }}
+                        disabled={isRepairingThis}
+                        title="Suggest and validate repair candidates against captured DOM"
+                      >
+                        {isRepairingThis ? 'Repairing...' : (findingRepair ? 'Re-suggest Repair' : 'Suggest Repair')}
+                      </button>
+                    )}
+                    <span className="finding-view-evidence-hint">
+                      {isSelected ? 'Viewing Evidence' : 'View Details →'}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

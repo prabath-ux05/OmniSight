@@ -10,7 +10,19 @@
     <h1>OmniSight Browser Agent Test</h1>
     <p>This page is used for local browser automation tests.</p>
 
-    <!-- Intentionally broken image for error-handling tests -->
+    <!-- Broken image test -->
     <img src="/missing-image.png" alt="Broken image test">
+
+    <!-- Dynamic content test -->
+    <div id="dynamic-content">
+        <p>Loading dynamic content...</p>
+    </div>
+
+    <script>
+        setTimeout(() => {
+            document.getElementById("dynamic-content").innerHTML =
+                "<p>Dynamic content loaded successfully!</p>";
+        }, 200);
+    </script>
 </body>
 </html>

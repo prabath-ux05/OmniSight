@@ -1,11 +1,19 @@
-"""OmniSight Backend Application Entry Point.
+﻿"""OmniSight Backend Application Entry Point.
 
 This module provides the central FastAPI application instance for OmniSight.
 """
 
+import sys
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# On Windows, ensure ProactorEventLoop is used so subprocesses (Playwright) function correctly under Uvicorn
+if sys.platform == "win32":
+    if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from backend.app.api.artifacts import router as artifacts_router
 from backend.app.api.health import router as health_router
 from backend.app.api.proposals import router as proposals_router
