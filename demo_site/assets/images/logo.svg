@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <defs>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#a855f7" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Outer Rounded Shield -->
+  <rect x="4" y="4" width="40" height="40" rx="12" fill="#0f172a" stroke="url(#logo-grad)" stroke-width="2.5" />
+  <!-- Eye Iris / Aperture Ring -->
+  <circle cx="24" cy="24" r="11" stroke="url(#logo-grad)" stroke-width="2.5" stroke-dasharray="5 2" />
+  <!-- Pupil -->
+  <circle cx="24" cy="24" r="5" fill="url(#logo-grad)" filter="url(#glow)" />
+  <circle cx="22" cy="22" r="1.5" fill="#ffffff" />
+  <!-- Pulse Antenna Node -->
+  <circle cx="38" cy="10" r="3" fill="#22c55e" />
+</svg>

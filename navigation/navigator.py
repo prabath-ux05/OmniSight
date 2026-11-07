@@ -1,4 +1,6 @@
 
+import asyncio
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,6 +74,19 @@ class BrowserNavigator:
         return is_valid
 
     @staticmethod
+    def _ensure_windows_proactor_policy():
+        if sys.platform == "win32":
+            current_policy = asyncio.get_event_loop_policy()
+
+            if not isinstance(
+                current_policy,
+                asyncio.WindowsProactorEventLoopPolicy,
+            ):
+                asyncio.set_event_loop_policy(
+                    asyncio.WindowsProactorEventLoopPolicy()
+                )
+
+    @staticmethod
     def _failed_result(
         url,
         run_id,
@@ -104,9 +119,7 @@ class BrowserNavigator:
         is_valid_url, url_message = validate_url(url)
 
         if not is_valid_url:
-            return self._failed_result(
-                url, run_id, url_message
-            )
+            return self._failed_result(url, run_id, url_message)
 
         url = url.strip()
 
@@ -114,9 +127,7 @@ class BrowserNavigator:
         is_valid_run_id, run_id_message = validate_run_id(run_id)
 
         if not is_valid_run_id:
-            return self._failed_result(
-                url, run_id, run_id_message
-            )
+            return self._failed_result(url, run_id, run_id_message)
 
         run_id = run_id.strip()
 
@@ -128,6 +139,9 @@ class BrowserNavigator:
         start_time = perf_counter()
 
         try:
+            # Set the Windows event-loop policy before Playwright starts.
+            self._ensure_windows_proactor_policy()
+
             with sync_playwright() as playwright:
 
                 browser = playwright.chromium.launch(
@@ -142,7 +156,7 @@ class BrowserNavigator:
                         }
                     )
 
-                    # Step 3: Capture browser console errors
+                    # Capture browser console errors
                     page.on(
                         "console",
                         lambda message: console_errors.append(
@@ -150,13 +164,13 @@ class BrowserNavigator:
                         ) if message.type == "error" else None,
                     )
 
-                    # Step 4: Capture JavaScript errors
+                    # Capture JavaScript errors
                     page.on(
                         "pageerror",
                         lambda error: page_errors.append(str(error)),
                     )
 
-                    # Step 5: Capture failed network requests
+                    # Capture failed network requests
                     def capture_failed_request(request):
                         failure = request.failure
 
@@ -173,29 +187,27 @@ class BrowserNavigator:
                     )
 
                     try:
-                        # Step 6: Navigate to the website
+                        # Navigate to the website
                         response = page.goto(
                             url,
                             wait_until="domcontentloaded",
                             timeout=self.timeout_ms,
                         )
 
-                        # Step 7: Capture HTTP response status
+                        # Capture HTTP response status
                         if response is not None:
                             response_status = response.status
 
-                        # Step 8: Allow dynamic content to render
+                        # Allow dynamic content to render
                         if self.render_wait_ms > 0:
-                            page.wait_for_timeout(
-                                self.render_wait_ms
-                            )
+                            page.wait_for_timeout(self.render_wait_ms)
 
-                        # Step 9: Capture page metadata
+                        # Capture page metadata
                         page_title = page.title()
                         viewport = page.viewport_size
                         timestamp = self._current_timestamp()
 
-                        # Step 10: Capture full-page screenshot
+                        # Capture screenshot
                         screenshot_path = (
                             ScreenshotManager.save_screenshot(
                                 page,
@@ -204,7 +216,7 @@ class BrowserNavigator:
                             )
                         )
 
-                        # Step 11: Capture DOM snapshot
+                        # Capture DOM snapshot
                         dom_snapshot_path = (
                             DOMCapture.save_dom_snapshot(
                                 page,
@@ -213,24 +225,30 @@ class BrowserNavigator:
                             )
                         )
 
-                        # Step 12: Verify evidence files
-                        if not Path(screenshot_path).is_file():
+                        # Verify evidence files
+                        if (
+                            not screenshot_path
+                            or not Path(screenshot_path).is_file()
+                        ):
                             raise FileNotFoundError(
                                 "Screenshot file was not created"
                             )
 
-                        if not Path(dom_snapshot_path).is_file():
+                        if (
+                            not dom_snapshot_path
+                            or not Path(dom_snapshot_path).is_file()
+                        ):
                             raise FileNotFoundError(
                                 "DOM snapshot file was not created"
                             )
 
-                        # Step 13: Calculate navigation duration
+                        # Calculate navigation duration
                         duration = round(
                             (perf_counter() - start_time) * 1000,
                             2,
                         )
 
-                        # Step 14: Identify HTTP errors
+                        # Identify HTTP errors
                         http_error = (
                             response_status is not None
                             and response_status >= 400
@@ -242,7 +260,7 @@ class BrowserNavigator:
                             else None
                         )
 
-                        # Step 15: Return structured result
+                        # Return structured result
                         return NavigationResult(
                             status="failed" if http_error else "success",
                             url=page.url,

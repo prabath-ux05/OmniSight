@@ -122,7 +122,7 @@ class DOMCapture:
         run_dir = Path(artifact_root) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
-        # Preserve old filenames when stage is not supplied
+        # Preserve existing filenames
         if stage is None:
             dom_filename = "dom.html"
             metadata_filename = "dom_metadata.json"
@@ -138,9 +138,19 @@ class DOMCapture:
         if not html_content:
             raise ValueError("DOM snapshot is empty")
 
-        # Save HTML snapshot
-        with open(dom_path, "w", encoding="utf-8") as file:
-            file.write(html_content)
+        # Save staged or default HTML snapshot
+        dom_path.write_text(
+            html_content,
+            encoding="utf-8"
+        )
+
+        # Save backward-compatible filenames for the before stage
+        if stage == "before":
+            legacy_dom_path = run_dir / "dom.html"
+            legacy_dom_path.write_text(
+                html_content,
+                encoding="utf-8"
+            )
 
         # Verify HTML file
         if not dom_path.exists() or dom_path.stat().st_size == 0:
@@ -195,5 +205,21 @@ class DOMCapture:
                 indent=4,
                 ensure_ascii=False
             )
+
+        # Save backward-compatible metadata for before stage
+        if stage == "before":
+            legacy_metadata_path = run_dir / "dom_metadata.json"
+
+            with open(
+                legacy_metadata_path,
+                "w",
+                encoding="utf-8"
+            ) as file:
+                json.dump(
+                    metadata,
+                    file,
+                    indent=4,
+                    ensure_ascii=False
+                )
 
         return str(dom_path)

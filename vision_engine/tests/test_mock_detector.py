@@ -307,3 +307,53 @@ def test_mock_detector_rejects_empty_dom_snapshot(tmp_path):
         match="DOM snapshot file is empty",
     ):
         detect_mock(input_data)
+
+
+def test_finding_accepts_structured_repair_recommendation():
+    finding = VisionFinding(
+        finding_id="repair-test-001",
+        category="broken_image",
+        severity="high",
+        confidence=0.95,
+        description="The hero image appears broken.",
+        repair_recommendation={
+            "summary": "Restore the hero image",
+            "suggested_action": "Check and correct the image src URL.",
+            "rationale": "The supplied evidence indicates that the image failed to load.",
+        },
+        evidence=EvidenceReferences(),
+    )
+
+    assert finding.repair_recommendation.summary == "Restore the hero image"
+    assert (
+        finding.repair_recommendation.suggested_action
+        == "Check and correct the image src URL."
+    )
+
+
+def test_finding_allows_missing_repair_recommendation():
+    finding = VisionFinding(
+        finding_id="repair-test-002",
+        category="layout_overflow",
+        severity="medium",
+        confidence=0.9,
+        description="A layout issue was detected.",
+        evidence=EvidenceReferences(),
+    )
+
+    assert finding.repair_recommendation is None
+
+
+def test_finding_rejects_incomplete_repair_recommendation():
+    with pytest.raises(ValidationError):
+        VisionFinding(
+            finding_id="repair-test-003",
+            category="broken_image",
+            severity="high",
+            confidence=0.9,
+            description="A broken image was detected.",
+            repair_recommendation={
+                "summary": "Restore the image",
+            },
+            evidence=EvidenceReferences(),
+        )

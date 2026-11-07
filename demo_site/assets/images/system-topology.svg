@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1329" />
+      <stop offset="100%" stop-color="#111c44" />
+    </linearGradient>
+    <linearGradient id="primary-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+    <linearGradient id="node-active" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <filter id="card-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="720" height="340" rx="16" fill="url(#bg-grad)" stroke="#1e293b" stroke-width="1.5" />
+
+  <!-- Grid Dots Pattern -->
+  <g opacity="0.15">
+    <circle cx="60" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="120" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="180" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="240" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="300" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="360" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="420" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="480" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="540" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="600" cy="40" r="1.5" fill="#94a3b8" />
+    <circle cx="660" cy="40" r="1.5" fill="#94a3b8" />
+
+    <circle cx="60" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="120" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="180" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="240" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="300" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="360" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="420" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="480" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="540" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="600" cy="100" r="1.5" fill="#94a3b8" />
+    <circle cx="660" cy="100" r="1.5" fill="#94a3b8" />
+
+    <circle cx="60" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="120" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="180" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="240" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="300" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="360" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="420" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="480" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="600" cy="180" r="1.5" fill="#94a3b8" />
+    <circle cx="660" cy="180" r="1.5" fill="#94a3b8" />
+
+    <circle cx="60" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="120" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="180" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="240" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="300" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="360" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="420" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="480" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="540" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="600" cy="260" r="1.5" fill="#94a3b8" />
+    <circle cx="660" cy="260" r="1.5" fill="#94a3b8" />
+  </g>
+
+  <!-- Connector Lines -->
+  <path d="M 180 160 L 320 90" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.8" />
+  <path d="M 180 160 L 320 230" stroke="#818cf8" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.8" />
+  <path d="M 480 90 L 580 160" stroke="#38bdf8" stroke-width="2.5" opacity="0.8" />
+  <path d="M 480 230 L 580 160" stroke="#818cf8" stroke-width="2.5" opacity="0.8" />
+
+  <!-- Node 1: Browser Runner / RPA -->
+  <g filter="url(#card-shadow)">
+    <rect x="60" y="115" width="130" height="90" rx="12" fill="url(#node-active)" stroke="#38bdf8" stroke-width="2" />
+    <circle cx="85" cy="140" r="12" fill="#0284c7" />
+    <path d="M 80 140 L 90 140 M 85 135 L 85 145" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <text x="105" y="145" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="13" font-weight="600">RPA Worker</text>
+    <text x="80" y="172" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">Playwright Driver</text>
+    <rect x="80" y="185" width="55" height="12" rx="6" fill="#065f46" />
+    <text x="88" y="194" fill="#34d399" font-family="system-ui, sans-serif" font-size="9" font-weight="700">ONLINE</text>
+  </g>
+
+  <!-- Node 2: Vision Model / Multimodal Inspector -->
+  <g filter="url(#card-shadow)">
+    <rect x="320" y="45" width="160" height="90" rx="12" fill="url(#node-active)" stroke="#818cf8" stroke-width="2" />
+    <circle cx="348" cy="70" r="12" fill="#4f46e5" />
+    <circle cx="348" cy="70" r="5" fill="#ffffff" />
+    <text x="370" y="75" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Vision Engine</text>
+    <text x="340" y="102" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">Visual Bounding Boxes</text>
+    <rect x="340" y="115" width="62" height="12" rx="6" fill="#312e81" />
+    <text x="346" y="124" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="9" font-weight="700">LLM ACTIVE</text>
+  </g>
+
+  <!-- Node 3: Self-Healing & Code Patch Generator -->
+  <g filter="url(#card-shadow)">
+    <rect x="320" y="185" width="160" height="90" rx="12" fill="url(#node-active)" stroke="#a855f7" stroke-width="2" />
+    <circle cx="348" cy="210" r="12" fill="#7e22ce" />
+    <path d="M 344 210 L 352 210 M 348 206 L 348 214" stroke="#ffffff" stroke-width="2" />
+    <text x="370" y="215" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Healing Engine</text>
+    <text x="340" y="242" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">Selector Synthesizer</text>
+    <rect x="340" y="255" width="62" height="12" rx="6" fill="#581c87" />
+    <text x="346" y="264" fill="#d8b4fe" font-family="system-ui, sans-serif" font-size="9" font-weight="700">READY</text>
+  </g>
+
+  <!-- Node 4: Target SUT (System Under Test) -->
+  <g filter="url(#card-shadow)">
+    <rect x="560" y="115" width="130" height="90" rx="12" fill="url(#node-active)" stroke="#22c55e" stroke-width="2" />
+    <circle cx="585" cy="140" r="12" fill="#15803d" />
+    <rect x="580" y="135" width="10" height="10" rx="2" fill="#ffffff" />
+    <text x="605" y="145" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Demo Portal</text>
+    <text x="580" y="172" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">Controlled SUT</text>
+    <rect x="580" y="185" width="65" height="12" rx="6" fill="#14532d" />
+    <text x="587" y="194" fill="#4ade80" font-family="system-ui, sans-serif" font-size="9" font-weight="700">INSTRUMENTED</text>
+  </g>
+
+  <!-- Flow Particle animations / static markers -->
+  <circle cx="250" cy="125" r="4" fill="#38bdf8" />
+  <circle cx="250" cy="195" r="4" fill="#818cf8" />
+  <circle cx="530" cy="125" r="4" fill="#38bdf8" />
+  <circle cx="530" cy="195" r="4" fill="#818cf8" />
+
+  <!-- Footer Banner text -->
+  <text x="40" y="318" fill="#64748b" font-family="system-ui, sans-serif" font-size="12">
+    Live Mesh Status: All agent nodes interconnected • Telemetry sync interval: 250ms • Zero pipeline latency
+  </text>
+</svg>
