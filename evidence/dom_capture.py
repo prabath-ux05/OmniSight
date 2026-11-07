@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
 
+from navigation.url_validator import validate_run_id
+
 
 class DOMMetadataParser(HTMLParser):
 
@@ -103,23 +105,18 @@ class DOMCapture:
     ) -> str:
 
         # Validate run ID
-        if not isinstance(run_id, str) or not run_id.strip():
-            raise ValueError("run_id is required")
+        is_valid, message = validate_run_id(run_id)
+
+        if not is_valid:
+            raise ValueError(message)
+
+        run_id = run_id.strip()
 
         # Validate stage
         if stage not in (None, "before", "after"):
             raise ValueError(
                 "stage must be 'before', 'after', or None"
             )
-
-        if (
-            run_id in (".", "..")
-            or Path(run_id).name != run_id
-            or "/" in run_id
-            or "\\" in run_id
-            or ":" in run_id
-        ):
-            raise ValueError("Invalid run_id")
 
         # Create run directory
         run_dir = Path(artifact_root) / run_id

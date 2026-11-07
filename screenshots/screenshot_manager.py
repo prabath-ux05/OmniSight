@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 import json
 import struct
 
+from navigation.url_validator import validate_run_id
+
 
 class ScreenshotManager:
 
@@ -25,18 +27,12 @@ class ScreenshotManager:
         artifact_root: str = "artifacts"
     ) -> Path:
 
-        if not isinstance(run_id, str) or not run_id.strip():
-            raise ValueError("run_id is required")
+        is_valid, message = validate_run_id(run_id)
 
-        # Prevent run IDs from escaping the artifact directory
-        if (
-            run_id in (".", "..")
-            or Path(run_id).name != run_id
-            or "/" in run_id
-            or "\\" in run_id
-            or ":" in run_id
-        ):
-            raise ValueError("Invalid run_id")
+        if not is_valid:
+            raise ValueError(message)
+
+        run_id = run_id.strip()
 
         run_dir = Path(artifact_root) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -70,6 +66,9 @@ class ScreenshotManager:
             header[16:24]
         )
 
+        if width <= 0 or height <= 0:
+            raise ValueError("Invalid screenshot dimensions")
+
         return {
             "width": width,
             "height": height
@@ -83,7 +82,6 @@ class ScreenshotManager:
         stage: str = "before"
     ) -> str:
 
-        # Only allow known capture stages
         if stage not in ("before", "after"):
             raise ValueError(
                 "stage must be 'before' or 'after'"
@@ -94,6 +92,7 @@ class ScreenshotManager:
             artifact_root
         )
 
+        run_id = run_id.strip()
         screenshot_path = run_dir / f"{stage}.png"
 
         # Capture full-page screenshot

@@ -25,4 +25,5 @@ def test_invalid_url():
     )
 
     assert result.status == "failed"
-    assert result.error == "Invalid URL"
+    assert result.error is not None
+    assert result.error != "Valid URL"

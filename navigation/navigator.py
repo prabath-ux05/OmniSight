@@ -2,9 +2,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
-from urllib.parse import urlparse
 from time import perf_counter
+from typing import Optional
 
 from playwright.sync_api import (
     sync_playwright,
@@ -13,6 +12,7 @@ from playwright.sync_api import (
 
 from evidence.dom_capture import DOMCapture
 from screenshots.screenshot_manager import ScreenshotManager
+from navigation.url_validator import validate_url, validate_run_id
 
 
 @dataclass
@@ -27,11 +27,9 @@ class NavigationResult:
     screenshot_path: Optional[str] = None
     dom_snapshot_path: Optional[str] = None
 
-    # Existing diagnostics
     console_errors: list = field(default_factory=list)
     page_errors: list = field(default_factory=list)
 
-    # Day 2 additions
     response_status: Optional[int] = None
     navigation_duration_ms: Optional[float] = None
     failed_requests: list = field(default_factory=list)
@@ -41,9 +39,28 @@ class NavigationResult:
 
 class BrowserNavigator:
 
-    def __init__(self, timeout_ms=30000, headless=True):
+    def __init__(
+        self,
+        timeout_ms=30000,
+        headless=True,
+        viewport_width=1280,
+        viewport_height=720,
+        render_wait_ms=500
+    ):
+        if timeout_ms <= 0:
+            raise ValueError("timeout_ms must be greater than zero")
+
+        if viewport_width <= 0 or viewport_height <= 0:
+            raise ValueError("Viewport dimensions must be positive")
+
+        if render_wait_ms < 0:
+            raise ValueError("render_wait_ms cannot be negative")
+
         self.timeout_ms = timeout_ms
         self.headless = headless
+        self.viewport_width = viewport_width
+        self.viewport_height = viewport_height
+        self.render_wait_ms = render_wait_ms
 
     @staticmethod
     def _current_timestamp():
@@ -51,20 +68,8 @@ class BrowserNavigator:
 
     @staticmethod
     def _is_valid_url(url):
-        if not isinstance(url, str) or not url.strip():
-            return False
-
-        try:
-            parsed = urlparse(url.strip())
-
-            return (
-                parsed.scheme in ("http", "https")
-                and bool(parsed.netloc)
-                and bool(parsed.hostname)
-            )
-
-        except Exception:
-            return False
+        is_valid, _ = validate_url(url)
+        return is_valid
 
     @staticmethod
     def _failed_result(
@@ -73,7 +78,9 @@ class BrowserNavigator:
         error,
         navigation_duration_ms=None,
         failed_requests=None,
-        response_status=None
+        response_status=None,
+        console_errors=None,
+        page_errors=None
     ):
         timestamp = BrowserNavigator._current_timestamp()
 
@@ -86,24 +93,32 @@ class BrowserNavigator:
             navigation_duration_ms=navigation_duration_ms,
             failed_requests=list(failed_requests or []),
             response_status=response_status,
-            console_errors=[],
-            page_errors=[],
+            console_errors=list(console_errors or []),
+            page_errors=list(page_errors or []),
             error=error
         )
 
     def navigate(self, url: str, run_id: str) -> NavigationResult:
 
         # Step 1: Validate URL
-        if not self._is_valid_url(url):
+        is_valid_url, url_message = validate_url(url)
+
+        if not is_valid_url:
             return self._failed_result(
-                url, run_id, "Invalid URL"
+                url, run_id, url_message
             )
 
+        url = url.strip()
+
         # Step 2: Validate run ID
-        if not isinstance(run_id, str) or not run_id.strip():
+        is_valid_run_id, run_id_message = validate_run_id(run_id)
+
+        if not is_valid_run_id:
             return self._failed_result(
-                url, run_id, "run_id is required"
+                url, run_id, run_id_message
             )
+
+        run_id = run_id.strip()
 
         console_errors = []
         page_errors = []
@@ -122,12 +137,12 @@ class BrowserNavigator:
                 try:
                     page = browser.new_page(
                         viewport={
-                            "width": 1280,
-                            "height": 720
+                            "width": self.viewport_width,
+                            "height": self.viewport_height
                         }
                     )
 
-                    # Step 3: Capture console errors
+                    # Step 3: Capture browser console errors
                     page.on(
                         "console",
                         lambda message: console_errors.append(
@@ -169,52 +184,56 @@ class BrowserNavigator:
                         if response is not None:
                             response_status = response.status
 
-                        # Allow a short time for page rendering
-                        page.wait_for_timeout(500)
+                        # Step 8: Allow dynamic content to render
+                        if self.render_wait_ms > 0:
+                            page.wait_for_timeout(
+                                self.render_wait_ms
+                            )
 
-                        # Step 8: Capture page metadata
+                        # Step 9: Capture page metadata
                         page_title = page.title()
                         viewport = page.viewport_size
-
                         timestamp = self._current_timestamp()
 
-                        # Step 9: Capture full-page screenshot
+                        # Step 10: Capture full-page screenshot
                         screenshot_path = (
                             ScreenshotManager.save_screenshot(
                                 page,
-                                run_id
+                                run_id,
+                                stage="before"
                             )
                         )
 
-                        # Step 10: Capture DOM snapshot
+                        # Step 11: Capture DOM snapshot
                         dom_snapshot_path = (
                             DOMCapture.save_dom_snapshot(
                                 page,
-                                run_id
+                                run_id,
+                                stage="before"
                             )
                         )
 
-                        # Step 11: Verify evidence files
-                        if not Path(screenshot_path).exists():
+                        # Step 12: Verify evidence files
+                        if not Path(screenshot_path).is_file():
                             raise FileNotFoundError(
                                 "Screenshot file was not created"
                             )
 
-                        if not Path(dom_snapshot_path).exists():
+                        if not Path(dom_snapshot_path).is_file():
                             raise FileNotFoundError(
                                 "DOM snapshot file was not created"
                             )
 
-                        # Step 12: Calculate navigation duration
+                        # Step 13: Calculate navigation duration
                         duration = round(
                             (perf_counter() - start_time) * 1000,
                             2
                         )
 
-                        # Step 13: Return structured result
+                        # Step 14: Return structured result
                         return NavigationResult(
                             status="success",
-                            url=url,
+                            url=page.url,
                             run_id=run_id,
                             page_title=page_title,
                             captured_at=timestamp,
@@ -242,7 +261,9 @@ class BrowserNavigator:
                             "Navigation timeout",
                             navigation_duration_ms=duration,
                             failed_requests=failed_requests,
-                            response_status=response_status
+                            response_status=response_status,
+                            console_errors=console_errors,
+                            page_errors=page_errors
                         )
 
                     except Exception as error:
@@ -257,7 +278,9 @@ class BrowserNavigator:
                             str(error),
                             navigation_duration_ms=duration,
                             failed_requests=failed_requests,
-                            response_status=response_status
+                            response_status=response_status,
+                            console_errors=console_errors,
+                            page_errors=page_errors
                         )
 
                 finally:
@@ -275,5 +298,7 @@ class BrowserNavigator:
                 str(error),
                 navigation_duration_ms=duration,
                 failed_requests=failed_requests,
-                response_status=response_status
+                response_status=response_status,
+                console_errors=console_errors,
+                page_errors=page_errors
             )
