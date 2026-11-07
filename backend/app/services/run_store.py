@@ -424,6 +424,56 @@ class DatabaseRunStore:
             logger.error("Database connection failure while updating approval for %s: %s", proposal_id, str(exc))
             raise DatabaseConnectionError(f"Database error during proposal approval update: {str(exc)}") from exc
 
+    def update_proposal_execution(
+        self, proposal_id: str, execution_status: str
+    ) -> RepairProposalResponse | None:
+        """Update the patch execution lifecycle state (unapplied, applying, applied, failed)."""
+        valid_statuses = ("unapplied", "applying", "applied", "failed")
+        if execution_status not in valid_statuses:
+            raise ValueError(
+                f"Invalid execution_status '{execution_status}'. Must be one of: {valid_statuses}."
+            )
+
+        try:
+            with get_db_session(self._session_factory) as db:
+                prop = db.get(RepairProposalModel, proposal_id)
+                if not prop:
+                    return None
+                prop.execution_status = execution_status
+                prop.updated_at = datetime.now(timezone.utc).isoformat()
+                db.flush()
+                response = self._model_to_proposal_response(prop)
+            logger.info("Updated proposal %s execution_status to '%s'.", proposal_id, execution_status)
+            return response
+        except (OperationalError, DBAPIError) as exc:
+            logger.error("Database connection failure while updating execution for %s: %s", proposal_id, str(exc))
+            raise DatabaseConnectionError(f"Database error during proposal execution update: {str(exc)}") from exc
+
+    def update_proposal_verification(
+        self, proposal_id: str, verification_status: str
+    ) -> RepairProposalResponse | None:
+        """Update the post-repair visual/DOM verification state (unverified, verified_success, verified_failure, inconclusive)."""
+        valid_statuses = ("unverified", "verified_success", "verified_failure", "inconclusive")
+        if verification_status not in valid_statuses:
+            raise ValueError(
+                f"Invalid verification_status '{verification_status}'. Must be one of: {valid_statuses}."
+            )
+
+        try:
+            with get_db_session(self._session_factory) as db:
+                prop = db.get(RepairProposalModel, proposal_id)
+                if not prop:
+                    return None
+                prop.verification_status = verification_status
+                prop.updated_at = datetime.now(timezone.utc).isoformat()
+                db.flush()
+                response = self._model_to_proposal_response(prop)
+            logger.info("Updated proposal %s verification_status to '%s'.", proposal_id, verification_status)
+            return response
+        except (OperationalError, DBAPIError) as exc:
+            logger.error("Database connection failure while updating verification for %s: %s", proposal_id, str(exc))
+            raise DatabaseConnectionError(f"Database error during proposal verification update: {str(exc)}") from exc
+
     def clear(self) -> None:
         """Clear all stored runs, findings, artifacts, and proposals (used for test isolation)."""
         try:
