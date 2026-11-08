@@ -1,3 +1,4 @@
+
 # OmniSight — Multimodal UI Self-Healing & RPA Agent
 
 OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing project. It aims to combine vision-language models, browser automation, and Git workflows to detect UI changes, diagnose broken selectors and workflows, generate candidate test repairs, and submit changes for human review.
@@ -79,8 +80,9 @@ OmniSight/
 ├── .env.example
 ├── requirements.txt
 └── README.md
+```
 
-The tree lists the documented Vision Engine files and Browser Agent module structure. Other project modules may contain additional files maintained by their respective team members.
+The tree highlights the main project modules and selected implementation files. Some directories contain additional files and supporting resources not shown here.
 
 ## 👥 Team Module Distribution
 
@@ -272,7 +274,7 @@ The Vision Engine focuses on defect detection, evaluation, and verification. Com
 
 ```powershell
 python -m pytest vision_engine/tests -v
-
+```
 
 ### Browser Agent — Member 2: RPA & Browser Agent
 
