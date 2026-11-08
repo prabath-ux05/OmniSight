@@ -18,38 +18,38 @@ UI automation scripts can break when frontend layouts, DOM structures, CSS class
 
 ```text
 OmniSight/
-vision_engine/
-├── detection/
-│   ├── dom_detector.py
-│   ├── gemini_provider.py
-│   ├── mock_detector.py
-│   ├── providers.py
-│   ├── vlm_detector.py
-│   ├── vlm_interface.py
-│   └── vlm_response_parser.py
-├── prompting/
-│   ├── defect_prompts.py
-│   └── vlm_prompt.py
-├── tests/
-│   ├── test_dom_detector.py
-│   ├── test_evaluation.py
-│   ├── test_evidence_validator.py
-│   ├── test_gemini_provider.py
-│   ├── test_image_processing.py
-│   ├── test_mock_detector.py
-│   ├── test_models.py
-│   ├── test_verification.py
-│   ├── test_vlm_detector.py
-│   ├── test_vlm_interface.py
-│   ├── test_vlm_prompt.py
-│   └── test_vlm_response_parser.py
-├── demo_tests/
-├── evaluation.py
-├── evidence_validator.py
-├── image_processing.py
-├── models.py
-├── verification.py
-└── README.md
+├── vision_engine/
+│   ├── detection/
+│   │   ├── dom_detector.py
+│   │   ├── gemini_provider.py
+│   │   ├── mock_detector.py
+│   │   ├── providers.py
+│   │   ├── vlm_detector.py
+│   │   ├── vlm_interface.py
+│   │   └── vlm_response_parser.py
+│   ├── prompting/
+│   │   ├── defect_prompts.py
+│   │   └── vlm_prompt.py
+│   ├── tests/
+│   │   ├── test_dom_detector.py
+│   │   ├── test_evaluation.py
+│   │   ├── test_evidence_validator.py
+│   │   ├── test_gemini_provider.py
+│   │   ├── test_image_processing.py
+│   │   ├── test_mock_detector.py
+│   │   ├── test_models.py
+│   │   ├── test_verification.py
+│   │   ├── test_vlm_detector.py
+│   │   ├── test_vlm_interface.py
+│   │   ├── test_vlm_prompt.py
+│   │   └── test_vlm_response_parser.py
+│   ├── demo_tests/
+│   ├── evaluation.py
+│   ├── evidence_validator.py
+│   ├── image_processing.py
+│   ├── models.py
+│   ├── verification.py
+│   └── README.md
 │
 ├── browser_agent/
 │   ├── navigation/                # Browser navigation and interactions
@@ -79,7 +79,6 @@ vision_engine/
 ├── .env.example
 ├── requirements.txt
 └── README.md
-```
 
 The tree lists the documented Vision Engine files and Browser Agent module structure. Other project modules may contain additional files maintained by their respective team members.
 
@@ -273,6 +272,7 @@ The Vision Engine focuses on defect detection, evaluation, and verification. Com
 
 ```powershell
 python -m pytest vision_engine/tests -v
+
 
 ### Browser Agent — Member 2: RPA & Browser Agent
 
