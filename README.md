@@ -18,39 +18,38 @@ UI automation scripts can break when frontend layouts, DOM structures, CSS class
 
 ```text
 OmniSight/
-├── vision_engine/
-│   ├── detection/
-│   │   ├── dom_detector.py
-│   │   ├── mock_detector.py
-│   │   ├── gemini_provider.py
-│   │   ├── vlm_interface.py
-│   │   └── vlm_response_parser.py
-│   ├── prompting/
-│   │   └── vlm_prompt.py
-│   ├── demo_tests/
-│   │   ├── evidence/
-│   │   │   ├── broken_image.html
-│   │   │   ├── broken_image.png
-│   │   │   ├── clean.html
-│   │   │   ├── clean.png
-│   │   │   ├── overflow.html
-│   │   │   ├── overflow.png
-│   │   │   ├── crop_comparison_results.json
-│   │   │   ├── dom_timeout_check_results.json
-│   │   │   └── live_validation_results.json
-│   │   ├── benchmark_crop_modes.py
-│   │   ├── capture_evidence.py
-│   │   ├── demo_site.html
-│   │   ├── run_dom_timeout_check.py
-│   │   ├── run_gemini_tests.py
-│   │   └── README.md
-│   ├── tests/
-│   ├── evaluation.py
-│   ├── evidence_validator.py
-│   ├── image_processing.py
-│   ├── models.py
-│   ├── verification.py
-│   └── README.md
+vision_engine/
+├── detection/
+│   ├── dom_detector.py
+│   ├── gemini_provider.py
+│   ├── mock_detector.py
+│   ├── providers.py
+│   ├── vlm_detector.py
+│   ├── vlm_interface.py
+│   └── vlm_response_parser.py
+├── prompting/
+│   ├── defect_prompts.py
+│   └── vlm_prompt.py
+├── tests/
+│   ├── test_dom_detector.py
+│   ├── test_evaluation.py
+│   ├── test_evidence_validator.py
+│   ├── test_gemini_provider.py
+│   ├── test_image_processing.py
+│   ├── test_mock_detector.py
+│   ├── test_models.py
+│   ├── test_verification.py
+│   ├── test_vlm_detector.py
+│   ├── test_vlm_interface.py
+│   ├── test_vlm_prompt.py
+│   └── test_vlm_response_parser.py
+├── demo_tests/
+├── evaluation.py
+├── evidence_validator.py
+├── image_processing.py
+├── models.py
+├── verification.py
+└── README.md
 │
 ├── browser_agent/
 │   ├── navigation/                # Browser navigation and interactions
@@ -200,28 +199,20 @@ The following checklist reflects the documented development status. Features sho
 
 ### Vision Engine — Member 1: Vision & Intelligence
 
-- [x] Implemented input and finding models using Pydantic.
-- [x] Added evidence-reference and bounding-box models.
-- [x] Added input validation for required fields and evidence requirements.
-- [x] Implemented evidence file validation for existence, file type, readability, and empty files.
-- [x] Implemented a deterministic mock detector.
-- [x] Added mock defect scenarios for `layout_overflow` and `broken_image`.
-- [x] Added a clean-page scenario that returns no findings.
-- [x] Added automated tests for input validation, evidence validation, and mock detection.
-- [x] Added static HTML DOM heuristics for missing or empty image sources.
-- [x] Added detection of missing or empty image alt text.
-- [x] Added heuristics for form controls that may lack accessible labels.
-- [x] Added automated DOM detector regression tests.
-- [x] Refined defect categories and finding-output validation.
-- [x] Integrated a Gemini vision-language model provider.
-- [x] Added VLM response parsing, validation, and failure handling.
-- [x] Added screenshot preprocessing, cropping, and bounding-box coordinate translation.
-- [x] Added fallback handling when screenshot crop preparation fails.
-- [x] Added evaluation metrics for precision, recall, and F1 score.
-- [x] Added post-repair verification support.
-- [x] Added demo evidence capture and live Gemini testing scripts.
-- [x] Added screenshot crop benchmarking for full-image, single-crop, and multi-crop modes.
-- [x] Updated Vision Engine documentation and benchmark reports.
+- [x] Implemented Pydantic input, finding, evidence-reference, and bounding-box models.
+- [x] Added input validation and evidence-file validation.
+- [x] Implemented deterministic mock defect detection.
+- [x] Implemented static HTML DOM heuristics for image and form-label issues.
+- [x] Integrated Gemini as a vision-language model provider.
+- [x] Added VLM prompt engineering and structured response parsing.
+- [x] Implemented screenshot cropping with support for single and multiple crop regions.
+- [x] Added coordinate translation from cropped images to original screenshot coordinates.
+- [x] Implemented spatial defect evaluation using Intersection over Union (IoU).
+- [x] Added one-to-one finding matching and configurable IoU thresholds.
+- [x] Added precision, recall, and F1-score evaluation metrics.
+- [x] Implemented post-repair finding verification.
+- [x] Added Gemini demo tests, evidence-capture scripts, and crop-mode benchmarking.
+- [x] Expanded automated tests across Vision Engine components.
 
 ### Vision Engine Implementation Details
 
@@ -229,49 +220,59 @@ The following checklist reflects the documented development status. Features sho
 
 | File | Description |
 |---|---|
-| `vision_engine/models.py` | Defines input, finding, evidence-reference, and bounding-box models. |
-| `vision_engine/evidence_validator.py` | Validates evidence paths, file existence, file type, readability, and empty files. |
+| `vision_engine/models.py` | Defines validated input, finding, evidence-reference, and bounding-box models. |
+| `vision_engine/evidence_validator.py` | Validates evidence-file existence, type, readability, and non-empty content. |
 | `vision_engine/detection/mock_detector.py` | Provides deterministic mock defect and clean-page scenarios. |
-| `vision_engine/detection/dom_detector.py` | Uses static HTML heuristics to identify image and form-label issues. |
-| `vision_engine/detection/gemini_provider.py` | Integrates Gemini for screenshot-based defect detection. |
-| `vision_engine/detection/vlm_interface.py` | Defines the vision-language model interface. |
+| `vision_engine/detection/dom_detector.py` | Uses static HTML heuristics to identify selected image and form-label issues. |
+| `vision_engine/detection/gemini_provider.py` | Implements Gemini-backed vision-language model detection. |
+| `vision_engine/detection/vlm_detector.py` | Provides VLM detection functionality. |
+| `vision_engine/detection/vlm_interface.py` | Defines the interface for vision-language model providers. |
 | `vision_engine/detection/vlm_response_parser.py` | Parses and validates structured VLM responses. |
-| `vision_engine/prompting/vlm_prompt.py` | Contains prompts and instructions for VLM-based detection. |
-| `vision_engine/image_processing.py` | Handles screenshot preprocessing, cropping, and coordinate translation. |
-| `vision_engine/evaluation.py` | Provides evaluation metrics, including precision, recall, and F1 score. |
-| `vision_engine/verification.py` | Supports post-repair verification. |
-| `vision_engine/demo_tests/` | Contains evidence capture, live Gemini testing, and benchmark scripts. |
-| `vision_engine/tests/` | Contains automated regression and integration tests for Vision Engine components. |
-| `vision_engine/README.md` | Documents Vision Engine architecture, setup, capabilities, and limitations. |
+| `vision_engine/detection/providers.py` | Contains provider-related detection functionality. |
+| `vision_engine/prompting/vlm_prompt.py` | Builds prompts and instructions for VLM-based defect detection. |
+| `vision_engine/prompting/defect_prompts.py` | Contains defect-related prompt definitions. |
+| `vision_engine/image_processing.py` | Handles screenshot cropping and coordinate translation. |
+| `vision_engine/evaluation.py` | Evaluates detection results using selector and spatial IoU matching, with precision, recall, and F1 metrics. |
+| `vision_engine/verification.py` | Verifies whether detected issues have been resolved after a repair. |
+| `vision_engine/demo_tests/` | Contains demo pages, evidence-capture scripts, Gemini validation, DOM checks, and crop benchmarking. |
+| `vision_engine/tests/` | Contains automated tests for Vision Engine models, detection, evaluation, prompting, image processing, and verification. |
+| `vision_engine/README.md` | Documents Vision Engine architecture, usage, capabilities, and limitations. |
 
 #### Current Capabilities
 
-- Accepts run identifiers, URLs, and screenshot or DOM evidence paths.
-- Validates required input fields and evidence files.
-- Generates deterministic mock findings for `layout_overflow` and `broken_image`.
-- Detects selected image and form-label accessibility issues through static HTML analysis.
-- Uses Gemini as a vision-language model provider to analyze screenshot evidence.
-- Validates and parses model responses into structured findings.
-- Handles selected temporary provider failures through retry logic.
-- Preprocesses screenshots and supports full-image, single-crop, and multi-crop detection.
-- Translates bounding-box coordinates from cropped images back to the original screenshot.
-- Falls back to full-screenshot processing if crop preparation fails.
-- Calculates precision, recall, and F1 score for detection evaluation.
-- Supports post-repair verification.
-- Includes demo scripts for capturing evidence and testing the live Gemini integration.
-- Includes benchmark scripts comparing screenshot processing modes.
+- Accepts screenshot and DOM evidence through validated input models.
+- Validates evidence-file accessibility and basic file requirements.
+- Supports deterministic mock detection for controlled testing.
+- Uses static DOM heuristics to identify selected image and form-label issues.
+- Integrates Gemini for screenshot and DOM-based vision-language analysis.
+- Uses structured prompts and response parsing to produce standardized findings.
+- Supports full-image analysis and single or multiple screenshot crop regions.
+- Translates bounding boxes from cropped-image coordinates back to original screenshot coordinates.
+- Evaluates expected and detected findings using category matching, selector matching, and spatial Intersection over Union (IoU).
+- Supports configurable IoU thresholds and one-to-one finding assignment.
+- Calculates true positives, false positives, false negatives, precision, recall, and F1 score.
+- Supports post-repair verification with `resolved`, `partially_resolved`, `unresolved`, and `unverifiable` outcomes.
+- Includes demo scripts for evidence capture, Gemini validation, DOM timeout checks, and crop-mode benchmarking.
 
 #### Current Limitations
 
-The mock detector generates deterministic example findings and is intended for testing rather than real visual analysis.
+The DOM detector performs static HTML analysis and does not execute JavaScript, inspect the fully rendered page layout, or independently verify whether remote images load successfully.
 
-The DOM detector performs static HTML analysis. It does not execute JavaScript, inspect the rendered page layout, fetch image URLs, or verify whether images load successfully. Its heuristic checks may produce false positives or miss issues in complex HTML structures.
+Gemini-based detection depends on external provider availability, API access, and model response quality. VLM predictions may produce false positives or miss defects, so findings require validation.
 
-Gemini-based detection depends on provider availability, valid API credentials, and model responses. Detection accuracy can vary depending on screenshot quality, prompt interpretation, and the visual complexity of the page.
+Screenshot crop benchmarking uses controlled demo fixtures and does not establish general accuracy improvements, production performance, or guaranteed cost savings.
 
-The screenshot crop benchmark covered two defect scenarios across six runs. All expected defects were detected. Single-crop processing reduced image payload size by approximately **58–60%** compared with full-image processing in the tested scenarios. These results are preliminary and should not be treated as a comprehensive accuracy or performance evaluation.
+Evidence validation checks basic file accessibility and content requirements but does not establish the semantic correctness of all supplied evidence.
 
-The latest recorded full-project regression test result was **119 passed**. Rerun the test suite after further changes to verify the current state.
+The Vision Engine focuses on defect detection, evaluation, and verification. Complete browser automation, automatic repair execution, and end-to-end RPA workflows are handled by other project components.
+
+#### Testing
+
+- Latest recorded full Vision Engine test suite: **145 passed**.
+- Run the tests using:
+
+```powershell
+python -m pytest vision_engine/tests -v
 
 ### Browser Agent — Member 2: RPA & Browser Agent
 
