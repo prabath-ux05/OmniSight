@@ -123,9 +123,11 @@ def test_parse_bounding_box():
     assert box.x == 10.5
     assert box.width == 100.0
 
-    # Negative width/height clamped to 0
-    clamped = parse_bounding_box({"x": 0.0, "y": 0.0, "width": -10.0, "height": -5.0})
-    assert clamped.width == 0.0
+    # Invalid dimensions return None because BoundingBox requires
+    # strictly positive width and height.
+    assert parse_bounding_box(
+        {"x": 0.0, "y": 0.0, "width": -10.0, "height": -5.0}
+    ) is None
 
     # Malformed box returns None
     assert parse_bounding_box("invalid") is None
