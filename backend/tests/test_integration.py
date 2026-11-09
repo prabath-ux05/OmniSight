@@ -189,3 +189,62 @@ def test_execute_run_pipeline_endpoint_unknown_run_raises_404():
 
     assert exc_info.value.status_code == 404
     assert "not found" in exc_info.value.detail.lower()
+
+
+# =============================================================================
+# Day 1: Backend Improvements Regression Tests
+# =============================================================================
+
+def test_execute_run_pipeline_conflict_when_already_active():
+    """Verify execute_run_pipeline raises HTTP 409 Conflict if run is already executing."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    run_store.update_run(run.run_id, status="capturing")
+
+    with pytest.raises(HTTPException) as exc_info:
+        execute_run_pipeline(run.run_id)
+
+    assert exc_info.value.status_code == 409
+    assert "already executing" in exc_info.value.detail
+
+
+def test_orchestrator_rejects_invalid_url_protocol():
+    """Verify orchestrator marks run as failed if URL scheme is not http or https."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+    run_orchestrator.execute_run(run.run_id, "ftp://example.com/resource")
+
+    updated = run_store.get(run.run_id)
+    assert updated is not None
+    assert updated.status == "failed"
+    assert "Must begin with http:// or https://" in updated.error
+    assert updated.completed_at is not None
+
+
+def test_orchestrator_preflight_missing_run():
+    """Verify orchestrator handles unknown run_id safely without raising unhandled exceptions."""
+    # Should log an error and return without raising
+    run_orchestrator.execute_run("run_completely_unknown", "http://127.0.0.1:8000/")
+
+
+def test_orchestrator_handles_missing_dom_file_gracefully():
+    """Verify orchestrator completes successfully even if dom_snapshot_path points to missing file."""
+    run = run_store.create(RunCreateRequest(url="http://127.0.0.1:8000/"))
+
+    mock_nav_result = NavigationResult(
+        run_id=run.run_id,
+        url=run.url,
+        page_title="OmniSight",
+        captured_at="2026-10-25T00:00:00Z",
+        viewport={"width": 1280, "height": 800},
+        screenshot_path="artifacts/test_sample_run/before.png",
+        dom_snapshot_path="artifacts/test_sample_run/nonexistent_file_dom.html",
+        status="success",
+        error=None,
+    )
+
+    with patch("navigation.navigator.BrowserNavigator.navigate", return_value=mock_nav_result):
+        run_orchestrator.execute_run(run.run_id, run.url)
+
+    updated = run_store.get(run.run_id)
+    assert updated is not None
+    assert updated.status == "completed"
+    assert updated.completed_at is not None

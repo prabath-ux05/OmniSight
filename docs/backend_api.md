@@ -1,278 +1,346 @@
 # OmniSight Backend API Documentation
 
-## Overview
+## 1. Overview & Architecture
 
-The OmniSight Backend is a high-performance REST API built using **FastAPI**, **Pydantic v2**, and **Uvicorn**. It serves as the central orchestration engine for OmniSight, coordinating inspection runs, managing execution state, and exposing structured defect findings for the dashboard frontend.
+The OmniSight Backend is a high-performance REST API built using **FastAPI**, **Pydantic v2**, **SQLAlchemy 2.0**, and **Uvicorn**. It orchestrates automated UI inspection workflows, persists execution telemetry and defect evidence in **PostgreSQL 18**, manages Human-in-the-Loop repair approval lifecycles, and exposes standardized endpoints for the React dashboard.
+
+### Architecture Topology
+
+```
+                       +-------------------------------+
+                       |    React Dashboard Frontend   |
+                       |       (Vite / Port 5173)      |
+                       +---------------+---------------+
+                                       | HTTP REST / JSON
+                                       v
+                       +-------------------------------+
+                       |    FastAPI Application Core   |
+                       |      (Uvicorn / Port 8000)    |
+                       +---------------+---------------+
+                                       |
+          +----------------------------+----------------------------+
+          |                            |                            |
+          v                            v                            v
++--------------------+       +--------------------+       +--------------------+
+|  RunOrchestrator   |       |  DatabaseRunStore  |       | Artifact Directory |
+|  Integration Flow  |       |  (SQLAlchemy 2.0)  |       |    (/artifacts)    |
++---------+----------+       +---------+----------+       +--------------------+
+          |                            |
+     +----+----+                       v
+     |         |             +--------------------+
+     v         v             |   PostgreSQL 18    |
+[Browser]   [Vision]         |   (omnisight_db)   |
+[ Agent ]   [Engine]         +--------------------+
+```
 
 ---
 
-## 1. Installation & Environment Configuration
+## 2. Directory Structure
 
-### Step 1: Virtual Environment Setup
-Ensure your virtual environment is created and activated:
+```text
+backend/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                     # Central FastAPI application & lifespan management
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── artifacts.py            # Artifact retrieval endpoint with traversal security
+│   │   ├── health.py               # Application and database health checks
+│   │   ├── proposals.py            # Proposal review, approval, and rejection lifecycle
+│   │   └── runs.py                 # Run creation, lookup, history, and pipeline dispatch
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py               # Environment configuration settings
+│   │   └── logging.py              # Structured logging configuration
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── base.py                 # Declarative Base metadata
+│   │   ├── models.py               # SQLAlchemy ORM models (runs, findings, artifacts, proposals)
+│   │   └── session.py              # Connection pooling and session lifecycle helpers
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── artifacts.py            # Artifact response Pydantic models
+│   │   ├── errors.py               # Standardized error payload models
+│   │   ├── findings.py             # FindingResponse and evidence models
+│   │   ├── proposals.py            # Proposal request and response models
+│   │   ├── repairs.py              # Locator repair, patch, and PR models
+│   │   └── runs.py                 # Run creation and lifecycle models
+│   └── services/
+│       ├── __init__.py
+│       ├── orchestrator.py         # Multi-stage execution pipeline coordinator
+│       └── run_store.py            # Database-backed repository with PostgreSQL persistence
+└── tests/
+    ├── test_artifacts.py           # Artifact security and retrieval tests
+    ├── test_database.py            # PostgreSQL persistence & schema integrity tests
+    ├── test_day5_integration_reliability.py # E2E lifecycle and error resilience tests
+    ├── test_github_api.py          # Diff generation and PR approval gate tests
+    ├── test_health.py              # Health check endpoint tests
+    ├── test_integration.py         # Pipeline coordination and failure recovery tests
+    ├── test_live_e2e_pipeline.py   # Multi-defect category round-trip tests
+    ├── test_live_vlm_self_healing_e2e.py # VLM provider and live locator repair tests
+    ├── test_orchestrator_pipeline.py # State transitions and timeout tests
+    ├── test_proposals.py           # Reviewer notes and approval conflict tests
+    ├── test_repairs_api.py         # Locator repair candidate generation tests
+    └── test_runs.py                # Run validation and history tests
+```
 
-**Windows (PowerShell):**
+---
+
+## 3. Server Startup & Verification
+
+### Virtual Environment & Dependencies
 ```powershell
-python -m venv .venv
+# Activate virtual environment
 .\.venv\Scripts\Activate.ps1
+
+# Install requirements
+pip install -r requirements.txt
 ```
 
-**macOS / Linux:**
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-
-### Step 2: Install Dependencies
-Install the required dependencies from the root `requirements.txt`:
-```bash
-python -m pip install -r requirements.txt
-```
-
-### Step 3: Environment Configuration
-Copy the template configuration file to `.env`:
-
-**Windows (PowerShell / Command Prompt):**
+### Starting the Server
 ```powershell
-Copy-Item .env.example .env
-```
-
-**macOS / Linux:**
-```bash
-cp .env.example .env
-```
-
-#### Application Environment Variables:
-```env
-APP_ENV=development
-APP_DEBUG=true
-API_HOST=127.0.0.1
-API_PORT=8000
-API_PREFIX=/api/v1
-```
-> **Security Notice**: Never commit `.env` files, API keys, passwords, or personal credentials to version control. The repository `.gitignore` automatically excludes `.env` files.
-
----
-
-## 2. Starting the Backend Server
-
-Start the local development server using **Uvicorn** with hot-reloading:
-
-```bash
 uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-*(Or alternatively via the Python module launcher)*:
-```bash
-python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
 
-### Interactive API Documentation:
-Once running, open your browser to inspect and interact with the endpoints:
-* **Swagger UI (Interactive)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-* **ReDoc (Specification)**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-* **Raw OpenAPI JSON**: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
+### Interactive Documentation
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **OpenAPI Schema**: [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json)
 
 ---
 
-## 3. Storage Architecture & Limitations
+## 4. Complete Endpoints Reference
 
-### In-Memory Storage (`RunStore`)
-During this development milestone, inspection runs and findings are managed in memory via `backend/app/services/run_store.py`.
+### A. Health & Diagnostics
 
-#### Documented Limitations:
-1. **Volatility (RAM-Only)**: Runs and findings are stored in process memory. Stopping or restarting the Uvicorn server resets the store to empty.
-2. **Single-Process Scope**: In-memory data is not shared between multiple Uvicorn worker processes or clustered instances. Run the server with a single worker during development.
-3. **Database Integration**: A persistent relational database (such as SQLite or PostgreSQL) with ORM models will replace this in-memory store in a future milestone.
-
----
-
-## 4. Endpoints Reference
-
-### 1. Health Check
-* **Endpoint**: `GET /health`
-* **Purpose**: Confirms that the backend API web server is operational.
-* **Note**: This endpoint confirms backend service availability only. It does **not** claim that the browser agent or vision engine are operational.
-
-#### Example Request:
-```bash
-curl -X GET "http://127.0.0.1:8000/health" -H "Accept: application/json"
-```
-
-#### Example Response (`200 OK`):
-```json
-{
-  "status": "ok",
-  "app": "OmniSight Backend",
-  "version": "0.1.0"
-}
-```
+#### 1. System Health Check
+- **Endpoint**: `GET /health`
+- **Description**: Verifies API availability and pings PostgreSQL (`SELECT 1`).
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "healthy",
+    "database": "healthy",
+    "version": "0.1.0"
+  }
+  ```
 
 ---
 
-### 2. Create Inspection Run
-* **Endpoint**: `POST /api/v1/runs`
-* **Purpose**: Validates the inspection request, generates a unique `run_id`, and places the run in the initial `"queued"` status.
-* **Validation Rules**:
-  * `url`: Must be a valid HTTP or HTTPS URL (maximum 2048 characters). Leading/trailing whitespace is automatically stripped.
-  * Rejects missing fields, malformed URLs, and unsupported schemes (such as `ftp://`).
+### B. Inspection Runs Management
 
-#### Example Request:
-```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/runs" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "http://127.0.0.1:8000/"}'
-```
+#### 2. Create Inspection Run
+- **Endpoint**: `POST /api/v1/runs`
+- **Query Parameters**: `auto_execute` (boolean, optional, default: `false`)
+- **Request Body**:
+  ```json
+  {
+    "url": "http://127.0.0.1:8080/index.html"
+  }
+  ```
+- **Response (`201 Created`)**:
+  ```json
+  {
+    "run_id": "run_a1b2c3d4",
+    "url": "http://127.0.0.1:8080/index.html",
+    "status": "queued",
+    "created_at": "2026-11-07T12:00:00Z",
+    "completed_at": null,
+    "message": "Run created successfully and queued for inspection.",
+    "error": null
+  }
+  ```
+- **Validation Errors (`422 Unprocessable Content`)**: Rejects missing or malformed URLs (must start with `http://` or `https://`).
 
-#### Example Response (`201 Created`):
-```json
-{
-  "run_id": "run_a1b2c3d4",
-  "url": "http://127.0.0.1:8000/",
-  "status": "queued",
-  "created_at": "2026-10-24T18:00:00.123456+00:00",
-  "message": "Run created successfully and queued for inspection.",
-  "error": null
-}
-```
+#### 3. List Historical Inspection Runs
+- **Endpoint**: `GET /api/v1/runs`
+- **Description**: Retrieves all runs persisted in PostgreSQL ordered by creation time descending.
+- **Response (`200 OK`)**: Array of `RunResponse` objects.
 
-#### Example Validation Error Response (`422 Unprocessable Entity`):
-*Triggered when `url` is missing or invalid:*
-```json
-{
-  "detail": [
+#### 4. Lookup Run Status
+- **Endpoint**: `GET /api/v1/runs/{run_id}`
+- **Response (`200 OK`)**: `RunResponse` object reflecting current execution status (`queued`, `capturing`, `analyzing`, `completed`, `failed`).
+- **Error (`404 Not Found`)**: If `run_id` does not exist in PostgreSQL.
+
+#### 5. Execute Run Pipeline On Demand
+- **Endpoint**: `POST /api/v1/runs/{run_id}/execute`
+- **Description**: Asynchronously dispatches the Browser Agent and Vision Engine for a queued run.
+- **Response (`202 Accepted`)**: Updated `RunResponse` with status `capturing`.
+- **Conflict (`409 Conflict`)**: If the pipeline is already executing for this run.
+
+---
+
+### C. Findings & Evidence Artifacts
+
+#### 6. Retrieve Run Findings
+- **Endpoint**: `GET /api/v1/runs/{run_id}/findings`
+- **Query Parameters**: `include_mock` (boolean, optional, default: `false`)
+- **Response (`200 OK`)**:
+  ```json
+  [
     {
-      "type": "url_parsing",
-      "loc": ["body", "url"],
-      "msg": "Input should be a valid URL, relative URL without a base"
+      "finding_id": "defect_run_a1b2c3d4_001",
+      "category": "missing_visible_element",
+      "severity": "high",
+      "confidence": 0.94,
+      "description": "Missing trigger action button locator in DOM.",
+      "selector": "#btn-trigger-self-heal",
+      "evidence": {
+        "screenshot_path": "artifacts/run_a1b2c3d4/before.png",
+        "dom_snapshot_path": "artifacts/run_a1b2c3d4/dom.html"
+      },
+      "source": "dom"
     }
   ]
-}
-```
+  ```
+
+#### 7. Serve Evidence Artifact File
+- **Endpoint**: `GET /api/v1/artifacts/{run_id}/{filename}`
+- **Security**: Strictly rejects path traversal (`../`) and non-artifact directory paths.
+- **Response (`200 OK`)**: Binary image stream (`image/png`) or HTML document (`text/html`).
+- **Error (`404 Not Found`)**: If the artifact file does not exist on disk.
 
 ---
 
-### 3. Retrieve Run Status & Metadata
-* **Endpoint**: `GET /api/v1/runs/{run_id}`
-* **Purpose**: Returns the current status and metadata of an existing run.
-* **Note**: Returns the genuine stored lifecycle state (`"queued"`). It does **not** invent progress stages or claim that inspection, repair, or verification has occurred.
+### D. Self-Healing & Proposal Lifecycle
 
-#### Example Request:
-```bash
-curl -X GET "http://127.0.0.1:8000/api/v1/runs/run_a1b2c3d4" \
-     -H "Accept: application/json"
-```
-
-#### Example Response (`200 OK`):
-```json
-{
-  "run_id": "run_a1b2c3d4",
-  "url": "http://127.0.0.1:8000/",
-  "status": "queued",
-  "created_at": "2026-10-24T18:00:00.123456+00:00",
-  "message": "Run created successfully and queued for inspection.",
-  "error": null
-}
-```
-
-#### Example Unknown Run Response (`404 Not Found`):
-```json
-{
-  "detail": "Run 'run_unknown_999' not found."
-}
-```
-
-#### Example Invalid Run ID Response (`400 Bad Request`):
-*Triggered when `run_id` is empty or whitespace-only:*
-```json
-{
-  "detail": "Invalid run_id: identifier must not be empty or whitespace."
-}
-```
-
----
-
-### 4. Retrieve Run Defect Findings
-* **Endpoint**: `GET /api/v1/runs/{run_id}/findings`
-* **Purpose**: Retrieves the list of UI defect findings associated with the specified run.
-* **Agreed Finding Schema**:
-  * `finding_id`: Unique finding identifier (e.g. `defect_run_xxx_001`).
-  * `category`: One of `"layout_overflow"`, `"missing_visible_element"`, `"broken_image"`.
-  * `severity`: `"low" | "medium" | "high" | "critical"`.
-  * `confidence`: Float between `0.0` and `1.0`.
-  * `description`: Explanation of the issue.
-  * `selector`: CSS/DOM selector if identified (or `null`).
-  * `evidence`: Contains `screenshot_path` and `dom_snapshot_path`.
-  * `source`: Explicitly tagged as `"mock"` (or `"vlm"` when integrated).
-
-#### Example Request:
-```bash
-curl -X GET "http://127.0.0.1:8000/api/v1/runs/run_a1b2c3d4/findings" \
-     -H "Accept: application/json"
-```
-
-#### Example Response — Clean Run with No Defects (`200 OK`):
-```json
-[]
-```
-
-#### Example Response — Run with Mock Defect Findings (`200 OK`):
-> **Note**: These findings are clearly labelled mock findings (`source: "mock"`) used for early dashboard testing before real vision model analysis is connected.
-```json
-[
+#### 8. Suggest Alternative Locators
+- **Endpoint**: `POST /api/v1/runs/{run_id}/repair`
+- **Request Body** (optional):
+  ```json
   {
     "finding_id": "defect_run_a1b2c3d4_001",
-    "category": "layout_overflow",
-    "severity": "medium",
-    "confidence": 0.92,
-    "description": "[MOCK] Content panel text extends beyond container boundary.",
-    "selector": "#main-content-panel",
-    "evidence": {
-      "screenshot_path": "artifacts/run_a1b2c3d4/before.png",
-      "dom_snapshot_path": "artifacts/run_a1b2c3d4/dom.html"
-    },
-    "source": "mock"
-  },
-  {
-    "finding_id": "defect_run_a1b2c3d4_002",
-    "category": "broken_image",
-    "severity": "high",
-    "confidence": 0.88,
-    "description": "[MOCK] Service topology image fails to display.",
-    "selector": "#service-topology-image",
-    "evidence": {
-      "screenshot_path": "artifacts/run_a1b2c3d4/before.png",
-      "dom_snapshot_path": null
-    },
-    "source": "mock"
+    "verify_live": false
   }
-]
-```
+  ```
+- **Response (`200 OK`)**: Ranked locator candidates verified against the captured DOM snapshot with explainable heuristic scores.
 
-#### Example Unknown Run Response (`404 Not Found`):
-```json
-{
-  "detail": "Run 'run_missing_999' not found."
-}
-```
+#### 9. Create or Generate Repair Proposals
+- **Endpoint**: `POST /api/v1/runs/{run_id}/proposals`
+- **Manual Draft Request (`201 Created`)**:
+  ```json
+  {
+    "finding_id": "defect_run_a1b2c3d4_001",
+    "proposed_change": "button[data-testid='trigger-self-heal-cta']",
+    "github_pr_url": "https://github.com/prabath-ux05/OmniSight/pull/12",
+    "github_pr_number": 12
+  }
+  ```
+- **Automated Generation Request (`200 OK`)**:
+  ```json
+  {
+    "finding_id": "defect_run_a1b2c3d4_001",
+    "target_file": "tests/e2e/test_checkout.py"
+  }
+  ```
+
+#### 10. List Proposals for Run
+- **Endpoint**: `GET /api/v1/runs/{run_id}/proposals`
+- **Query Parameters**: `finding_id` (optional filter)
+- **Response (`200 OK`)**: Array of `RepairProposalResponse` objects with tri-stage statuses.
+
+#### 11. Authorize / Approve Proposal
+- **Endpoint**: `POST /api/v1/proposals/{proposal_id}/approve`
+- **Request Body**:
+  ```json
+  {
+    "notes": "Verified selector uniqueness against production DOM."
+  }
+  ```
+- **Response (`200 OK`)**: Updates `approval_status` to `"approved"` and records `reviewer_notes`.
+- **Conflict (`409 Conflict`)**: If the proposal is already approved or rejected.
+
+#### 12. Reject Proposal
+- **Endpoint**: `POST /api/v1/proposals/{proposal_id}/reject`
+- **Request Body**:
+  ```json
+  {
+    "notes": "Rejected: locator is fragile on mobile viewports."
+  }
+  ```
+- **Response (`200 OK`)**: Updates `approval_status` to `"rejected"`.
+- **Conflict (`409 Conflict`)**: If the proposal is already approved or rejected.
+
+#### 13. Proposal Status Summary
+- **Endpoint**: `GET /api/v1/proposals/{proposal_id}/status`
+- **Response (`200 OK`)**: Detailed breakdown of Review, Execution, and Verification states.
 
 ---
 
-## 5. Automated Tests
+### E. Code Patching & GitHub Pull Request
 
-The backend test suite is located in `backend/tests/` and configured via `pytest.ini`.
+#### 14. Generate Minimal Safe Diff
+- **Endpoint**: `POST /api/v1/runs/{run_id}/proposals/{proposal_id}/patch`
+- **Request Body**:
+  ```json
+  {
+    "target_file": "tests/e2e/test_checkout.py"
+  }
+  ```
+- **Security**: Rejects path traversal and protected OmniSight internal directories. Generates minimal unified diff strictly in memory.
 
-### Running All Backend Tests:
-```bash
-pytest -v
+#### 15. Submit Pull Request with Human Approval Gate
+- **Endpoint**: `POST /api/v1/runs/{run_id}/proposals/{proposal_id}/pull-request`
+- **Request Body**:
+  ```json
+  {
+    "user_approved": true,
+    "simulate": true
+  }
+  ```
+- **Security & Governance Gate**: If `user_approved` is `false`, strictly returns **HTTP 403 Forbidden**. If `simulate` is `true`, dry-runs without remote writes.
+
+---
+
+### F. Provider Configuration Checks
+
+#### 16. Inspect VLM Configuration
+- **Endpoint**: `GET /api/v1/runs/vlm/config` (or `/api/v1/vlm/config`)
+- **Description**: Reports VLM readiness (Gemini, OpenAI, Mock) with masked API keys.
+
+#### 17. Inspect GitHub Configuration
+- **Endpoint**: `GET /api/v1/runs/github/config` (or `/api/v1/github/config`)
+- **Description**: Reports repository credentials status (`owner`, `repo`, `masked_token`) without leaking secrets.
+
+---
+
+## 5. Lifecycles & State Transitions
+
+### Inspection Run Lifecycle
 ```
-*(Or via Python)*:
-```bash
-python -m pytest backend/tests/ -v
+[queued] ──> [capturing] ──> [analyzing] ──> [completed]
+   │              │               │
+   └──────────────┴───────────────┴───────────> [failed]
 ```
 
-### Covered Test Cases (25 Tests):
-* **Health endpoint**: Registration in OpenAPI, unit execution, raw ASGI HTTP dispatch.
-* **Run creation**: Valid URL, leading/trailing whitespace stripping, oversized URL rejection (422), unsupported scheme rejection (422), missing body rejection (422), unique run ID generation.
-* **Run retrieval**: Existing run metadata matching (200), unknown run ID (404), whitespace run ID (400).
-* **Findings retrieval**: Clean run empty list (200), mock findings structure and `source="mock"` verification (200), unknown run ID (404), whitespace run ID (400).
-* **Consistency**: Guaranteed run ID structure and adherence to allowed lifecycle states (`queued`, `capturing`, `analyzing`, etc.).
+1. **`queued`**: Run created and stored in PostgreSQL; awaiting execution.
+2. **`capturing`**: Browser Agent launched Chromium, navigating and capturing screenshots and DOM.
+3. **`analyzing`**: Vision Engine inspecting visual artifacts for layout, missing element, or broken image defects.
+4. **`completed`**: Inspection finished successfully; findings stored in PostgreSQL.
+5. **`failed`**: Execution stopped due to network failure, unreachable host, or fatal pipeline error.
+
+### Repair Proposal Tri-Stage Governance
+```
+Review Status:       PENDING ──────> APPROVED or REJECTED (Human Decision)
+Execution Status:    UNAPPLIED ────> APPLYING ───> APPLIED or FAILED
+Verification Status: UNVERIFIED ───> VERIFIED_SUCCESS or VERIFIED_FAILURE
+```
+
+- **Separation of Concerns**: Authorizing a repair proposal only updates `approval_status`. It never falsely marks patch execution or visual re-inspection as verified.
+
+---
+
+## 6. Error Handling & HTTP Status Codes
+
+| Code | Meaning | Example Trigger |
+| :--- | :--- | :--- |
+| **`200 OK`** | Request succeeded | Successful GET, proposal retrieval, status check. |
+| **`201 Created`** | Resource created | Successful run creation (`POST /runs`), proposal draft. |
+| **`202 Accepted`** | Asynchronous task queued | Dispatched execution pipeline (`POST /runs/{id}/execute`). |
+| **`400 Bad Request`** | Malformed input | Empty or whitespace identifier, path traversal attempt. |
+| **`403 Forbidden`** | Governance gate rejected | Submitting a PR with `user_approved=false`. |
+| **`404 Not Found`** | Resource does not exist | Nonexistent `run_id`, `finding_id`, or missing artifact file. |
+| **`409 Conflict`** | State machine conflict | Attempting duplicate approval or re-executing an active run. |
+| **`422 Unprocessable`** | Schema validation error | Invalid URL format, empty `proposed_change` string. |
+| **`502 Bad Gateway`** | Remote service failed | GitHub API token rejected during live PR submission. |
+| **`503 Unavailable`** | Infrastructure failure | PostgreSQL database connection unreachable or down. |

@@ -1,0 +1,23 @@
+services:
+  omnisight-postgres:
+    image: postgres:16-alpine
+    container_name: omnisight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: omnisight_db
+      POSTGRES_USER: omnisight_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "5433:5432"
+    volumes:
+      - omnisight_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omnisight_user -d omnisight_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  omnisight_postgres_data:
+    name: omnisight_postgres_data
