@@ -3,10 +3,15 @@
 import pytest
 
 from vision_engine.evaluation import evaluate_findings
-from vision_engine.models import EvidenceReferences, VisionFinding
+from vision_engine.models import BoundingBox, EvidenceReferences, VisionFinding
 
 
-def create_finding(finding_id, category="layout_overflow", selector="#main"):
+def create_finding(
+    finding_id,
+    category="layout_overflow",
+    selector="#main",
+    bounding_box=None,
+):
     return VisionFinding(
         finding_id=finding_id,
         category=category,
@@ -14,6 +19,7 @@ def create_finding(finding_id, category="layout_overflow", selector="#main"):
         confidence=0.95,
         description="UI defect detected",
         selector=selector,
+        bounding_box=bounding_box,
         evidence=EvidenceReferences(
             screenshot_path="screenshot.png",
         ),
@@ -128,3 +134,161 @@ def test_evaluation_handles_empty_inputs():
     assert result.precision == 0.0
     assert result.recall == 0.0
     assert result.f1_score == 0.0
+
+
+def test_evaluation_matches_overlapping_bounding_boxes():
+    expected = [
+        create_finding(
+            "expected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=10,
+                y=10,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    detected = [
+        create_finding(
+            "detected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=20,
+                y=20,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    result = evaluate_findings(expected, detected)
+
+    assert result.true_positive_count == 1
+    assert result.false_positive_count == 0
+    assert result.false_negative_count == 0
+
+
+def test_evaluation_does_not_match_findings_at_different_locations():
+    expected = [
+        create_finding(
+            "expected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=10,
+                y=10,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    detected = [
+        create_finding(
+            "detected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=300,
+                y=300,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    result = evaluate_findings(expected, detected)
+
+    assert result.true_positive_count == 0
+    assert result.false_positive_ids == ["detected-1"]
+    assert result.false_negative_ids == ["expected-1"]
+
+
+def test_evaluation_uses_category_fallback_without_spatial_evidence():
+    expected = [
+        create_finding(
+            "expected-1",
+            selector=None,
+            bounding_box=None,
+        )
+    ]
+
+    detected = [
+        create_finding(
+            "detected-1",
+            selector=None,
+            bounding_box=None,
+        )
+    ]
+
+    result = evaluate_findings(expected, detected)
+
+    assert result.true_positive_count == 1
+
+
+def test_evaluation_respects_iou_threshold():
+    expected = [
+        create_finding(
+            "expected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=10,
+                y=10,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    detected = [
+        create_finding(
+            "detected-1",
+            selector=None,
+            bounding_box=BoundingBox(
+                x=40,
+                y=40,
+                width=100,
+                height=100,
+            ),
+        )
+    ]
+
+    result = evaluate_findings(
+        expected,
+        detected,
+        iou_threshold=0.8,
+    )
+
+    assert result.true_positive_count == 0
+    assert result.false_positive_ids == ["detected-1"]
+    assert result.false_negative_ids == ["expected-1"]
+
+
+def test_evaluation_reassigns_matches_to_maximize_true_positives():
+    expected = [
+        create_finding(
+            "expected-1",
+            selector="#shared",
+        ),
+        create_finding(
+            "expected-2",
+            selector="#shared",
+        ),
+    ]
+
+    detected = [
+        create_finding(
+            "detected-1",
+            selector="#shared",
+        ),
+        create_finding(
+            "detected-2",
+            selector="#shared",
+        ),
+    ]
+
+    result = evaluate_findings(expected, detected)
+
+    assert result.true_positive_count == 2
+    assert result.false_positive_count == 0
+    assert result.false_negative_count == 0
