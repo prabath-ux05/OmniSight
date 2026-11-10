@@ -45,6 +45,48 @@ export default function RunStatusCard({
   };
 
   const isTerminalStatus = run && ['completed', 'failed', 'cancelled'].includes(run.status);
+  const isActiveRun = run && !isTerminalStatus;
+
+  // Derive execution stage from backend status without inventing mock data
+  const getStageState = (stageKey) => {
+    if (!run) return 'pending';
+    const s = run.status?.toLowerCase();
+    if (s === 'failed' || s === 'cancelled') {
+      if (stageKey === 'queued' && s === 'queued') return 'failed';
+      if (stageKey === 'capturing' && (s === 'capturing' || s === 'failed')) return 'failed';
+      if (stageKey === 'analyzing' && s === 'analyzing') return 'failed';
+      return 'failed';
+    }
+    switch (stageKey) {
+      case 'queued':
+        return s === 'queued' ? 'active' : 'completed';
+      case 'capturing':
+        if (s === 'queued') return 'pending';
+        if (s === 'capturing') return 'active';
+        return 'completed';
+      case 'analyzing':
+        if (s === 'queued' || s === 'capturing') return 'pending';
+        if (s === 'analyzing' || s === 'repair_pending' || s === 'repairing' || s === 'verifying') return 'active';
+        return 'completed';
+      case 'completed':
+        return s === 'completed' ? 'completed' : 'pending';
+      default:
+        return 'pending';
+    }
+  };
+
+  const calculateDuration = (startIso, endIso) => {
+    if (!startIso || !endIso) return null;
+    try {
+      const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+      if (isNaN(ms) || ms < 0) return null;
+      return `${(ms / 1000).toFixed(1)}s`;
+    } catch {
+      return null;
+    }
+  };
+
+  const duration = run ? calculateDuration(run.created_at, run.completed_at) : null;
 
   return (
     <section className="card run-status-section">
@@ -79,14 +121,14 @@ export default function RunStatusCard({
                   isTerminalStatus
                     ? 'Polling stopped: Run has reached a terminal status.'
                     : isAutoPolling
-                    ? 'Auto-refresh active every 4 seconds. Click to pause.'
-                    : 'Click to enable automatic polling every 4 seconds.'
+                    ? 'Auto-refresh active every 2.5 seconds. Click to pause.'
+                    : 'Click to enable automatic polling every 2.5 seconds.'
                 }
               >
                 {isAutoPolling ? (
                   <>
                     <span className="polling-pulse-dot"></span>
-                    <span>Auto-Refresh: ON (4s)</span>
+                    <span>Auto-Refresh: ON (2.5s)</span>
                   </>
                 ) : (
                   <span>Auto-Refresh: OFF</span>
@@ -106,6 +148,66 @@ export default function RunStatusCard({
           )}
         </div>
       </div>
+
+      {/* Distinction: Active Run vs Completed/Historical Run */}
+      {run && (
+        <div className="run-mode-banner">
+          <div className="run-mode-left">
+            {isActiveRun ? (
+              <span className="badge badge-active-run">
+                <span className="polling-pulse-dot" aria-hidden="true"></span>
+                ACTIVE RUN IN PROGRESS
+              </span>
+            ) : run.status === 'completed' ? (
+              <span className="badge badge-completed-run">
+                ✓ HISTORICAL AUDIT (COMPLETED)
+              </span>
+            ) : (
+              <span className="badge badge-terminal-run">
+                ✕ TERMINAL RUN ({run.status.toUpperCase()})
+              </span>
+            )}
+            <span className="run-id-highlight"><code>{run.run_id}</code></span>
+          </div>
+
+          {duration && (
+            <span className="run-duration-pill" title="Execution duration between created_at and completed_at">
+              ⏱ Execution Time: {duration}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Pipeline Stages Progress Tracker (Derived strictly from real run.status) */}
+      {run && (
+        <div className="pipeline-tracker-box">
+          <div className="pipeline-tracker-header">
+            <span className="tracker-title">Inspection Pipeline Stages:</span>
+            <span className="tracker-status-text">Status: <code>{run.status}</code></span>
+          </div>
+          <div className="pipeline-steps-row">
+            <div className={`pipeline-step pipeline-step-${getStageState('queued')}`}>
+              <div className="step-number">1</div>
+              <div className="step-label">Queued</div>
+            </div>
+            <div className="step-connector"></div>
+            <div className={`pipeline-step pipeline-step-${getStageState('capturing')}`}>
+              <div className="step-number">2</div>
+              <div className="step-label">Browser Capture</div>
+            </div>
+            <div className="step-connector"></div>
+            <div className={`pipeline-step pipeline-step-${getStageState('analyzing')}`}>
+              <div className="step-number">3</div>
+              <div className="step-label">Vision Analysis</div>
+            </div>
+            <div className="step-connector"></div>
+            <div className={`pipeline-step pipeline-step-${getStageState('completed')}`}>
+              <div className="step-number">4</div>
+              <div className="step-label">Complete</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Lookup Bar */}
       <form onSubmit={handleLookupSubmit} className="lookup-form">
@@ -174,6 +276,22 @@ export default function RunStatusCard({
                 {run.created_at ? new Date(run.created_at).toLocaleString() : 'N/A'}
               </span>
             </div>
+
+            {run.completed_at && (
+              <div className="status-item">
+                <span className="status-label">Completed At (UTC)</span>
+                <span className="status-value">
+                  {new Date(run.completed_at).toLocaleString()}
+                </span>
+              </div>
+            )}
+
+            {duration && (
+              <div className="status-item">
+                <span className="status-label">Total Duration</span>
+                <span className="status-value status-mono">{duration}</span>
+              </div>
+            )}
           </div>
 
           {/* Backend Message Banner */}

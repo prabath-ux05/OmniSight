@@ -9,6 +9,7 @@ export default function EvidenceSection({
   isRepairing,
   repairError,
   onSuggestRepair,
+  onNavigateToRepair,
 }) {
   const [imageError, setImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -83,13 +84,23 @@ export default function EvidenceSection({
 
   return (
     <section className="card evidence-section">
-      <div className="card-header">
+      <div className="card-header-with-actions">
         <div>
           <h2 className="card-title">Evidence &amp; Artifact Details</h2>
           <p className="card-description">
             Associated visual evidence for finding <code className="finding-id-highlight">{finding.finding_id}</code>.
           </p>
         </div>
+        {onNavigateToRepair && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => onNavigateToRepair(finding)}
+            title="Open this finding in the Self-Healing Repair Proposal Workflow"
+          >
+            🛡️ Open in Repair Workflow →
+          </button>
+        )}
       </div>
 
       <div className="evidence-grid">
@@ -176,8 +187,29 @@ export default function EvidenceSection({
 
             <div className="meta-row">
               <span className="meta-key">CSS / DOM Selector:</span>
-              <code className="meta-val">{finding.selector || 'Global layout scope'}</code>
+              <div className="meta-val-with-action">
+                <code className="meta-val">{finding.selector || 'Global layout scope'}</code>
+                {finding.selector && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs btn-copy-inline"
+                    onClick={() => handleCopy(finding.selector)}
+                    title="Copy selector to clipboard"
+                  >
+                    {copied ? '✓ Copied' : 'Copy'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {(finding.box_2d || finding.bounding_box || evidence.bounding_box) && (
+              <div className="meta-row">
+                <span className="meta-key">Affected Area (Box):</span>
+                <code className="meta-val">
+                  {JSON.stringify(finding.box_2d || finding.bounding_box || evidence.bounding_box)}
+                </code>
+              </div>
+            )}
 
             <div className="meta-row">
               <span className="meta-key">Defect Category:</span>

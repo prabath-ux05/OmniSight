@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
+import HomePage from './components/HomePage';
+import InspectionPage from './components/InspectionPage';
 import InspectionForm from './components/InspectionForm';
 import RunStatusCard from './components/RunStatusCard';
 import FindingsSection from './components/FindingsSection';
 import EvidenceSection from './components/EvidenceSection';
 import InspectionHistoryTable from './components/InspectionHistoryTable';
+import HistoryPage from './components/HistoryPage';
+import RepairWorkspacePage from './components/RepairWorkspacePage';
 import RepairProposalWorkflow from './components/RepairProposalWorkflow';
+import AboutPage from './components/AboutPage';
+import SettingsPage from './components/SettingsPage';
+import GuidedTutorial, { TUTORIAL_STEPS } from './components/GuidedTutorial';
 import Alert from './components/Alert';
 import {
   fetchHealth,
@@ -27,6 +34,24 @@ const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
 export default function App() {
   // Navigation tabs: 'live' | 'history' | 'proposals'
   const [activeTab, setActiveTab] = useState('live');
+
+  // Shared Application Shell view: 'home' | 'inspection' | 'history' | 'repair' | 'about' | 'settings'
+  const [currentView, setCurrentView] = useState('inspection');
+
+  // Responsive navigation drawer state
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Theme foundation: 'dark' | 'light' | 'system'
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('omnisight_theme') || 'system';
+    } catch {
+      return 'system';
+    }
+  });
+
+  // Authenticated user session state (null when not logged in - strictly no fake sessions)
+  const [user, setUser] = useState(null);
 
   // Backend health status
   const [health, setHealth] = useState(null);
@@ -62,9 +87,79 @@ export default function App() {
   // Alerts & notifications
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+
+  // Guided Onboarding Tour state (Batch 7)
+  const [hasCompletedTour, setHasCompletedTour] = useState(() => {
+    try {
+      return localStorage.getItem('omnisight_tour_completed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isTourOpen, setIsTourOpen] = useState(() => {
+    try {
+      return localStorage.getItem('omnisight_tour_completed') !== 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [tourStep, setTourStep] = useState(0);
 
   // Ref to prevent overlapping polling intervals
   const pollingTimerRef = useRef(null);
+
+  // Refs to track active run requests and prevent stale async race conditions
+  const activeFindingsRunIdRef = useRef(null);
+  const activeProposalsRunIdRef = useRef(null);
+  const findingsSeqRef = useRef(0);
+  const proposalsSeqRef = useRef(0);
+
+  // ---------------------------------------------------------------------------
+  // Theme Management & Persistence
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    try {
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      localStorage.setItem('omnisight_theme', theme);
+    } catch {
+      // Safely ignore storage quotas or sandboxed iframe restrictions
+    }
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => {
+      if (prev === 'system') return 'dark';
+      if (prev === 'dark') return 'light';
+      return 'system';
+    });
+  };
+
+  // Close navigation drawer when Escape key is pressed
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isMenuOpen) {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMenuOpen]);
+
+  // Auth Action Handlers (Optional Sign In / Sign Up triggers)
+  const handleSignIn = () => {
+    setInfoMessage('Authentication Not Configured: No backend authentication service or user session exists. OmniSight operates in full Guest Mode — all inspection, history, and repair workflows are completely unlocked.');
+  };
+
+  const handleSignUp = () => {
+    setInfoMessage('Account Registration Not Configured: No user database is provisioned. OmniSight is fully unlocked in Guest Mode without requiring an account.');
+  };
 
   // ---------------------------------------------------------------------------
   // 1. Backend Health Check
@@ -108,56 +203,106 @@ export default function App() {
   // ---------------------------------------------------------------------------
   const loadProposals = useCallback(async (runId) => {
     if (!runId) {
+      activeProposalsRunIdRef.current = null;
+      proposalsSeqRef.current += 1;
       setProposalsList([]);
+      setIsProposalsLoading(false);
       return;
     }
+
+    activeProposalsRunIdRef.current = runId;
+    const currentSeq = ++proposalsSeqRef.current;
     setIsProposalsLoading(true);
-    const result = await fetchRunProposals(runId);
-    if (result.ok) {
-      setProposalsList(result.data || []);
-    } else {
-      setProposalsList([]);
+
+    try {
+      const result = await fetchRunProposals(runId);
+      // Discard stale response if active run has switched or newer request dispatched
+      if (activeProposalsRunIdRef.current === runId && proposalsSeqRef.current === currentSeq) {
+        if (result.ok) {
+          setProposalsList(result.data || []);
+        } else {
+          setProposalsList([]);
+        }
+      }
+    } catch {
+      if (activeProposalsRunIdRef.current === runId && proposalsSeqRef.current === currentSeq) {
+        setProposalsList([]);
+      }
+    } finally {
+      if (activeProposalsRunIdRef.current === runId && proposalsSeqRef.current === currentSeq) {
+        setIsProposalsLoading(false);
+      }
     }
-    setIsProposalsLoading(false);
   }, []);
 
   // ---------------------------------------------------------------------------
   // 4. Fetch Findings
   // ---------------------------------------------------------------------------
   const loadFindings = useCallback(async (runId, useMock) => {
-    if (!runId) return;
+    if (!runId) {
+      activeFindingsRunIdRef.current = null;
+      findingsSeqRef.current += 1;
+      setFindings(null);
+      setSelectedFinding(null);
+      setFindingsError('');
+      setIsFindingsLoading(false);
+      return;
+    }
+
+    activeFindingsRunIdRef.current = runId;
+    const currentSeq = ++findingsSeqRef.current;
     setIsFindingsLoading(true);
     setFindingsError('');
 
-    const result = await fetchRunFindings(runId, useMock);
-
-    if (result.ok) {
-      setFindings(result.data);
-      if (Array.isArray(result.data) && result.data.length > 0) {
-        setSelectedFinding(result.data[0]);
-      } else {
-        setSelectedFinding(null);
+    try {
+      const result = await fetchRunFindings(runId, useMock);
+      // Discard stale response if active run has switched or newer request dispatched
+      if (activeFindingsRunIdRef.current === runId && findingsSeqRef.current === currentSeq) {
+        if (result.ok) {
+          setFindings(result.data);
+          if (Array.isArray(result.data) && result.data.length > 0) {
+            setSelectedFinding(result.data[0]);
+          } else {
+            setSelectedFinding(null);
+          }
+        } else {
+          setFindings(null);
+          setSelectedFinding(null);
+          setFindingsError(result.error);
+        }
       }
-    } else {
-      setFindings(null);
-      setSelectedFinding(null);
-      setFindingsError(result.error);
+    } catch (err) {
+      if (activeFindingsRunIdRef.current === runId && findingsSeqRef.current === currentSeq) {
+        setFindings(null);
+        setSelectedFinding(null);
+        setFindingsError(err?.message || 'Failed to fetch findings');
+      }
+    } finally {
+      if (activeFindingsRunIdRef.current === runId && findingsSeqRef.current === currentSeq) {
+        setIsFindingsLoading(false);
+      }
     }
-
-    setIsFindingsLoading(false);
   }, []);
 
   // ---------------------------------------------------------------------------
   // 5. Initiate a New Inspection Run
   // ---------------------------------------------------------------------------
   const handleStartInspection = async (targetUrl) => {
+    // Invalidate outstanding findings/proposals requests from any previous run
+    activeFindingsRunIdRef.current = null;
+    activeProposalsRunIdRef.current = null;
+    findingsSeqRef.current += 1;
+    proposalsSeqRef.current += 1;
+
     setErrorMessage('');
     setSuccessMessage('');
     setIsRunLoading(true);
     setFindings(null);
     setSelectedFinding(null);
     setFindingsError('');
+    setIsFindingsLoading(false);
     setProposalsList([]);
+    setIsProposalsLoading(false);
     setRepairs({});
     setRepairError('');
 
@@ -172,7 +317,8 @@ export default function App() {
       );
 
       // Start auto-polling until terminal status (completed/failed)
-      if (!TERMINAL_STATUSES.includes(runData.status)) {
+      const runStatus = typeof runData?.status === 'string' ? runData.status.trim().toLowerCase() : '';
+      if (!TERMINAL_STATUSES.includes(runStatus)) {
         setIsAutoPolling(true);
       } else {
         setIsAutoPolling(false);
@@ -190,6 +336,12 @@ export default function App() {
     setIsRunLoading(false);
   };
 
+  const handleStartInspectionFromHome = async (targetUrl) => {
+    setCurrentView('inspection');
+    setActiveTab('live');
+    await handleStartInspection(targetUrl);
+  };
+
   // ---------------------------------------------------------------------------
   // 6. Poll / Refresh Run Status
   // ---------------------------------------------------------------------------
@@ -203,7 +355,8 @@ export default function App() {
       const updatedRun = result.data;
       setCurrentRun(updatedRun);
 
-      if (TERMINAL_STATUSES.includes(updatedRun.status)) {
+      const updatedStatus = typeof updatedRun?.status === 'string' ? updatedRun.status.trim().toLowerCase() : '';
+      if (TERMINAL_STATUSES.includes(updatedStatus)) {
         setIsAutoPolling(false);
       }
 
@@ -222,13 +375,21 @@ export default function App() {
   // 7. Look up an existing or unknown run ID
   // ---------------------------------------------------------------------------
   const handleLookupRun = async (runId) => {
+    // Invalidate outstanding findings/proposals requests from any previous run
+    activeFindingsRunIdRef.current = null;
+    activeProposalsRunIdRef.current = null;
+    findingsSeqRef.current += 1;
+    proposalsSeqRef.current += 1;
+
     setErrorMessage('');
     setSuccessMessage('');
     setIsRunLoading(true);
     setFindings(null);
     setSelectedFinding(null);
     setFindingsError('');
+    setIsFindingsLoading(false);
     setProposalsList([]);
+    setIsProposalsLoading(false);
     setRepairs({});
     setRepairError('');
 
@@ -236,9 +397,10 @@ export default function App() {
     if (result.ok) {
       const runData = result.data;
       setCurrentRun(runData);
-      setSuccessMessage(`Loaded run '${runData.run_id}'. Status: ${runData.status.toUpperCase()}.`);
+      const lookupStatus = typeof runData?.status === 'string' ? runData.status.trim().toLowerCase() : '';
+      setSuccessMessage(`Loaded run '${runData.run_id}'. Status: ${lookupStatus ? lookupStatus.toUpperCase() : 'UNKNOWN'}.`);
 
-      if (!TERMINAL_STATUSES.includes(runData.status)) {
+      if (!TERMINAL_STATUSES.includes(lookupStatus)) {
         setIsAutoPolling(true);
       } else {
         setIsAutoPolling(false);
@@ -278,15 +440,124 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 9. Select Run From Historical Table (Day 4)
+  // View Routing & Sub-Tab Synchronization
   // ---------------------------------------------------------------------------
-  const handleSelectRunFromHistory = async (run) => {
-    setCurrentRun(run);
-    setActiveTab('live');
-    setErrorMessage('');
-    setSuccessMessage(`Selected run '${run.run_id}' from history.`);
+  const handleSelectView = (viewId) => {
+    setIsMenuOpen(false);
+    if (viewId === 'home') {
+      setCurrentView('home');
+    } else if (viewId === 'inspection' || viewId === 'live') {
+      setCurrentView('inspection');
+      setActiveTab('live');
+    } else if (viewId === 'history') {
+      setCurrentView('history');
+      setActiveTab('history');
+      loadRunsList();
+    } else if (viewId === 'repair' || viewId === 'proposals') {
+      setCurrentView('repair');
+      setActiveTab('proposals');
+      if (currentRun?.run_id) {
+        loadProposals(currentRun.run_id);
+      }
+    } else if (viewId === 'about') {
+      setCurrentView('about');
+    } else if (viewId === 'settings') {
+      setCurrentView('settings');
+    }
+  };
 
-    if (!TERMINAL_STATUSES.includes(run.status)) {
+  const handleNavigateToRepair = (finding) => {
+    if (finding) {
+      setSelectedFinding(finding);
+    }
+    handleSelectView('repair');
+  };
+
+  // ---------------------------------------------------------------------------
+  // Guided Onboarding Tour Handlers (Batch 7)
+  // ---------------------------------------------------------------------------
+  const handleTourNext = () => {
+    const nextStep = Math.min(tourStep + 1, TUTORIAL_STEPS.length - 1);
+    const targetView = TUTORIAL_STEPS[nextStep]?.viewId;
+    if (targetView && targetView !== currentView) {
+      handleSelectView(targetView);
+    }
+    setTourStep(nextStep);
+  };
+
+  const handleTourPrev = () => {
+    const prevStep = Math.max(tourStep - 1, 0);
+    const targetView = TUTORIAL_STEPS[prevStep]?.viewId;
+    if (targetView && targetView !== currentView) {
+      handleSelectView(targetView);
+    }
+    setTourStep(prevStep);
+  };
+
+  const handleTourSkip = () => {
+    setIsTourOpen(false);
+    setHasCompletedTour(true);
+    try {
+      localStorage.setItem('omnisight_tour_completed', 'true');
+    } catch {}
+  };
+
+  const handleTourFinish = () => {
+    setIsTourOpen(false);
+    setHasCompletedTour(true);
+    try {
+      localStorage.setItem('omnisight_tour_completed', 'true');
+    } catch {}
+    setSuccessMessage('🎉 Onboarding tour completed! You are ready to run inspections and heal defect locators.');
+  };
+
+  const handleTourJumpToStep = (index) => {
+    const clampedIndex = Math.max(0, Math.min(index, TUTORIAL_STEPS.length - 1));
+    const targetView = TUTORIAL_STEPS[clampedIndex]?.viewId;
+    if (targetView && targetView !== currentView) {
+      handleSelectView(targetView);
+    }
+    setTourStep(clampedIndex);
+  };
+
+  const handleReplayTour = () => {
+    setTourStep(0);
+    setIsTourOpen(true);
+    handleSelectView('home');
+  };
+
+  // ---------------------------------------------------------------------------
+  // 9. Select Run & Synchronize State
+  // ---------------------------------------------------------------------------
+  const handleSelectRun = async (run, targetView = null) => {
+    if (!run?.run_id) return;
+
+    // Immediately cancel/invalidate in-flight requests for prior runs or overlapping requests
+    activeFindingsRunIdRef.current = run.run_id;
+    activeProposalsRunIdRef.current = run.run_id;
+    findingsSeqRef.current += 1;
+    proposalsSeqRef.current += 1;
+
+    // Clear prior run state immediately to prevent cross-run data bleed
+    setFindings(null);
+    setSelectedFinding(null);
+    setFindingsError('');
+    setIsFindingsLoading(false);
+    setProposalsList([]);
+    setIsProposalsLoading(false);
+    setRepairs({});
+    setRepairError('');
+
+    setCurrentRun(run);
+    if (targetView) {
+      handleSelectView(targetView);
+    }
+
+    setErrorMessage('');
+    setSuccessMessage(`Selected run '${run.run_id}'.`);
+
+    const historyRunStatus = typeof run?.status === 'string' ? run.status.trim().toLowerCase() : '';
+    if (!TERMINAL_STATUSES.includes(historyRunStatus)) {
       setIsAutoPolling(true);
     } else {
       setIsAutoPolling(false);
@@ -294,6 +565,10 @@ export default function App() {
 
     await loadFindings(run.run_id, includeMockFindings);
     await loadProposals(run.run_id);
+  };
+
+  const handleSelectRunFromHistory = (run) => {
+    handleSelectRun(run, 'inspection');
   };
 
   // ---------------------------------------------------------------------------
@@ -385,7 +660,8 @@ export default function App() {
       return;
     }
 
-    if (TERMINAL_STATUSES.includes(currentRun.status)) {
+    const currentStatusNormalized = typeof currentRun?.status === 'string' ? currentRun.status.trim().toLowerCase() : '';
+    if (TERMINAL_STATUSES.includes(currentStatusNormalized)) {
       setIsAutoPolling(false);
       return;
     }
@@ -397,15 +673,16 @@ export default function App() {
         const freshRun = result.data;
         setCurrentRun(freshRun);
 
-        if (TERMINAL_STATUSES.includes(freshRun.status)) {
+        const freshStatus = typeof freshRun?.status === 'string' ? freshRun.status.trim().toLowerCase() : '';
+        if (TERMINAL_STATUSES.includes(freshStatus)) {
           setIsAutoPolling(false);
           await loadFindings(freshRun.run_id, includeMockFindings);
           await loadProposals(freshRun.run_id);
           loadRunsList();
 
-          if (freshRun.status === 'completed') {
+          if (freshStatus === 'completed') {
             setSuccessMessage(`Run '${freshRun.run_id}' completed successfully!`);
-          } else if (freshRun.status === 'failed') {
+          } else if (freshStatus === 'failed') {
             setErrorMessage(`Run '${freshRun.run_id}' failed: ${freshRun.error || freshRun.message || 'Inspection pipeline failure'}`);
           }
         }
@@ -436,48 +713,51 @@ export default function App() {
 
   return (
     <div className="dashboard-layout">
-      {/* 1. Header with OmniSight title and backend health */}
+      {/* 1. Shared Header with branding, navigation, health, theme & auth */}
       <Header
         health={health}
         onRefreshHealth={checkHealth}
         isHealthLoading={isHealthLoading}
+        currentView={currentView}
+        onSelectView={handleSelectView}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        user={user}
+        onSignIn={handleSignIn}
+        onSignUp={handleSignUp}
+        isMenuOpen={isMenuOpen}
+        onToggleMenu={() => setIsMenuOpen((prev) => !prev)}
       />
 
       <main className="dashboard-container">
-        {/* Navigation Tabs */}
-        <nav className="dashboard-nav-tabs" aria-label="Dashboard views">
-          <button
-            type="button"
-            className={`nav-tab-btn ${activeTab === 'live' ? 'nav-tab-active' : ''}`}
-            onClick={() => setActiveTab('live')}
-          >
-            🔍 Live Inspection &amp; Evidence
-          </button>
-          <button
-            type="button"
-            className={`nav-tab-btn ${activeTab === 'history' ? 'nav-tab-active' : ''}`}
-            onClick={() => {
-              setActiveTab('history');
-              loadRunsList();
-            }}
-          >
-            📋 Run History ({runsList.length})
-          </button>
-          <button
-            type="button"
-            className={`nav-tab-btn ${activeTab === 'proposals' ? 'nav-tab-active' : ''}`}
-            onClick={() => {
-              setActiveTab('proposals');
-              if (currentRun?.run_id) {
-                loadProposals(currentRun.run_id);
-              }
-            }}
-          >
-            🛡️ Repair Proposals ({proposalsList.length})
-          </button>
-        </nav>
+        {/* Secondary Sub-navigation Tabs (for Inspection, History & Repair views) */}
+        {['inspection', 'live', 'history', 'repair', 'proposals'].includes(currentView) && (
+          <nav className="dashboard-nav-tabs" aria-label="Dashboard views">
+            <button
+              type="button"
+              className={`nav-tab-btn ${activeTab === 'live' ? 'nav-tab-active' : ''}`}
+              onClick={() => handleSelectView('inspection')}
+            >
+              🔍 Live Inspection &amp; Evidence
+            </button>
+            <button
+              type="button"
+              className={`nav-tab-btn ${activeTab === 'history' ? 'nav-tab-active' : ''}`}
+              onClick={() => handleSelectView('history')}
+            >
+              📋 Run History ({runsList.length})
+            </button>
+            <button
+              type="button"
+              className={`nav-tab-btn ${activeTab === 'proposals' ? 'nav-tab-active' : ''}`}
+              onClick={() => handleSelectView('repair')}
+            >
+              🛡️ Repair Proposals ({proposalsList.length})
+            </button>
+          </nav>
+        )}
 
-        {/* Global Error & Success alerts */}
+        {/* Global Error, Success & Info alerts */}
         {errorMessage && (
           <Alert
             type="error"
@@ -492,109 +772,138 @@ export default function App() {
             onDismiss={() => setSuccessMessage('')}
           />
         )}
-
-        {/* TAB 1: Live Inspection View */}
-        {activeTab === 'live' && (
-          <>
-            {/* Initiate inspection */}
-            <InspectionForm
-              onSubmit={handleStartInspection}
-              isLoading={isRunLoading}
-            />
-
-            {/* Run status & controls */}
-            <RunStatusCard
-              run={currentRun}
-              onRefresh={handleRefreshRun}
-              isRefreshing={isRunLoading}
-              isAutoPolling={isAutoPolling}
-              onToggleAutoPolling={() => setIsAutoPolling((prev) => !prev)}
-              onLookupRun={handleLookupRun}
-              onExecutePipeline={handleExecutePipeline}
-              isExecuting={isExecuting}
-            />
-
-            {/* Split grid: Findings list and Evidence / Screenshot */}
-            <div className="dashboard-split-grid">
-              <FindingsSection
-                findings={findings}
-                isLoading={isFindingsLoading}
-                selectedFindingId={selectedFinding?.finding_id}
-                onSelectFinding={(item) => setSelectedFinding(item)}
-                runId={currentRun?.run_id}
-                includeMock={includeMockFindings}
-                onToggleMockFindings={handleToggleMockFindings}
-                onRefreshFindings={() => loadFindings(currentRun?.run_id, includeMockFindings)}
-                findingsError={findingsError}
-                repairs={repairs}
-                onSuggestRepair={handleSuggestRepair}
-                repairingFindingId={repairingFindingId}
-              />
-
-              <EvidenceSection
-                finding={selectedFinding}
-                runId={currentRun?.run_id}
-                repair={selectedFinding ? repairs[selectedFinding.finding_id] : null}
-                isRepairing={selectedFinding && repairingFindingId === selectedFinding.finding_id}
-                repairError={repairError}
-                onSuggestRepair={(verifyLive) => selectedFinding && handleSuggestRepair(selectedFinding.finding_id, verifyLive)}
-              />
-            </div>
-
-            {/* Quick banner linking to repair proposals if current run has findings */}
-            {currentRun && (
-              <div className="card proposals-shortcut-card">
-                <div className="shortcut-content">
-                  <div>
-                    <h3 className="shortcut-title">Self-Healing Repair Proposals</h3>
-                    <p className="shortcut-desc">
-                      {proposalsList.length > 0
-                        ? `${proposalsList.length} repair proposal(s) recorded for this run. Review and authorize fixes.`
-                        : 'No repair proposals generated yet for this run. Draft or review repair proposals in the workflow tab.'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      setActiveTab('proposals');
-                      loadProposals(currentRun.run_id);
-                    }}
-                  >
-                    Go to Repair Workflow ({proposalsList.length}) →
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+        {infoMessage && (
+          <Alert
+            type="info"
+            message={infoMessage}
+            onDismiss={() => setInfoMessage('')}
+          />
         )}
 
-        {/* TAB 2: Inspection Run History */}
-        {activeTab === 'history' && (
-          <InspectionHistoryTable
+        {/* VIEW 1: Polished Home Landing View */}
+        {currentView === 'home' && (
+          <HomePage
+            health={health}
+            isHealthLoading={isHealthLoading}
+            onRefreshHealth={checkHealth}
+            runsList={runsList}
+            isRunsLoading={isRunsLoading}
+            runsError={runsError}
+            onRefreshRuns={loadRunsList}
+            currentRun={currentRun}
+            onStartInspection={handleStartInspectionFromHome}
+            isRunLoading={isRunLoading}
+            onSelectView={handleSelectView}
+            onSelectRun={handleSelectRunFromHistory}
+          />
+        )}
+
+        {/* VIEW 2: Dedicated Live Inspection Studio */}
+        {(currentView === 'inspection' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'live')) && (
+          <InspectionPage
+            onStartInspection={handleStartInspection}
+            isRunLoading={isRunLoading}
+            currentRun={currentRun}
+            onRefreshRun={handleRefreshRun}
+            isAutoPolling={isAutoPolling}
+            onToggleAutoPolling={() => setIsAutoPolling((prev) => !prev)}
+            onLookupRun={handleLookupRun}
+            onExecutePipeline={handleExecutePipeline}
+            isExecuting={isExecuting}
+            findings={findings}
+            isFindingsLoading={isFindingsLoading}
+            findingsError={findingsError}
+            selectedFinding={selectedFinding}
+            onSelectFinding={(item) => setSelectedFinding(item)}
+            includeMockFindings={includeMockFindings}
+            onToggleMockFindings={handleToggleMockFindings}
+            onRefreshFindings={() => loadFindings(currentRun?.run_id, includeMockFindings)}
+            repairs={repairs}
+            onSuggestRepair={handleSuggestRepair}
+            repairingFindingId={repairingFindingId}
+            repairError={repairError}
+            proposalsCount={proposalsList.length}
+            onNavigateToRepair={handleNavigateToRepair}
+            onSelectView={handleSelectView}
+          />
+        )}
+
+        {/* VIEW 3: Dedicated Inspection Run History Page */}
+        {(currentView === 'history' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'history')) && (
+          <HistoryPage
             runs={runsList}
             isLoading={isRunsLoading}
             error={runsError}
             onRefresh={loadRunsList}
             onSelectRun={handleSelectRunFromHistory}
             selectedRunId={currentRun?.run_id}
+            currentRun={currentRun}
+            findings={findings}
+            isFindingsLoading={isFindingsLoading}
+            onSelectView={handleSelectView}
+            includeMockFindings={includeMockFindings}
           />
         )}
 
-        {/* TAB 3: Repair Proposal Workflow */}
-        {activeTab === 'proposals' && (
-          <RepairProposalWorkflow
+        {/* VIEW 4: Dedicated Self-Healing Repair Workspace & Assistant */}
+        {(currentView === 'repair' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'proposals')) && (
+          <RepairWorkspacePage
             run={currentRun}
+            runsList={runsList}
+            onSelectRun={(targetRun) => handleSelectRun(targetRun, 'repair')}
             findings={findings || []}
+            isFindingsLoading={isFindingsLoading}
+            selectedFinding={selectedFinding}
+            onSelectFinding={(f) => setSelectedFinding(f)}
+            repairs={repairs}
+            repairingFindingId={repairingFindingId}
+            repairError={repairError}
+            onSuggestRepair={handleSuggestRepair}
             proposals={proposalsList}
-            isLoading={isProposalsLoading}
+            isProposalsLoading={isProposalsLoading}
             onRefreshProposals={() => currentRun && loadProposals(currentRun.run_id)}
-            onApprove={handleApproveProposal}
-            onReject={handleRejectProposal}
+            onApproveProposal={handleApproveProposal}
+            onRejectProposal={handleRejectProposal}
             onCreateProposal={handleCreateProposal}
+            onSelectView={handleSelectView}
+          />
+        )}
+
+        {/* VIEW 5: Dedicated About & Architecture Documentation */}
+        {currentView === 'about' && (
+          <AboutPage
+            onSelectView={handleSelectView}
+            onStartTour={handleReplayTour}
+          />
+        )}
+
+        {/* VIEW 6: Dedicated Settings Page */}
+        {currentView === 'settings' && (
+          <SettingsPage
+            theme={theme}
+            onSelectTheme={setTheme}
+            hasCompletedTour={hasCompletedTour}
+            onReplayTour={handleReplayTour}
+            health={health}
+            isHealthLoading={isHealthLoading}
+            onCheckHealth={checkHealth}
+            includeMockFindings={includeMockFindings}
+            onToggleMockFindings={handleToggleMockFindings}
+            onSelectView={handleSelectView}
           />
         )}
       </main>
+
+      {/* 6-Step Guided Onboarding Tour Overlay */}
+      <GuidedTutorial
+        isOpen={isTourOpen}
+        currentStepIndex={tourStep}
+        onNext={handleTourNext}
+        onPrev={handleTourPrev}
+        onSkip={handleTourSkip}
+        onFinish={handleTourFinish}
+        onJumpToStep={handleTourJumpToStep}
+      />
 
       <footer className="dashboard-footer">
         <p>OmniSight &mdash; Multimodal UI Self-Healing &amp; RPA Agent Orchestration</p>
