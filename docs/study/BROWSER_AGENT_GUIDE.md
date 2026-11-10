@@ -1,7 +1,7 @@
 # OmniSight — Browser Agent Study Guide
 
-> **Module Lead:** Janvi Kumari  
-> **Component:** `browser_agent/` (with compatibility aliases in `navigation/` and `screenshots/`)  
+> **Module Lead:** Janvi Kumari
+> **Component:** `browser_agent/` (with compatibility aliases in `navigation/` and `screenshots/`)
 > **Primary Technology:** Python 3.10+, Playwright (Chromium sync API), Asyncio Windows Event Loop Management
 
 ---
@@ -13,7 +13,7 @@ The **Browser Agent** serves as the sensory gateway and autonomous navigation en
 ```mermaid
 flowchart TD
     A["Caller (RunOrchestrator / Integration Pipeline)"] -->|"navigate(url, run_id)"| B["BrowserNavigator"]
-    
+
     subgraph Browser Agent Lifecycle
         B --> C{"Input Validation"}
         C -->|"Invalid URL / Empty run_id"| D["Return NavigationResult(status='failed')"]
@@ -26,7 +26,7 @@ flowchart TD
         J --> K["Extract Page Title, Viewport, Timestamp"]
         K --> L["browser.close() (finally block)"]
     end
-    
+
     L --> M["Return NavigationResult(status='success')"]
 ```
 

@@ -379,7 +379,10 @@ export async function fetchRunProposals(runId, findingId = null) {
   if (!runId || !runId.trim()) {
     return { ok: false, error: 'Run ID is required.' };
   }
-  const query = findingId ? `?finding_id=${encodeURIComponent(findingId.trim())}` : '';
+  const cleanFindingId = typeof findingId === 'string'
+    ? findingId.trim()
+    : (findingId && typeof findingId === 'object' && findingId.finding_id ? String(findingId.finding_id).trim() : null);
+  const query = cleanFindingId ? `?finding_id=${encodeURIComponent(cleanFindingId)}` : '';
   const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals${query}`;
   try {
     const res = await fetch(endpoint, {

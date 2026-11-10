@@ -8,7 +8,7 @@ import {
 
 /**
  * FindingRepairWorkflow
- * 
+ *
  * Specialized single-finding workflow used within EvidenceSection.
  * Allows inspecting the self-healed locator candidate, creating a reviewable proposal,
  * generating a minimal unified diff against source code, requiring explicit human

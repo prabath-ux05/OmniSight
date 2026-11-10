@@ -1,7 +1,7 @@
 # OmniSight — Integration & Self-Healing Module Study Guide
 
-> **Module Lead:** Prabath (Integration Lead)  
-> **Components:** `integration/`, `self_healing/`, `github_integration/`, `demo_site/`  
+> **Module Lead:** Prabath (Integration Lead)
+> **Components:** `integration/`, `self_healing/`, `github_integration/`, `demo_site/`
 > **Primary Technology:** Python 3.10+, BeautifulSoup4 / lxml, Pydantic v2, Dataclasses, Playwright, HTTPX, Git & GitHub REST APIs
 
 ---

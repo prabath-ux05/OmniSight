@@ -21,14 +21,14 @@ graph TD
     Input[VisionInput: screenshot_path + dom_snapshot_path] --> Validator[evidence_validator.py]
     Validator -->|File Missing or Empty| Fail[Raise ValidationError]
     Validator -->|Valid Evidence| Router{VLM Configured & API Key Set?}
-    
+
     Router -->|Yes| VLM[vlm_detector.py: Gemini / OpenAI Provider]
     Router -->|No / Offline| DOM[dom_detector.py: HTMLParser Heuristics]
     Router -->|Test Scenario| Mock[mock_detector.py: Deterministic Scenarios]
-    
+
     VLM -->|VLM Success| Normalizer[vlm_detector.py: Category & Box Normalizer]
     VLM -->|API 404/500 Timeout & Fallback=True| DOM
-    
+
     Normalizer --> Output[list of VisionFinding]
     DOM --> Output
     Mock --> Output
@@ -201,14 +201,14 @@ pytest vision_engine/tests/test_evidence_validator.py -v
 
 ## 9. Likely Viva / Oral Examination Questions & Answers
 
-**Q1: Why does OmniSight require both visual screenshots and DOM snapshots for defect analysis?**  
+**Q1: Why does OmniSight require both visual screenshots and DOM snapshots for defect analysis?**
 *Answer:* A screenshot captures the rendered visual truth (overlapping text, clipping, visual 404 image icons) which is impossible to detect purely from HTML strings. Conversely, the DOM snapshot provides exact element tags, IDs, classes, and accessibility attributes needed for self-healing locator repair. Combining both gives multimodal coverage.
 
-**Q2: How does the Vision Engine handle VLM API rate limits or network dropouts?**  
+**Q2: How does the Vision Engine handle VLM API rate limits or network dropouts?**
 *Answer:* The engine implements a graceful fallback mechanism. In `vlm_detector.py`, when `allow_fallback=True` is enabled, any network error, timeout, or invalid HTTP status caught from the external provider logs a warning and automatically executes `detect_dom_issues()`. This guarantees the inspection run finishes with actionable findings instead of crashing the pipeline.
 
-**Q3: How does OmniSight ensure that mock results are never mistaken for real AI detections?**  
+**Q3: How does OmniSight ensure that mock results are never mistaken for real AI detections?**
 *Answer:* The `VisionFinding` and `FindingResponse` schemas require a strict `source` attribute constrained to `Literal["vlm", "mock"]`. Mock detectors and DOM fallback detectors explicitly tag findings as `"mock"`, whereas genuine model responses are tagged as `"vlm"`.
 
-**Q4: How does the prompt engineering prevent the Vision-Language Model from hallucinating invalid JSON?**  
+**Q4: How does the prompt engineering prevent the Vision-Language Model from hallucinating invalid JSON?**
 *Answer:* `defect_prompts.py` injects a rigorous system prompt along with a formal JSON schema (`VLM_DEFECT_DETECTION_SCHEMA`). Additionally, `parse_vlm_json_response()` extracts JSON blocks from response strings, strips Markdown formatting, and validates each item through Pydantic models before returning findings.

@@ -18,13 +18,13 @@ graph TD
     User([Test Engineer]) --> Form[InspectionForm.jsx]
     Form -->|POST /api/v1/runs?auto_execute=true| API[api.js client]
     API -->|Vite Proxy :5173 -> :8000| Backend[(FastAPI Backend)]
-    
+
     App[App.jsx State Container] -->|1. Poll GET /runs/run_id| API
     App -->|2. On Completed -> GET /findings| API
     App --> Status[RunStatusCard.jsx]
     App --> Findings[FindingsSection.jsx]
     App --> Evidence[EvidenceSection.jsx: Screenshot + DOM Viewer]
-    
+
     Findings -->|Click Repair Locator| RepairModal[RepairProposalWorkflow.jsx]
     RepairModal -->|POST /repair| API
     RepairModal -->|POST /proposals/generate-patch| API
@@ -208,14 +208,14 @@ npm run build
 
 ## 8. Likely Viva / Oral Examination Questions & Answers
 
-**Q1: How does the frontend handle asynchronous state updates while the browser agent runs?**  
+**Q1: How does the frontend handle asynchronous state updates while the browser agent runs?**
 *Answer:* The dashboard uses an interval-based polling mechanism managed via `useRef`. When a run is initiated, `setInterval` polls `GET /api/v1/runs/{run_id}` every 1,000 milliseconds. When the run status enters a terminal state (`completed`, `failed`, or `cancelled`), the timer is cleared via `clearInterval`, and findings are fetched automatically.
 
-**Q2: What is the purpose of the Vite reverse proxy?**  
+**Q2: What is the purpose of the Vite reverse proxy?**
 *Answer:* The React dashboard runs on port 5173, while the FastAPI backend runs on port 8000. The Vite reverse proxy forwards requests matching `/api` and `/artifacts` directly to port 8000, preventing browser CORS errors and eliminating the need to hardcode absolute URLs in the client application.
 
-**Q3: How does the dashboard prevent accidental or unauthorized code changes to the target repository?**  
+**Q3: How does the dashboard prevent accidental or unauthorized code changes to the target repository?**
 *Answer:* The Self-Healing Repair workflow uses a multi-tier safety gate. First, it generates and previews a non-destructive unified Git diff. Second, the frontend enforces a mandatory user approval checkbox (`userApproved: true`). Finally, the backend rejects any PR submission request where `user_approved` is `false`, ensuring code is never modified without human consent.
 
-**Q4: How does the evidence section render DOM snapshots safely?**  
+**Q4: How does the evidence section render DOM snapshots safely?**
 *Answer:* The DOM snapshot is fetched as plain text and rendered within an escaped, read-only `<pre><code>` block rather than injecting raw HTML via `dangerouslySetInnerHTML`. This completely prevents script injection (XSS) while allowing developers to inspect element attributes and hierarchy.

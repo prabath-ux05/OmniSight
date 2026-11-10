@@ -201,14 +201,14 @@ pytest backend/tests -v
 
 ## 8. Likely Viva / Oral Examination Questions & Answers
 
-**Q1: Why does OmniSight use FastAPI rather than Flask or Django?**  
+**Q1: Why does OmniSight use FastAPI rather than Flask or Django?**
 *Answer:* FastAPI provides automatic OpenAPI/Swagger documentation, native asynchronous request handling, built-in background tasks (`BackgroundTasks`), and typed request/response validation through Pydantic v2. This ensures high throughput and strict data contract enforcement between the frontend dashboard and internal engines.
 
-**Q2: How does the backend execute long-running browser navigation without blocking HTTP requests?**  
+**Q2: How does the backend execute long-running browser navigation without blocking HTTP requests?**
 *Answer:* The run creation endpoint (`POST /api/v1/runs?auto_execute=true`) registers the run in `RunStore` as `"queued"`, returns HTTP 201 immediately with the `run_id`, and adds `RunOrchestrator.execute_run` as a background task. FastAPI offloads this synchronous function to a worker thread via `anyio.to_thread.run_sync`, allowing the main event loop to continue serving incoming API requests while the browser agent runs in the background.
 
-**Q3: What happens if an exception occurs inside a background task?**  
+**Q3: What happens if an exception occurs inside a background task?**
 *Answer:* The entire execution body of `RunOrchestrator.execute_run()` is wrapped in a top-level `try ... except Exception as exc:` block. Any unexpected exception is logged with full traceback via `logger.exception()` and updates the run store with `status="failed"`, persisting a non-empty, actionable error message so the frontend can display the cause of failure.
 
-**Q4: How does the backend prevent API secrets from leaking into error messages?**  
+**Q4: How does the backend prevent API secrets from leaking into error messages?**
 *Answer:* The Pydantic model validator on `RunResponse` executes `mask_sensitive_strings()` on both `error` and `message` fields, replacing sensitive tokens (`api_key=...`, `token=...`, `Bearer ...`) with `***MASKED***` prior to JSON serialization.

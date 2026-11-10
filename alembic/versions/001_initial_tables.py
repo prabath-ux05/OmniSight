@@ -1,7 +1,7 @@
 """Create initial tables for runs, findings, artifacts, and repair proposals.
 
 Revision ID: 001_initial_tables
-Revises: 
+Revises:
 Create Date: 2026-11-01 18:00:00.000000
 
 """
