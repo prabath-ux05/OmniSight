@@ -36,6 +36,45 @@ class Settings:
         self._raw_database_url: str | None = os.getenv("DATABASE_URL")
         self.TEST_DATABASE_URL: str = os.getenv("TEST_DATABASE_URL", "sqlite:///./test_omnisight.db")
 
+        # CORS Allowed Origins
+        raw_cors = os.getenv("CORS_ORIGINS")
+        if raw_cors:
+            self.CORS_ORIGINS: list[str] = [origin.strip() for origin in raw_cors.split(",") if origin.strip()]
+        else:
+            self.CORS_ORIGINS = [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
+
+        # Authentication Session and Cookie Settings
+        self.SESSION_COOKIE_NAME: str = os.getenv("SESSION_COOKIE_NAME", "omnisight_session")
+        self.CSRF_COOKIE_NAME: str = os.getenv("CSRF_COOKIE_NAME", "omnisight_csrf")
+        self.SESSION_EXPIRE_DAYS: int = int(os.getenv("SESSION_EXPIRE_DAYS", "7"))
+        # In development/test, allow non-secure HTTP cookies; require secure cookies in production/staging
+        self.COOKIE_SECURE: bool = os.getenv(
+            "COOKIE_SECURE",
+            "false" if self.APP_ENV in ("development", "test") else "true",
+        ).lower() in ("true", "1", "yes")
+        self.COOKIE_SAMESITE: str = os.getenv("COOKIE_SAMESITE", "lax").lower()
+        self.COOKIE_DOMAIN: str | None = os.getenv("COOKIE_DOMAIN") or None
+        self.COOKIE_PATH: str = "/"
+
+        # CSRF Signing Secret Key: strictly required in production with >= 32 chars
+        raw_csrf_secret = os.getenv("CSRF_SECRET_KEY")
+        dev_placeholder = "omnisight-dev-insecure-csrf-secret-key-32b"
+
+        if self.APP_ENV not in ("development", "test"):
+            if not raw_csrf_secret or len(raw_csrf_secret.strip()) < 32 or raw_csrf_secret.strip() == dev_placeholder:
+                raise ValueError(
+                    "Production configuration error: CSRF_SECRET_KEY must be set in production "
+                    "with at least 32 characters of high-entropy secret material."
+                )
+            self.CSRF_SECRET_KEY: str = raw_csrf_secret.strip()
+        else:
+            self.CSRF_SECRET_KEY: str = raw_csrf_secret.strip() if raw_csrf_secret else dev_placeholder
+
     @property
     def DATABASE_URL(self) -> str:
         """Return the active database connection string based on the running environment."""

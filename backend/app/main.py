@@ -1,4 +1,4 @@
-﻿"""OmniSight Backend Application Entry Point.
+"""OmniSight Backend Application Entry Point.
 
 This module provides the central FastAPI application instance for OmniSight.
 """
@@ -15,9 +15,11 @@ if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from backend.app.api.artifacts import router as artifacts_router
+from backend.app.api.auth import router as auth_router
 from backend.app.api.health import router as health_router
 from backend.app.api.proposals import router as proposals_router
 from backend.app.api.runs import router as runs_router
+from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.db.session import check_db_connection, init_db
 
@@ -25,9 +27,12 @@ from backend.app.db.session import check_db_connection, init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle event handler managing startup initialization and shutdown cleanup."""
-    logger.info("OmniSight Backend starting up: initializing database connection...")
+    logger.info("OmniSight Backend starting up: verifying database connection...")
     try:
-        init_db()
+        # In development/test environments, auto-create tables; in production, schema is managed via Alembic
+        if settings.APP_ENV in ("development", "test"):
+            init_db()
+
         if check_db_connection():
             logger.info("Database connection successfully established and verified.")
         else:
@@ -48,16 +53,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow CORS for development frontend
+# Allow CORS for trusted origins with credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "*",
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,6 +64,7 @@ app.add_middleware(
 
 # Register routers
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(runs_router)
 app.include_router(artifacts_router)
 app.include_router(proposals_router)

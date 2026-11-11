@@ -461,6 +461,8 @@ export default function App() {
       }
     } else if (viewId === 'about') {
       setCurrentView('about');
+    } else if (viewId === 'profile') {
+      setCurrentView('profile');
     } else if (viewId === 'settings') {
       setCurrentView('settings');
     }
@@ -725,8 +727,10 @@ export default function App() {
         user={user}
         onSignIn={handleSignIn}
         onSignUp={handleSignUp}
+        onLoginSignUp={handleSignIn}
         isMenuOpen={isMenuOpen}
         onToggleMenu={() => setIsMenuOpen((prev) => !prev)}
+        onCloseMenu={() => setIsMenuOpen(false)}
       />
 
       <main className="dashboard-container">
@@ -799,7 +803,7 @@ export default function App() {
         )}
 
         {/* VIEW 2: Dedicated Live Inspection Studio */}
-        {(currentView === 'inspection' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'live')) && (
+        {(currentView === 'inspection' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'live')) && (
           <InspectionPage
             onStartInspection={handleStartInspection}
             isRunLoading={isRunLoading}
@@ -829,7 +833,7 @@ export default function App() {
         )}
 
         {/* VIEW 3: Dedicated Inspection Run History Page */}
-        {(currentView === 'history' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'history')) && (
+        {(currentView === 'history' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'history')) && (
           <HistoryPage
             runs={runsList}
             isLoading={isRunsLoading}
@@ -846,7 +850,7 @@ export default function App() {
         )}
 
         {/* VIEW 4: Dedicated Self-Healing Repair Workspace & Assistant */}
-        {(currentView === 'repair' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'settings' && activeTab === 'proposals')) && (
+        {(currentView === 'repair' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'proposals')) && (
           <RepairWorkspacePage
             run={currentRun}
             runsList={runsList}
@@ -877,7 +881,85 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 6: Dedicated Settings Page */}
+        {/* VIEW 6: Dedicated User Profile Center (Batch 1.1) */}
+        {currentView === 'profile' && (
+          <div className="shell-view-container profile-view-container">
+            <section className="shell-hero-card" aria-label="User Profile Header">
+              <div className="shell-hero-badge">👤 User Profile</div>
+              <h2 className="shell-hero-title">Account &amp; Profile Center</h2>
+              <p className="shell-hero-desc">
+                Manage your OmniSight identity, active session status, and workspace preferences.
+              </p>
+            </section>
+
+            <div className="card settings-section-card">
+              <div className="card-header">
+                <h3 className="card-title">👤 Account &amp; Session Status</h3>
+                <p className="card-description">
+                  Current authentication and session state across OmniSight services.
+                </p>
+              </div>
+
+              {user ? (
+                <div className="profile-details-card">
+                  <div className="profile-details-avatar-row">
+                    {user.avatar || user.avatarUrl || user.picture ? (
+                      <img
+                        src={user.avatar || user.avatarUrl || user.picture}
+                        alt={user.name || user.firstName || 'User'}
+                        className="profile-details-avatar-img"
+                      />
+                    ) : (
+                      <div className="user-profile-avatar profile-large-avatar">
+                        {user.firstName?.charAt(0).toUpperCase() || user.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div className="profile-details-info">
+                      <h4 className="profile-details-name">{user.name || user.firstName || 'User'}</h4>
+                      <p className="profile-details-email">{user.email || 'No email associated'}</p>
+                      <span className="badge badge-success">Authenticated</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="guest-model-callout">
+                  <div className="callout-header">
+                    <span className="callout-icon" aria-hidden="true">ℹ️</span>
+                    <div>
+                      <h4 className="callout-title">Full Guest Access Active</h4>
+                      <span className="callout-subtitle">Authentication is not configured in this deployment</span>
+                    </div>
+                  </div>
+                  <p className="callout-body">
+                    OmniSight currently operates with full guest access. You can launch real-time inspections,
+                    audit multimodal DOM and screenshot evidence, review defect findings, and test self-healing
+                    locator repairs without requiring an account or signing in.
+                  </p>
+                  <div className="callout-action-row" style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={handleSignIn}
+                      title="Login or register an account"
+                    >
+                      Login / Sign Up
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleSelectView('home')}
+                      title="Return to Home overview"
+                    >
+                      Return to Home
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 7: Dedicated Settings Page */}
         {currentView === 'settings' && (
           <SettingsPage
             theme={theme}

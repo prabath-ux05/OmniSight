@@ -44,8 +44,20 @@ engine = create_app_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
 
 
-def init_db(bind_engine=None) -> None:
-    """Initialize database tables according to registered ORM models."""
+def init_db(bind_engine=None, force: bool = False) -> None:
+    """Initialize database tables according to registered ORM models.
+
+    In development and test environments, auto-creates tables via metadata create_all.
+    In production environments, schema creation and evolution must be managed
+    strictly via Alembic migrations, so create_all is skipped unless force=True.
+    """
+    if not force and settings.APP_ENV not in ("development", "test"):
+        logger.info(
+            "Skipping Base.metadata.create_all in %s environment; schema is managed via Alembic migrations.",
+            settings.APP_ENV,
+        )
+        return
+
     target = bind_engine or engine
     Base.metadata.create_all(bind=target)
     logger.info("Initialized database tables on engine: %s", target.url)
