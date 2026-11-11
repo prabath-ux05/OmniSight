@@ -295,3 +295,21 @@ def test_database_connection_failure_raises_clean_error():
 
     with pytest.raises(DatabaseConnectionError):
         broken_store.get("run_any_id")
+
+
+def test_init_db_skips_create_all_in_production(monkeypatch):
+    """Verify that init_db does not execute Base.metadata.create_all in production environment."""
+    from unittest.mock import MagicMock, patch
+    from backend.app.core.config import settings
+    from backend.app.db.session import init_db
+
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+    with patch("backend.app.db.session.Base.metadata.create_all") as mock_create_all:
+        # Standard call in production must skip create_all
+        init_db()
+        mock_create_all.assert_not_called()
+
+        # Calling with force=True should still execute create_all
+        init_db(force=True)
+        mock_create_all.assert_called_once()

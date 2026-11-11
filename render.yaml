@@ -1,0 +1,89 @@
+# =============================================================================
+# OmniSight — Render Infrastructure as Code (Blueprint Specification)
+#
+# Defines the production FastAPI web service, managed PostgreSQL database,
+# persistent artifact storage disk, and build/deploy lifecycle hooks.
+# Reference: https://render.com/docs/blueprint-spec
+# =============================================================================
+
+services:
+  - type: web
+    name: omnisight-backend
+    runtime: python
+    plan: starter
+    region: oregon
+    autoDeploy: true
+
+    # Build phase: install Python dependencies and Playwright Chromium with Linux libraries
+    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
+
+    # Pre-deploy phase: runs migrations once on a single container before traffic cutover
+    # Eliminates concurrent migration race conditions across multiple instances
+    preDeployCommand: alembic upgrade head
+
+    # Service execution: binds Uvicorn to all interfaces on Render's assigned $PORT
+    # --proxy-headers enables reading X-Forwarded-Proto and X-Forwarded-For from Render's edge
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+
+    # Health check probe: Render verifies HTTP 200 before routing live traffic
+    healthCheckPath: /health
+
+    # Persistent disk for inspection screenshots, DOM snapshots, and artifacts
+    disk:
+      name: omnisight-artifacts
+      mountPath: /opt/render/project/src/artifacts
+      sizeGB: 10
+
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      - key: APP_DEBUG
+        value: "false"
+
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+      # Internal PostgreSQL connection string provided by the attached Render database
+      - key: DATABASE_URL
+        fromDatabase:
+          name: omnisight-db
+          property: connectionString
+
+      # CSRF signing key: auto-generated cryptographically secure 256-bit secret (>= 32 chars)
+      - key: CSRF_SECRET_KEY
+        generateValue: true
+
+      # Trusted CORS & Origin validation: prompt user on initial Blueprint deployment
+      # Set to the public frontend domain (e.g., https://app.yourdomain.com)
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Uvicorn trusted proxy IPs: trusts Render edge proxies forwarding requests
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+
+      # Security cookie policy (enforces Secure flag in production)
+      - key: COOKIE_SECURE
+        value: "true"
+
+      - key: COOKIE_SAMESITE
+        value: lax
+
+      # AI & Vision engine settings (set by user in Render Dashboard)
+      - key: VISION_MODEL_PROVIDER
+        sync: false
+
+      - key: GEMINI_API_KEY
+        sync: false
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+databases:
+  - name: omnisight-db
+    databaseName: omnisight_db
+    user: omnisight_user
+    plan: starter
+    region: oregon
+
