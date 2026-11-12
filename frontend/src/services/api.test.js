@@ -158,7 +158,7 @@ test('fetchVLMConfig calls VLM configuration status endpoint', async () => {
         headers: { get: () => 'application/json' },
         json: async () => ({
           provider: 'gemini',
-          model: 'gemini-1.5-flash',
+          model: 'gemini-3.5-flash-lite',
           configured: false,
           status: 'unconfigured',
         }),
@@ -245,4 +245,129 @@ test('submitProposalPR posts approved payload when userApproved is true', async 
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Findings View State & Polling Resilience Tests
+// ---------------------------------------------------------------------------
+
+test('MAX_CONSECUTIVE_POLL_ERRORS is 20 to withstand ~50s container reboot', async () => {
+  const { MAX_CONSECUTIVE_POLL_ERRORS } = await import('../utils/findingsState.js');
+  assert.equal(MAX_CONSECUTIVE_POLL_ERRORS, 20);
+});
+
+test('getFindingsViewState returns clean ONLY for completed run with zero findings and no error', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const cleanState = getFindingsViewState({
+    runId: 'run_clean_123',
+    runStatus: 'completed',
+    runError: null,
+    count: 0,
+  });
+  assert.equal(cleanState, 'clean');
+});
+
+test('getFindingsViewState prioritizes failed status over partial findings (count > 0)', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const state = getFindingsViewState({
+    runId: 'run_failed_with_partial_findings',
+    runStatus: 'failed',
+    runError: null,
+    count: 3,
+  });
+  assert.equal(state, 'failed');
+});
+
+test('getFindingsViewState prioritizes execution error over partial findings (count > 0)', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const state = getFindingsViewState({
+    runId: 'run_error_with_partial_findings',
+    runStatus: 'completed',
+    runError: 'Playwright browser launch failed on Render (OOM)',
+    count: 2,
+  });
+  assert.equal(state, 'failed');
+});
+
+test('getFindingsViewState returns has_findings for completed status with findings', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const state = getFindingsViewState({
+    runId: 'run_completed_with_findings',
+    runStatus: 'completed',
+    runError: null,
+    count: 5,
+  });
+  assert.equal(state, 'has_findings');
+});
+
+test('getFindingsViewState returns clean for completed status with zero findings and no error', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const state = getFindingsViewState({
+    runId: 'run_clean_verified',
+    runStatus: 'completed',
+    runError: null,
+    count: 0,
+  });
+  assert.equal(state, 'clean');
+});
+
+test('getFindingsViewState returns failed when run has an error, even if status is completed or undefined', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const failedWithError = getFindingsViewState({
+    runId: 'run_err_123',
+    runStatus: 'completed',
+    runError: 'Browser process crashed',
+    count: 0,
+  });
+  assert.equal(failedWithError, 'failed');
+
+  const failedStatus = getFindingsViewState({
+    runId: 'run_err_456',
+    runStatus: 'failed',
+    runError: null,
+    count: 0,
+  });
+  assert.equal(failedStatus, 'failed');
+});
+
+test('getFindingsViewState returns in_progress for queued, capturing, or analyzing states', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  assert.equal(getFindingsViewState({ runId: 'run_1', runStatus: 'queued', count: 0 }), 'in_progress');
+  assert.equal(getFindingsViewState({ runId: 'run_2', runStatus: 'capturing', count: 0 }), 'in_progress');
+  assert.equal(getFindingsViewState({ runId: 'run_3', runStatus: 'analyzing', count: 0 }), 'in_progress');
+});
+
+test('getFindingsViewState returns pending (never clean) for interrupted, null, or unknown run statuses', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  assert.equal(getFindingsViewState({ runId: 'run_null', runStatus: null, count: 0 }), 'pending');
+  assert.equal(getFindingsViewState({ runId: 'run_undef', runStatus: undefined, count: 0 }), 'pending');
+  assert.equal(getFindingsViewState({ runId: 'run_int', runStatus: 'interrupted', count: 0 }), 'pending');
+  assert.equal(getFindingsViewState({ runId: 'run_unk', runStatus: 'something_unexpected', count: 0 }), 'pending');
+});
+
+test('getFindingsViewState returns has_findings when defect findings count > 0', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  const state = getFindingsViewState({
+    runId: 'run_with_defects',
+    runStatus: 'completed',
+    count: 3,
+  });
+  assert.equal(state, 'has_findings');
+});
+
+test('getFindingsViewState handles loading, errors, and unselected run correctly', async () => {
+  const { getFindingsViewState } = await import('../utils/findingsState.js');
+
+  assert.equal(getFindingsViewState({ isLoading: true }), 'loading');
+  assert.equal(getFindingsViewState({ findingsError: 'Network error 500' }), 'error');
+  assert.equal(getFindingsViewState({ runId: null }), 'no_run');
 });

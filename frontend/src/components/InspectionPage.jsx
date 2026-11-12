@@ -144,6 +144,8 @@ export default function InspectionPage({
           selectedFindingId={selectedFinding?.finding_id}
           onSelectFinding={onSelectFinding}
           runId={currentRun?.run_id}
+          runStatus={currentRun?.status}
+          runError={currentRun?.error}
           includeMock={includeMockFindings}
           onToggleMockFindings={onToggleMockFindings}
           onRefreshFindings={onRefreshFindings}

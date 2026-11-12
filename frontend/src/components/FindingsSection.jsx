@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getFindingsViewState } from '../utils/findingsState';
 
 export default function FindingsSection({
   findings,
@@ -6,6 +7,8 @@ export default function FindingsSection({
   selectedFindingId,
   onSelectFinding,
   runId,
+  runStatus = null,
+  runError = null,
   includeMock,
   onToggleMockFindings,
   onRefreshFindings,
@@ -205,6 +208,15 @@ export default function FindingsSection({
     );
   };
 
+  const viewState = getFindingsViewState({
+    isLoading,
+    findingsError,
+    runId,
+    count,
+    runStatus,
+    runError,
+  });
+
   return (
     <section className="card findings-section">
       <div className="card-header-with-actions">
@@ -248,7 +260,7 @@ export default function FindingsSection({
       </div>
 
       {/* Loading Indicator */}
-      {isLoading && (
+      {viewState === 'loading' && (
         <div className="loading-container">
           <span className="spinner-md"></span>
           <p className="loading-text">Fetching defect findings for run {runId}...</p>
@@ -256,7 +268,7 @@ export default function FindingsSection({
       )}
 
       {/* Request or Malformed Response Error */}
-      {!isLoading && findingsError && (
+      {viewState === 'error' && (
         <div className="alert alert-error" role="alert">
           <div className="alert-content">
             <span className="alert-message">{findingsError}</span>
@@ -265,7 +277,7 @@ export default function FindingsSection({
       )}
 
       {/* No Run Selected */}
-      {!isLoading && !findingsError && !runId && (
+      {viewState === 'no_run' && (
         <div className="empty-state">
           <p className="empty-state-text">
             No inspection run selected. Start an inspection or look up a Run ID to view detected UI defects.
@@ -273,8 +285,52 @@ export default function FindingsSection({
         </div>
       )}
 
-      {/* Clean Run: Zero Findings */}
-      {!isLoading && !findingsError && runId && isArray && count === 0 && (
+      {/* Terminal Failure or Error Present: Never disguise as clean */}
+      {viewState === 'failed' && (
+        <div className="empty-state empty-state-failed card" style={{ borderColor: 'var(--color-danger, #ef4444)' }}>
+          <div className="clean-check-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>✕</div>
+          <h3 className="clean-title" style={{ color: '#ef4444' }}>Inspection Run Failed</h3>
+          <p className="empty-state-text">
+            Run <code>{runId}</code> encountered a fatal error during execution and could not complete inspection.
+          </p>
+          {runError && (
+            <div className="alert alert-error" style={{ marginTop: '0.75rem', textAlign: 'left' }}>
+              <div className="alert-content">
+                <span className="alert-message"><strong>Failure Reason:</strong> {runError}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* In-Progress Pipeline: Show active inspection stage */}
+      {viewState === 'in_progress' && (
+        <div className="empty-state empty-state-progress card">
+          <div className="spinner-sm" style={{ width: '2rem', height: '2rem', margin: '0 auto 1rem' }}></div>
+          <h3 className="clean-title">Inspection In Progress</h3>
+          <p className="empty-state-text">
+            Run <code>{runId}</code> is currently <strong>{runStatus}</strong>. Findings and evidence will appear once inspection finishes.
+          </p>
+        </div>
+      )}
+
+      {/* Interrupted, Unconfirmed, or Pending Status: Never disguise as clean */}
+      {viewState === 'pending' && (
+        <div className="empty-state empty-state-progress card">
+          <div className="spinner-sm" style={{ width: '2rem', height: '2rem', margin: '0 auto 1rem' }}></div>
+          <h3 className="clean-title">Inspection Status Pending</h3>
+          <p className="empty-state-text">
+            {runStatus ? (
+              <>Run <code>{runId}</code> status: <strong>{runStatus}</strong>. Awaiting final inspection completion.</>
+            ) : (
+              <>Awaiting inspection status for run <code>{runId}</code>...</>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Clean Run: Zero Findings (Strictly only when completed AND no error) */}
+      {viewState === 'clean' && (
         <div className="empty-state empty-state-clean">
           <div className="clean-check-icon">✓</div>
           <h3 className="clean-title">No UI Defects Detected</h3>
@@ -291,7 +347,7 @@ export default function FindingsSection({
       )}
 
       {/* Findings Content Area */}
-      {!isLoading && !findingsError && isArray && count > 0 && (
+      {viewState === 'has_findings' && (
         <>
           {/* Interactive Severity & Category Filter Toolbar */}
           <div className="findings-filter-toolbar" aria-label="Findings Filters">

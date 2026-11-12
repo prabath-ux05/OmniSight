@@ -27,6 +27,7 @@ import {
   rejectProposal,
   repairRunFinding,
 } from './services/api';
+import { MAX_CONSECUTIVE_POLL_ERRORS } from './utils/findingsState';
 import './App.css';
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
@@ -108,6 +109,7 @@ export default function App() {
 
   // Ref to prevent overlapping polling intervals
   const pollingTimerRef = useRef(null);
+  const pollingErrorCountRef = useRef(0);
 
   // Refs to track active run requests and prevent stale async race conditions
   const activeFindingsRunIdRef = useRef(null);
@@ -651,12 +653,12 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // 12. Polling Lifecycle Effect
+  // 12. Polling Lifecycle Effect (Recursive setTimeout to prevent overlapping requests)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!currentRun?.run_id || !isAutoPolling) {
       if (pollingTimerRef.current) {
-        clearInterval(pollingTimerRef.current);
+        clearTimeout(pollingTimerRef.current);
         pollingTimerRef.current = null;
       }
       return;
@@ -668,35 +670,86 @@ export default function App() {
       return;
     }
 
-    // Poll every 2.5 seconds
-    pollingTimerRef.current = setInterval(async () => {
-      const result = await fetchRun(currentRun.run_id);
-      if (result.ok) {
-        const freshRun = result.data;
-        setCurrentRun(freshRun);
+    let isCancelled = false;
+    const POLLING_INTERVAL_MS = 2500;
 
-        const freshStatus = typeof freshRun?.status === 'string' ? freshRun.status.trim().toLowerCase() : '';
-        if (TERMINAL_STATUSES.includes(freshStatus)) {
-          setIsAutoPolling(false);
-          await loadFindings(freshRun.run_id, includeMockFindings);
-          await loadProposals(freshRun.run_id);
-          loadRunsList();
+    const executePoll = async () => {
+      if (isCancelled) return;
 
-          if (freshStatus === 'completed') {
-            setSuccessMessage(`Run '${freshRun.run_id}' completed successfully!`);
-          } else if (freshStatus === 'failed') {
-            setErrorMessage(`Run '${freshRun.run_id}' failed: ${freshRun.error || freshRun.message || 'Inspection pipeline failure'}`);
+      try {
+        const result = await fetchRun(currentRun.run_id);
+        if (isCancelled) return;
+
+        if (result.ok) {
+          pollingErrorCountRef.current = 0;
+          const freshRun = result.data;
+          setCurrentRun(freshRun);
+
+          const freshStatus = typeof freshRun?.status === 'string' ? freshRun.status.trim().toLowerCase() : '';
+          if (TERMINAL_STATUSES.includes(freshStatus)) {
+            setIsAutoPolling(false);
+            await loadFindings(freshRun.run_id, includeMockFindings);
+            await loadProposals(freshRun.run_id);
+            loadRunsList();
+
+            if (freshStatus === 'completed') {
+              setSuccessMessage(`Run '${freshRun.run_id}' completed successfully!`);
+            } else if (freshStatus === 'failed') {
+              setErrorMessage(`Run '${freshRun.run_id}' failed: ${freshRun.error || freshRun.message || 'Inspection pipeline failure'}`);
+            }
+            return; // Terminal reached: stop scheduling further polls
+          }
+        } else {
+          // Distinct Handling: Genuine 404 (Missing Run) vs Transient Gateway/Network Errors
+          if (result.status === 404) {
+            setIsAutoPolling(false);
+            pollingErrorCountRef.current = 0;
+            setErrorMessage(`Polling stopped: Run '${currentRun.run_id}' was not found on the server (404 Not Found).`);
+            return; // 404: stop scheduling further polls
+          }
+
+          pollingErrorCountRef.current += 1;
+          const currentFailures = pollingErrorCountRef.current;
+
+          if (currentFailures >= MAX_CONSECUTIVE_POLL_ERRORS) {
+            setIsAutoPolling(false);
+            pollingErrorCountRef.current = 0;
+            setErrorMessage(
+              `Polling paused: Server unavailable after ${MAX_CONSECUTIVE_POLL_ERRORS} attempts (${result.error}). Click 'Refresh' to retry.`
+            );
+            return; // Error threshold reached: stop scheduling further polls
+          } else {
+            console.warn(
+              `Transient polling error for run '${currentRun.run_id}' (attempt ${currentFailures}/${MAX_CONSECUTIVE_POLL_ERRORS}): ${result.error}`
+            );
           }
         }
-      } else {
-        setIsAutoPolling(false);
-        setErrorMessage(`Polling stopped: ${result.error}`);
+      } catch (err) {
+        if (isCancelled) return;
+        pollingErrorCountRef.current += 1;
+        if (pollingErrorCountRef.current >= MAX_CONSECUTIVE_POLL_ERRORS) {
+          setIsAutoPolling(false);
+          pollingErrorCountRef.current = 0;
+          setErrorMessage(
+            `Polling paused: Unexpected error after ${MAX_CONSECUTIVE_POLL_ERRORS} attempts. Click 'Refresh' to retry.`
+          );
+          return;
+        }
       }
-    }, 2500);
+
+      // Schedule next poll only after current request finishes and if not cancelled
+      if (!isCancelled) {
+        pollingTimerRef.current = setTimeout(executePoll, POLLING_INTERVAL_MS);
+      }
+    };
+
+    // Kick off initial poll after the interval
+    pollingTimerRef.current = setTimeout(executePoll, POLLING_INTERVAL_MS);
 
     return () => {
+      isCancelled = true;
       if (pollingTimerRef.current) {
-        clearInterval(pollingTimerRef.current);
+        clearTimeout(pollingTimerRef.current);
         pollingTimerRef.current = null;
       }
     };
