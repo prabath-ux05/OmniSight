@@ -41,6 +41,8 @@ class DatabaseRunStore:
         self._runs: dict[str, Any] = {}
         self._findings: dict[str, Any] = {}
         self._proposals: dict[str, Any] = {}
+        self._run_viewports: dict[str, list[str]] = {}
+        self._proposal_notes: dict[str, str] = {}
         try:
             init_db()
         except Exception as exc:
@@ -48,18 +50,40 @@ class DatabaseRunStore:
 
     def _model_to_run_response(self, run: RunModel) -> RunResponse:
         """Convert a SQLAlchemy RunModel instance into a Pydantic RunResponse."""
+        vps = self._run_viewports.get(run.run_id)
+        if not vps:
+            detected = []
+            run_dir = Path("artifacts") / run.run_id
+            if run_dir.is_dir():
+                for candidate in ["desktop", "tablet", "mobile"]:
+                    if (run_dir / f"before_{candidate}.png").exists():
+                        detected.append(candidate)
+            vps = detected if detected else ["desktop"]
+
         return RunResponse(
             run_id=run.run_id,
+            user_id=getattr(run, "user_id", None),
             url=run.url,
             status=run.status,
             created_at=run.created_at,
             completed_at=run.completed_at,
             message=run.message,
             error=run.error,
+            viewports=vps,
         )
 
     def _model_to_finding_response(self, finding: FindingModel) -> FindingResponse:
         """Convert a SQLAlchemy FindingModel instance into a Pydantic FindingResponse."""
+        vp = getattr(finding, "viewport", None)
+        if not vp:
+            sp = (finding.screenshot_path or "").lower()
+            if "_mobile" in sp:
+                vp = "mobile"
+            elif "_tablet" in sp:
+                vp = "tablet"
+            else:
+                vp = "desktop"
+
         return FindingResponse(
             finding_id=finding.finding_id,
             category=finding.category,
@@ -67,6 +91,7 @@ class DatabaseRunStore:
             confidence=finding.confidence if finding.confidence is not None else 1.0,
             description=finding.description,
             selector=finding.selector,
+            viewport=vp,
             evidence=EvidenceReferences(
                 screenshot_path=finding.screenshot_path,
                 dom_snapshot_path=finding.dom_snapshot_path,
@@ -91,6 +116,8 @@ class DatabaseRunStore:
 
     def _model_to_proposal_response(self, prop: RepairProposalModel) -> RepairProposalResponse:
         """Convert a SQLAlchemy RepairProposalModel instance into a Pydantic RepairProposalResponse."""
+        can_revisit = prop.approval_status == "approved"
+        reviewer_notes = self._proposal_notes.get(prop.proposal_id)
         return RepairProposalResponse(
             proposal_id=prop.proposal_id,
             run_id=prop.run_id,
@@ -103,20 +130,26 @@ class DatabaseRunStore:
             github_pr_number=prop.github_pr_number,
             created_at=prop.created_at,
             updated_at=prop.updated_at,
+            reviewer_notes=reviewer_notes,
+            can_revisit=can_revisit,
         )
 
     # =========================================================================
     # Run Lifecycle Management
     # =========================================================================
 
-    def create(self, request: RunCreateRequest) -> RunResponse:
+    def create(self, request: RunCreateRequest, user_id: str | None = None) -> RunResponse:
         """Create and persist a new run in the initial 'queued' status."""
         run_id = f"run_{uuid.uuid4().hex[:8]}"
         created_at = datetime.now(timezone.utc).isoformat()
         message = "Run created successfully and queued for inspection."
 
+        req_viewports = getattr(request, "viewports", None) or ["desktop"]
+        self._run_viewports[run_id] = [str(v) for v in req_viewports]
+
         run_obj = RunModel(
             run_id=run_id,
+            user_id=user_id,
             url=str(request.url),
             status="queued",
             created_at=created_at,
@@ -130,7 +163,7 @@ class DatabaseRunStore:
                 db.add(run_obj)
                 db.flush()
                 response = self._model_to_run_response(run_obj)
-            logger.info("Persisted new run %s to database.", run_id)
+            logger.info("Persisted new run %s to database (user_id=%s).", run_id, user_id)
             self._runs[run_id] = response
             return response
         except (OperationalError, DBAPIError) as exc:
@@ -160,6 +193,24 @@ class DatabaseRunStore:
                 return [self._model_to_run_response(r) for r in runs]
         except (OperationalError, DBAPIError) as exc:
             logger.error("Database connection failure while listing runs: %s", str(exc))
+            raise DatabaseConnectionError(f"Database error during runs listing: {str(exc)}") from exc
+
+    def list_runs_for_user(self, user_id: str | None = None, include_guest: bool = False) -> list[RunResponse]:
+        """List runs filtered for a specific user context."""
+        try:
+            with get_db_session(self._session_factory) as db:
+                if user_id is None:
+                    stmt = select(RunModel).where(RunModel.user_id.is_(None)).order_by(RunModel.created_at.desc())
+                elif include_guest:
+                    stmt = select(RunModel).where(
+                        (RunModel.user_id == user_id) | (RunModel.user_id.is_(None))
+                    ).order_by(RunModel.created_at.desc())
+                else:
+                    stmt = select(RunModel).where(RunModel.user_id == user_id).order_by(RunModel.created_at.desc())
+                runs = db.execute(stmt).scalars().all()
+                return [self._model_to_run_response(r) for r in runs]
+        except (OperationalError, DBAPIError) as exc:
+            logger.error("Database connection failure while listing user runs: %s", str(exc))
             raise DatabaseConnectionError(f"Database error during runs listing: {str(exc)}") from exc
 
     def update_run(
@@ -233,6 +284,7 @@ class DatabaseRunStore:
                         screenshot_path=item.evidence.screenshot_path if item.evidence else None,
                         dom_snapshot_path=item.evidence.dom_snapshot_path if item.evidence else None,
                         source=item.source,
+                        viewport=getattr(item, "viewport", "desktop") or "desktop",
                         created_at=created_at,
                     )
                     db.add(model)
@@ -439,8 +491,19 @@ class DatabaseRunStore:
             logger.error("Database connection failure while listing proposals for run %s: %s", run_id, str(exc))
             raise DatabaseConnectionError(f"Database error during proposals listing: {str(exc)}") from exc
 
-    def update_proposal_approval(self, proposal_id: str, decision: str, notes: str | None = None) -> RepairProposalResponse | None:
-        """Record an approval or rejection decision on a proposal with strict state validation."""
+    def update_proposal_approval(
+        self,
+        proposal_id: str,
+        decision: str,
+        notes: str | None = None,
+        revisit: bool = False,
+    ) -> RepairProposalResponse | None:
+        """Record an approval or rejection decision on a proposal with strict state validation.
+
+        Enforces:
+        - Rejected proposals strictly remain rejected and can never be approved or reopened.
+        - Approved proposals can be revisited and revoked/changed when revisit=True.
+        """
         if decision not in ("approved", "rejected"):
             raise ValueError(f"Invalid approval decision '{decision}'. Must be 'approved' or 'rejected'.")
 
@@ -450,16 +513,44 @@ class DatabaseRunStore:
                 if not prop:
                     return None
 
-                # Guard against duplicate or conflicting decisions
+                # Rule 1: Rejected proposals strictly remain rejected and cannot be approved or reopened
+                if prop.approval_status == "rejected":
+                    raise ProposalConflictError(
+                        f"Proposal '{proposal_id}' has already been rejected and cannot be approved."
+                    )
+
+                # Rule 2: Approved decisions can be revisited when revisit=True
+                if prop.approval_status == "approved":
+                    if not revisit:
+                        if decision == "approved":
+                            raise ProposalConflictError(f"Proposal '{proposal_id}' is already approved.")
+                        else:
+                            raise ProposalConflictError(
+                                f"Proposal '{proposal_id}' is already approved and cannot be rejected."
+                            )
+
+                    # Revisit is allowed for approved proposals:
+                    prop.approval_status = decision
+                    prop.updated_at = datetime.now(timezone.utc).isoformat()
+                    if notes is not None:
+                        self._proposal_notes[proposal_id] = notes
+                    db.flush()
+                    response = self._model_to_proposal_response(prop)
+                    logger.info(
+                        "Revisited approved proposal %s: new approval status '%s'.",
+                        proposal_id,
+                        decision,
+                    )
+                    return response
+
+                # Rule 3: Pending proposals transition to decision
                 if prop.approval_status == decision:
                     raise ProposalConflictError(f"Proposal '{proposal_id}' is already {decision}.")
-                if prop.approval_status == "approved" and decision == "rejected":
-                    raise ProposalConflictError(f"Proposal '{proposal_id}' is already approved and cannot be rejected.")
-                if prop.approval_status == "rejected" and decision == "approved":
-                    raise ProposalConflictError(f"Proposal '{proposal_id}' has already been rejected and cannot be approved.")
 
                 prop.approval_status = decision
                 prop.updated_at = datetime.now(timezone.utc).isoformat()
+                if notes is not None:
+                    self._proposal_notes[proposal_id] = notes
                 db.flush()
                 response = self._model_to_proposal_response(prop)
             logger.info("Updated proposal %s approval status to '%s'.", proposal_id, decision)
@@ -527,6 +618,8 @@ class DatabaseRunStore:
         self._runs.clear()
         self._findings.clear()
         self._proposals.clear()
+        self._run_viewports.clear()
+        self._proposal_notes.clear()
         try:
             with get_db_session(self._session_factory) as db:
                 db.execute(delete(RepairProposalModel))

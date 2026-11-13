@@ -101,7 +101,8 @@ class DOMCapture:
         page,
         run_id: str,
         artifact_root: str = "artifacts",
-        stage: str = None
+        stage: str = None,
+        viewport: str = None,
     ) -> str:
 
         # Validate run ID
@@ -113,7 +114,7 @@ class DOMCapture:
         run_id = run_id.strip()
 
         # Validate stage
-        if stage not in (None, "before", "after"):
+        if stage not in (None, "before", "after") and not (isinstance(stage, str) and any(stage.startswith(s) for s in ("before", "after"))):
             raise ValueError(
                 "stage must be 'before', 'after', or None"
             )
@@ -124,11 +125,11 @@ class DOMCapture:
 
         # Preserve existing filenames
         if stage is None:
-            dom_filename = "dom.html"
-            metadata_filename = "dom_metadata.json"
+            dom_filename = f"dom_{viewport}.html" if viewport else "dom.html"
+            metadata_filename = f"dom_{viewport}_metadata.json" if viewport else "dom_metadata.json"
         else:
-            dom_filename = f"{stage}_dom.html"
-            metadata_filename = f"{stage}_dom_metadata.json"
+            dom_filename = f"{stage}_dom_{viewport}.html" if viewport else f"{stage}_dom.html"
+            metadata_filename = f"{stage}_dom_{viewport}_metadata.json" if viewport else f"{stage}_dom_metadata.json"
 
         dom_path = run_dir / dom_filename
 
@@ -144,13 +145,21 @@ class DOMCapture:
             encoding="utf-8"
         )
 
-        # Save backward-compatible filenames for the before stage
-        if stage == "before":
+        # Save backward-compatible filenames (e.g. dom.html and before_dom.html)
+        if stage == "before" or stage is None:
             legacy_dom_path = run_dir / "dom.html"
-            legacy_dom_path.write_text(
-                html_content,
-                encoding="utf-8"
-            )
+            if viewport == "desktop" or not legacy_dom_path.exists():
+                legacy_dom_path.write_text(
+                    html_content,
+                    encoding="utf-8"
+                )
+            if stage == "before":
+                legacy_stage_dom = run_dir / "before_dom.html"
+                if viewport == "desktop" or not legacy_stage_dom.exists():
+                    legacy_stage_dom.write_text(
+                        html_content,
+                        encoding="utf-8"
+                    )
 
         # Verify HTML file
         if not dom_path.exists() or dom_path.stat().st_size == 0:

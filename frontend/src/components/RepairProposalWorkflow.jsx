@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import VisualComparisonSplitView from './VisualComparisonSplitView';
 import {
   fetchGitHubConfig,
   fetchRunProposals,
@@ -446,6 +447,7 @@ export function RunProposalsDashboard({
   const [decisionNotes, setDecisionNotes] = useState({});
   const [actionInProgress, setActionInProgress] = useState({});
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [selectedComparisonProposal, setSelectedComparisonProposal] = useState(null);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState('');
@@ -756,6 +758,14 @@ export function RunProposalsDashboard({
                         Target Finding: <code>{proposal.finding_id}</code>
                       </span>
                     )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm proposal-compare-btn"
+                      onClick={() => setSelectedComparisonProposal(proposal)}
+                      title="Open Before / After Visual Split-View Comparison"
+                    >
+                      🔍 Split-View Comparison
+                    </button>
                   </div>
 
                   <div className="proposal-badge-row">
@@ -800,6 +810,12 @@ export function RunProposalsDashboard({
                       <span className="meta-value">{formatTime(proposal.updated_at)}</span>
                     </div>
                   )}
+                  {proposal.reviewer_notes && (
+                    <div className="proposal-meta-item">
+                      <span className="meta-label">Reviewer Notes:</span>
+                      <span className="meta-value">"{proposal.reviewer_notes}"</span>
+                    </div>
+                  )}
                   {proposal.github_pr_url && (
                     <div className="proposal-meta-item">
                       <span className="meta-label">Pull Request:</span>
@@ -841,32 +857,65 @@ export function RunProposalsDashboard({
                       <div className="review-buttons-group">
                         <button
                           type="button"
-                          className="btn btn-success btn-sm"
+                          className="btn-approve-lg"
                           onClick={() => handleApproveClick(proposal.proposal_id)}
                           disabled={Boolean(inProgressAction)}
                           title="Authorize repair patch execution"
                         >
-                          {inProgressAction === 'approving' ? 'Approving...' : '✓ Approve Proposal'}
+                          {inProgressAction === 'approving' ? (
+                            <><span className="spinner-xs" /> Approving...</>
+                          ) : (
+                            <>✓ Approve Proposal</>
+                          )}
                         </button>
                         <button
                           type="button"
-                          className="btn btn-danger btn-sm"
+                          className="btn-reject-lg"
                           onClick={() => handleRejectClick(proposal.proposal_id)}
                           disabled={Boolean(inProgressAction)}
                           title="Reject repair proposal"
                         >
-                          {inProgressAction === 'rejecting' ? 'Rejecting...' : '✕ Reject Proposal'}
+                          {inProgressAction === 'rejecting' ? (
+                            <><span className="spinner-xs" /> Rejecting...</>
+                          ) : (
+                            <>✕ Reject Proposal</>
+                          )}
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="review-decision-recorded">
-                      <span className="decision-icon">
-                        {isApproved ? '✅' : '🚫'}
-                      </span>
-                      <span className="decision-text">
-                        <strong>Decision Recorded:</strong> Proposal was {proposal.approval_status.toUpperCase()} on {formatTime(proposal.updated_at)}.
-                      </span>
+                      {isApproved ? (
+                        <div className="decision-approved-banner">
+                          <span className="decision-banner-icon">✅</span>
+                          <div className="decision-banner-text">
+                            <strong>Proposal Approved</strong>
+                            <span className="decision-banner-ts">
+                              {formatTime(proposal.updated_at)}
+                              {proposal.reviewer_notes && ` — "${proposal.reviewer_notes}"`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setSelectedComparisonProposal(proposal)}
+                            title="Revisit approved proposal decision in visual comparison"
+                          >
+                            🔄 Revisit Decision
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="decision-rejected-banner">
+                          <span className="decision-banner-icon">🚫</span>
+                          <div className="decision-banner-text">
+                            <strong>Proposal Rejected</strong>
+                            <span className="decision-banner-ts">
+                              {formatTime(proposal.updated_at)}
+                              {proposal.reviewer_notes && ` — "${proposal.reviewer_notes}"`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -874,6 +923,19 @@ export function RunProposalsDashboard({
             );
           })}
         </div>
+      )}
+
+      {selectedComparisonProposal && (
+        <VisualComparisonSplitView
+          runId={run.run_id}
+          proposalId={selectedComparisonProposal.proposal_id}
+          finding={findings.find((f) => f.finding_id === selectedComparisonProposal.finding_id)}
+          initialViewport={selectedComparisonProposal.viewport || 'desktop'}
+          onDecisionUpdated={() => {
+            if (onRefreshProposals) onRefreshProposals();
+          }}
+          onClose={() => setSelectedComparisonProposal(null)}
+        />
       )}
     </section>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import VisualComparisonSplitView from './VisualComparisonSplitView';
 import { FindingRepairWorkflow, RunProposalsDashboard } from './RepairProposalWorkflow';
-import { getArtifactUrl, repairRunFinding } from '../services/api';
+import { fetchChatStatus, getArtifactUrl, repairRunFinding, sendChatMessage } from '../services/api';
 
 /**
  * Strategy human-readable label helper.
@@ -35,6 +36,45 @@ function formatTime(isoString) {
   } catch {
     return isoString;
   }
+}
+
+/**
+ * Format inline markdown code blocks and bold text.
+ */
+function formatInlineCode(line) {
+  if (!line) return null;
+  const parts = line.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="chat-inline-code">{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+/**
+ * Render multi-line markdown text with code and bullets.
+ */
+function renderMarkdownContent(text) {
+  if (!text) return null;
+  return text.split('\n').map((line, idx) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('•') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      return (
+        <p key={idx} className="bubble-line bubble-bullet">
+          {formatInlineCode(line)}
+        </p>
+      );
+    }
+    return (
+      <p key={idx} className="bubble-line">
+        {formatInlineCode(line)}
+      </p>
+    );
+  });
 }
 
 /**
@@ -208,7 +248,19 @@ export default function RepairWorkspacePage({
   // Chatbot conversation state
   const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatStatus, setChatStatus] = useState(null);
   const chatMessagesEndRef = useRef(null);
+  const chatInputRef = useRef(null);
+
+  // Check LLM readiness on mount
+  useEffect(() => {
+    fetchChatStatus().then((res) => {
+      if (res.ok) {
+        setChatStatus(res.data);
+      }
+    });
+  }, []);
 
   // Initialize or reset chat conversation when selected finding changes
   useEffect(() => {
@@ -217,7 +269,7 @@ export default function RepairWorkspacePage({
         {
           id: `init-${currentFinding.finding_id}`,
           sender: 'assistant',
-          text: `Hello! I am the OmniSight Repair Assistant. I am analyzing finding #${currentFinding.finding_id} (${currentFinding.category.replace(/_/g, ' ')}).\n\nYou can ask why this issue was detected, examine root cause factors, review synthesized locator repairs, or inspect proposed test code diffs.`,
+          text: `Hello! I am the OmniSight Conversational Assistant. I have loaded context for finding #${currentFinding.finding_id} (${currentFinding.category?.replace(/_/g, ' ') || 'defect'}).\n\nYou can ask why this issue was detected, examine root cause factors, review synthesized locator repairs, or inspect proposed test code diffs. You can also ask any technical or general question!`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isInitial: true,
         },
@@ -227,7 +279,7 @@ export default function RepairWorkspacePage({
         {
           id: 'init-none',
           sender: 'assistant',
-          text: 'Welcome to the Repair Workspace. Select an inspection run and defect finding to begin.',
+          text: 'Welcome to the OmniSight Assistant! Ask me anything about your inspection runs, self-healing repairs, Playwright test automation, or web locator strategies.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isInitial: true,
         },
@@ -240,12 +292,38 @@ export default function RepairWorkspacePage({
     if (chatMessagesEndRef.current) {
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages]);
+  }, [chatMessages, isChatLoading]);
 
-  // Send message in chat
-  const handleSendMessage = (messageText) => {
+  // Reset conversation to a clean state
+  const handleResetChat = () => {
+    if (currentFinding) {
+      setChatMessages([
+        {
+          id: `init-${currentFinding.finding_id}-${Date.now()}`,
+          sender: 'assistant',
+          text: `Fresh conversation started for finding #${currentFinding.finding_id}. What would you like to explore or troubleshoot?`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isInitial: true,
+        },
+      ]);
+    } else {
+      setChatMessages([
+        {
+          id: `init-none-${Date.now()}`,
+          sender: 'assistant',
+          text: 'Fresh conversation started. Ask me anything about OmniSight, defect diagnosis, or test automation.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isInitial: true,
+        },
+      ]);
+    }
+    setUserInput('');
+  };
+
+  // Send message in chat to real LLM backend
+  const handleSendMessage = async (messageText) => {
     const text = (messageText || userInput).trim();
-    if (!text) return;
+    if (!text || isChatLoading) return;
 
     const userMsg = {
       id: `user-${Date.now()}`,
@@ -254,17 +332,81 @@ export default function RepairWorkspacePage({
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const answerText = generateGroundedAnswer(text, currentFinding, currentRepair, currentProposal, run);
+    // Filter recent history for multi-turn conversational context
+    const historyPayload = chatMessages
+      .filter((m) => !m.isInitial && !m.isError)
+      .slice(-8)
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }));
 
-    const assistantMsg = {
-      id: `asst-${Date.now() + 1}`,
-      sender: 'assistant',
-      text: answerText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    // Active inspection context
+    const contextPayload = {
+      run_id: run?.run_id || null,
+      url: run?.url || null,
+      run_status: run?.status || null,
+      finding: currentFinding
+        ? {
+            finding_id: currentFinding.finding_id,
+            category: currentFinding.category,
+            severity: currentFinding.severity,
+            description: currentFinding.description,
+            selector: currentFinding.selector,
+            confidence: currentFinding.confidence,
+          }
+        : null,
+      repair: currentRepair
+        ? {
+            repaired: currentRepair.repaired,
+            best_locator: currentRepair.best_locator,
+            strategy: currentRepair.strategy,
+            confidence: currentRepair.confidence,
+            reason: currentRepair.reason,
+          }
+        : null,
+      proposal: currentProposal
+        ? {
+            proposal_id: currentProposal.proposal_id,
+            approval_status: currentProposal.approval_status,
+            proposed_change: currentProposal.proposed_change,
+          }
+        : null,
     };
 
-    setChatMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setChatMessages((prev) => [...prev, userMsg]);
     setUserInput('');
+    setIsChatLoading(true);
+
+    const result = await sendChatMessage({
+      message: text,
+      history: historyPayload,
+      context: contextPayload,
+    });
+
+    if (result.ok && result.data?.message) {
+      const assistantMsg = {
+        id: `asst-${Date.now() + 1}`,
+        sender: 'assistant',
+        text: result.data.message,
+        provider: result.data.provider,
+        model: result.data.model,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isError: false,
+      };
+      setChatMessages((prev) => [...prev, assistantMsg]);
+    } else {
+      const errorMsg = {
+        id: `asst-err-${Date.now() + 1}`,
+        sender: 'assistant',
+        text: result.error || 'Failed to reach AI assistant. Please verify backend LLM credentials.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isError: true,
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
+    }
+
+    setIsChatLoading(false);
   };
 
   // Quick question handler
@@ -423,6 +565,14 @@ export default function RepairWorkspacePage({
                 })}
               </div>
             </div>
+          ) : run?.status === 'failed' ? (
+            <div className="card repair-clean-run-card" style={{ borderColor: 'var(--color-danger, #ef4444)' }}>
+              <div className="clean-check-icon" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>✕</div>
+              <h4 className="clean-title" style={{ color: '#ef4444' }}>Inspection Run Failed</h4>
+              <p className="empty-state-text">
+                Run <code>{run.run_id}</code> encountered an error and could not complete inspection: {run.error || run.message || 'Pipeline execution failed'}.
+              </p>
+            </div>
           ) : (
             <div className="card repair-clean-run-card">
               <div className="clean-check-icon">✓</div>
@@ -524,57 +674,78 @@ export default function RepairWorkspacePage({
                 <div className="assistant-header-left">
                   <span className="assistant-icon">🤖</span>
                   <div>
-                    <h4 className="assistant-title">OmniSight Repair Assistant</h4>
+                    <h4 className="assistant-title">OmniSight AI Assistant</h4>
                     <span className="assistant-grounding-pill">
-                      Deterministic Grounding &bull; No Hallucination
+                      {chatStatus?.configured ? (
+                        <>✨ Powered by {chatStatus.provider === 'openai' ? 'OpenAI' : 'Google Gemini'} ({chatStatus.model})</>
+                      ) : (
+                        <>⚡ Grounded LLM Assistant</>
+                      )}
                     </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Limitation Transparency Notice */}
-              <div className="assistant-limitation-notice">
-                <span className="notice-icon">ℹ️</span>
-                <div className="notice-text">
-                  <strong>Notice:</strong> Real conversational AI / LLM backend is not currently connected.
-                  Assistant responses are generated deterministically from verified inspection data, DOM attributes, and self-healing analysis.
+                <div className="assistant-header-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs btn-new-chat"
+                    onClick={handleResetChat}
+                    title="Start a new conversation session"
+                  >
+                    ✨ New Chat
+                  </button>
                 </div>
               </div>
+
+              {/* Status Notice if LLM credentials are not configured */}
+              {chatStatus && !chatStatus.configured && (
+                <div className="assistant-limitation-notice">
+                  <span className="notice-icon">⚠️</span>
+                  <div className="notice-text">
+                    <strong>LLM Setup Notice:</strong> Backend API key is not currently detected. Add <code>GEMINI_API_KEY</code> to your backend environment to enable live Gemini completions.
+                  </div>
+                </div>
+              )}
 
               {/* Quick Questions Chips */}
               <div className="assistant-quick-chips">
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleQuickQuestion('Why was this issue detected?')}
+                  onClick={() => handleQuickQuestion('Why was this issue detected? Explain what caused the locator failure.')}
+                  disabled={isChatLoading}
                 >
                   ❓ Why detected?
                 </button>
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleQuickQuestion('Explain root cause')}
+                  onClick={() => handleQuickQuestion('Explain the root cause of this defect and common reasons for it.')}
+                  disabled={isChatLoading}
                 >
                   🔍 Root cause?
                 </button>
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleQuickQuestion('What is the recommended repair?')}
+                  onClick={() => handleQuickQuestion('What is the recommended locator repair candidate and why is it resilient?')}
+                  disabled={isChatLoading}
                 >
                   ⚡ Recommended fix?
                 </button>
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleQuickQuestion('Show test code changes')}
+                  onClick={() => handleQuickQuestion('How would this locator repair be applied as a test code diff?')}
+                  disabled={isChatLoading}
                 >
                   📝 Code diff?
                 </button>
                 <button
                   type="button"
                   className="quick-chip-btn"
-                  onClick={() => handleQuickQuestion('How does human approval work?')}
+                  onClick={() => handleQuickQuestion('How does the human-in-the-loop approval gate and pull request flow work?')}
+                  disabled={isChatLoading}
                 >
                   🛡️ Approval rules?
                 </button>
@@ -587,7 +758,7 @@ export default function RepairWorkspacePage({
                     key={msg.id}
                     className={`chat-bubble-row ${msg.sender === 'user' ? 'bubble-user' : 'bubble-assistant'}`}
                   >
-                    <div className="chat-bubble">
+                    <div className={`chat-bubble ${msg.isError ? 'bubble-error' : ''}`}>
                       <div className="bubble-header">
                         <span className="bubble-sender">
                           {msg.sender === 'user' ? 'You' : 'OmniSight Assistant'}
@@ -595,26 +766,46 @@ export default function RepairWorkspacePage({
                         <span className="bubble-time">{msg.timestamp}</span>
                       </div>
                       <div className="bubble-content">
-                        {msg.text.split('\n').map((line, idx) => (
-                          <p key={idx} className="bubble-line">
-                            {line}
-                          </p>
-                        ))}
+                        {renderMarkdownContent(msg.text)}
                       </div>
                       {msg.sender === 'assistant' && !msg.isInitial && (
                         <div className="bubble-footer">
-                          <span className="bubble-grounded-tag">
-                            ✓ Verified against inspection attributes
-                          </span>
+                          {msg.isError ? (
+                            <span className="bubble-error-tag" style={{ color: '#ef4444', fontSize: '0.7rem' }}>
+                              ⚠️ Service guidance: Check API key configuration
+                            </span>
+                          ) : (
+                            <span className="bubble-grounded-tag">
+                              ✓ Verified against inspection context &bull; {msg.provider === 'openai' ? 'OpenAI' : 'Google Gemini'} ({msg.model || 'LLM'})
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
+
+                {/* Animated Thinking Bubble */}
+                {isChatLoading && (
+                  <div className="chat-bubble-row bubble-assistant">
+                    <div className="chat-bubble bubble-thinking">
+                      <div className="bubble-header">
+                        <span className="bubble-sender">OmniSight Assistant</span>
+                        <span className="bubble-time">Thinking...</span>
+                      </div>
+                      <div className="bubble-content thinking-indicator">
+                        <span className="thinking-dot"></span>
+                        <span className="thinking-dot"></span>
+                        <span className="thinking-dot"></span>
+                        <span className="thinking-label">Consulting LLM &amp; analyzing inspection context...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatMessagesEndRef} />
               </div>
 
-              {/* Chat Input Bar */}
+              {/* Chat Input Bar with Multiline Support */}
               <form
                 className="assistant-input-form"
                 onSubmit={(e) => {
@@ -622,19 +813,27 @@ export default function RepairWorkspacePage({
                   handleSendMessage();
                 }}
               >
-                <input
-                  type="text"
-                  className="form-input assistant-input"
-                  placeholder="Ask a question about this finding or repair..."
+                <textarea
+                  ref={chatInputRef}
+                  className="form-input assistant-input assistant-textarea"
+                  placeholder="Ask any question about this defect, repairs, Playwright, or general testing (Enter to send, Shift+Enter for newline)..."
                   value={userInput}
+                  rows={1}
+                  disabled={isChatLoading}
                   onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                 />
                 <button
                   type="submit"
                   className="btn btn-primary btn-sm btn-send"
-                  disabled={!userInput.trim()}
+                  disabled={!userInput.trim() || isChatLoading}
                 >
-                  Send ➔
+                  {isChatLoading ? 'Thinking...' : 'Send ➔'}
                 </button>
               </form>
             </div>
@@ -652,6 +851,13 @@ export default function RepairWorkspacePage({
                 <div className="preview-tab-controls">
                   <button
                     type="button"
+                    className={`preview-tab-btn ${activePreviewTab === 'split' ? 'active' : ''}`}
+                    onClick={() => setActivePreviewTab('split')}
+                  >
+                    Split-View Comparison ↔
+                  </button>
+                  <button
+                    type="button"
                     className={`preview-tab-btn ${activePreviewTab === 'before' ? 'active' : ''}`}
                     onClick={() => setActivePreviewTab('before')}
                   >
@@ -666,6 +872,32 @@ export default function RepairWorkspacePage({
                   </button>
                 </div>
               </div>
+
+              {/* Tab 0: Visual Comparison Split View */}
+              {activePreviewTab === 'split' && (
+                <div className="preview-content-box preview-split-box">
+                  {currentProposal?.proposal_id || (proposals && proposals[0]?.proposal_id) ? (
+                    <VisualComparisonSplitView
+                      runId={run?.run_id}
+                      proposalId={currentProposal?.proposal_id || proposals[0]?.proposal_id}
+                      finding={currentFinding}
+                      initialViewport={currentFinding?.viewport || 'desktop'}
+                      onDecisionUpdated={() => {
+                        if (refreshProposals) refreshProposals();
+                      }}
+                    />
+                  ) : (
+                    <div className="preview-fallback-box">
+                      <span className="fallback-icon">🛡️</span>
+                      <h5 className="fallback-heading">No Active Proposal for Split-View</h5>
+                      <p className="fallback-text">
+                        Split-view visual comparison compares the original defect screenshot with the proposed repair in a controlled sandbox.
+                        Select or draft a repair proposal on the left to inspect visual differences and record approval decisions.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tab 1: Before Evidence */}
               {activePreviewTab === 'before' && (

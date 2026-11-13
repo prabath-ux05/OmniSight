@@ -14,6 +14,7 @@ import AboutPage from './components/AboutPage';
 import SettingsPage from './components/SettingsPage';
 import GuidedTutorial, { TUTORIAL_STEPS } from './components/GuidedTutorial';
 import Alert from './components/Alert';
+import AuthModal from './components/AuthModal';
 import {
   fetchHealth,
   createInspectionRun,
@@ -26,6 +27,8 @@ import {
   approveProposal,
   rejectProposal,
   repairRunFinding,
+  fetchCurrentUser,
+  logoutUser,
 } from './services/api';
 import { MAX_CONSECUTIVE_POLL_ERRORS } from './utils/findingsState';
 import './App.css';
@@ -53,6 +56,8 @@ export default function App() {
 
   // Authenticated user session state (null when not logged in - strictly no fake sessions)
   const [user, setUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
 
   // Backend health status
   const [health, setHealth] = useState(null);
@@ -154,13 +159,46 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMenuOpen]);
 
-  // Auth Action Handlers (Optional Sign In / Sign Up triggers)
+  // Auth Action Handlers & Session Lifecycle
+  useEffect(() => {
+    let isCancelled = false;
+    const checkAuthSession = async () => {
+      const res = await fetchCurrentUser();
+      if (!isCancelled) {
+        if (res.ok && res.data) {
+          setUser(res.data);
+        } else {
+          setUser(null);
+        }
+      }
+    };
+    checkAuthSession();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
   const handleSignIn = () => {
-    setInfoMessage('Authentication Not Configured: No backend authentication service or user session exists. OmniSight operates in full Guest Mode — all inspection, history, and repair workflows are completely unlocked.');
+    setAuthModalMode('login');
+    setIsAuthModalOpen(true);
   };
 
   const handleSignUp = () => {
-    setInfoMessage('Account Registration Not Configured: No user database is provisioned. OmniSight is fully unlocked in Guest Mode without requiring an account.');
+    setAuthModalMode('register');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    setSuccessMessage(`Signed in successfully as ${userData.email}.`);
+    loadRunsList();
+  };
+
+  const handleLogout = async () => {
+    await logoutUser();
+    setUser(null);
+    setSuccessMessage('Logged out successfully.');
+    loadRunsList();
   };
 
   // ---------------------------------------------------------------------------
@@ -289,7 +327,7 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // 5. Initiate a New Inspection Run
   // ---------------------------------------------------------------------------
-  const handleStartInspection = async (targetUrl) => {
+  const handleStartInspection = async (targetUrl, viewports = ['desktop']) => {
     // Invalidate outstanding findings/proposals requests from any previous run
     activeFindingsRunIdRef.current = null;
     activeProposalsRunIdRef.current = null;
@@ -308,14 +346,15 @@ export default function App() {
     setRepairs({});
     setRepairError('');
 
-    // Submit real POST /api/v1/runs?auto_execute=true
-    const result = await createInspectionRun(targetUrl, true);
+    // Submit real POST /api/v1/runs?auto_execute=true with selected viewports
+    const result = await createInspectionRun(targetUrl, true, viewports);
 
     if (result.ok) {
       const runData = result.data;
       setCurrentRun(runData);
+      const vpsStr = Array.isArray(viewports) && viewports.length > 1 ? ` across ${viewports.join(', ')}` : '';
       setSuccessMessage(
-        `Run '${runData.run_id}' dispatched! Automated inspection pipeline active...`
+        `Run '${runData.run_id}' dispatched${vpsStr}! Automated inspection pipeline active...`
       );
 
       // Start auto-polling until terminal status (completed/failed)
@@ -338,10 +377,10 @@ export default function App() {
     setIsRunLoading(false);
   };
 
-  const handleStartInspectionFromHome = async (targetUrl) => {
+  const handleStartInspectionFromHome = async (targetUrl, viewports = ['desktop']) => {
     setCurrentView('inspection');
     setActiveTab('live');
-    await handleStartInspection(targetUrl);
+    await handleStartInspection(targetUrl, viewports);
   };
 
   // ---------------------------------------------------------------------------
@@ -970,8 +1009,49 @@ export default function App() {
                     <div className="profile-details-info">
                       <h4 className="profile-details-name">{user.name || user.firstName || 'User'}</h4>
                       <p className="profile-details-email">{user.email || 'No email associated'}</p>
-                      <span className="badge badge-success">Authenticated</span>
+                      <div className="profile-badge-row">
+                        <span className="badge badge-success">Authenticated</span>
+                        <span className="badge badge-neutral">User ID: {user.id || 'Active'}</span>
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="profile-section-divider"></div>
+
+                  <div className="profile-details-grid">
+                    <div className="profile-detail-item">
+                      <span className="profile-detail-label">Full Name</span>
+                      <span className="profile-detail-value">{user.name || user.full_name || 'Not provided'}</span>
+                    </div>
+                    <div className="profile-detail-item">
+                      <span className="profile-detail-label">Email Address</span>
+                      <span className="profile-detail-value">{user.email}</span>
+                    </div>
+                    <div className="profile-detail-item">
+                      <span className="profile-detail-label">Workspace Isolation</span>
+                      <span className="profile-detail-value text-success">Enabled (User-Partitioned)</span>
+                    </div>
+                    <div className="profile-detail-item">
+                      <span className="profile-detail-label">Session Status</span>
+                      <span className="profile-detail-value">Active (Secure Cookie)</span>
+                    </div>
+                  </div>
+
+                  <div className="profile-actions-row">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleSelectView('history')}
+                    >
+                      View My Inspections
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={handleLogout}
+                    >
+                      Log Out
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -980,13 +1060,13 @@ export default function App() {
                     <span className="callout-icon" aria-hidden="true">ℹ️</span>
                     <div>
                       <h4 className="callout-title">Full Guest Access Active</h4>
-                      <span className="callout-subtitle">Authentication is not configured in this deployment</span>
+                      <span className="callout-subtitle">Sign in or register to protect private inspection history</span>
                     </div>
                   </div>
                   <p className="callout-body">
                     OmniSight currently operates with full guest access. You can launch real-time inspections,
                     audit multimodal DOM and screenshot evidence, review defect findings, and test self-healing
-                    locator repairs without requiring an account or signing in.
+                    locator repairs without requiring an account. Sign in to isolate your inspection history.
                   </p>
                   <div className="callout-action-row" style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     <button
@@ -1038,6 +1118,14 @@ export default function App() {
         onSkip={handleTourSkip}
         onFinish={handleTourFinish}
         onJumpToStep={handleTourJumpToStep}
+      />
+
+      {/* Authentication Modal (Sign In / Register) */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        initialMode={authModalMode}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
       />
 
       <footer className="dashboard-footer">

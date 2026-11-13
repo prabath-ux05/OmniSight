@@ -1,4 +1,14 @@
 from typing import Any, Optional
+from urllib.parse import unquote
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from backend.app.api.deps import check_run_access, get_current_user_optional
+from backend.app.core.logging import logger
+from backend.app.db.session import DatabaseConnectionError
+from backend.app.models.user import UserModel
+from backend.app.schemas.artifacts import ArtifactResponse
+from backend.app.schemas.errors import ErrorResponse
+from backend.app.schemas.findings import FindingResponse
 from backend.app.schemas.repairs import (
     PatchGenerateRequest,
     PatchResult,
@@ -9,14 +19,6 @@ from backend.app.schemas.repairs import (
     RepairRequest,
     RepairResult,
 )
-from urllib.parse import unquote
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse
-from backend.app.core.logging import logger
-from backend.app.db.session import DatabaseConnectionError
-from backend.app.schemas.artifacts import ArtifactResponse
-from backend.app.schemas.errors import ErrorResponse
-from backend.app.schemas.findings import FindingResponse
 from backend.app.schemas.runs import RunCreateRequest, RunResponse
 from backend.app.services.run_store import run_store
 
@@ -61,11 +63,13 @@ def create_run(
     payload: RunCreateRequest,
     background_tasks: BackgroundTasks = None,
     auto_execute: bool = False,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> RunResponse:
     """Validate request and create a new inspection run in 'queued' status."""
     logger.info("Received run creation request for URL: %s", payload.url)
+    user_id = current_user.id if isinstance(current_user, UserModel) else None
     try:
-        run = run_store.create(payload)
+        run = run_store.create(payload, user_id=user_id)
     except DatabaseConnectionError as exc:
         logger.error("Failed to persist run in database: %s", str(exc))
         raise HTTPException(
@@ -73,11 +77,17 @@ def create_run(
             detail="Database service unavailable. Please check database connection.",
         ) from exc
 
-    logger.info("Run created successfully with ID: %s (status=%s)", run.run_id, run.status)
+    logger.info("Run created successfully with ID: %s (status=%s, user_id=%s)", run.run_id, run.status, user_id)
 
     if auto_execute and background_tasks is not None:
         from backend.app.services.orchestrator import run_orchestrator
-        background_tasks.add_task(run_orchestrator.execute_run, run.run_id, str(payload.url))
+        viewports = getattr(payload, "viewports", None) or ["desktop"]
+        background_tasks.add_task(
+            run_orchestrator.execute_run,
+            run.run_id,
+            str(payload.url),
+            viewports=viewports,
+        )
 
     return run
 
@@ -88,18 +98,26 @@ def create_run(
     status_code=status.HTTP_200_OK,
     summary="List all inspection runs",
     description=(
-        "Retrieves all inspection runs recorded in PostgreSQL, ordered by creation time descending. "
-        "Returns an empty list if no runs have been initiated."
+        "Retrieves inspection runs recorded in PostgreSQL, ordered by creation time descending. "
+        "Authenticated users see their own inspection history (and guest runs if include_guest=true). "
+        "Guest users see public guest runs."
     ),
     responses={
         200: {"description": "List of inspection runs"},
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def list_runs() -> list[RunResponse]:
-    """Retrieve all stored runs ordered by creation time descending."""
+def list_runs(
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+    include_guest: bool = False,
+) -> list[RunResponse]:
+    """Retrieve stored runs ordered by creation time descending for current user or guest."""
     try:
-        return run_store.list_all()
+        user_id = current_user.id if isinstance(current_user, UserModel) else None
+        return run_store.list_runs_for_user(
+            user_id=user_id,
+            include_guest=(user_id is None or include_guest),
+        )
     except DatabaseConnectionError as exc:
         logger.error("Failed to query runs in database: %s", str(exc))
         raise HTTPException(
@@ -128,6 +146,7 @@ def list_runs() -> list[RunResponse]:
 def execute_run_pipeline(
     run_id: str,
     background_tasks: BackgroundTasks = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> RunResponse:
     """Execute browser capture and vision engine analysis for an existing run."""
     clean_id = _validate_run_id(run_id)
@@ -146,6 +165,8 @@ def execute_run_pipeline(
             detail=f"Run '{clean_id}' not found.",
         )
 
+    check_run_access(run, current_user)
+
     # Concurrency guard: prevent duplicate simultaneous pipeline runs
     if run.status in ("capturing", "analyzing"):
         logger.warning("Pipeline execution rejected: run '%s' is already in state '%s'", clean_id, run.status)
@@ -156,10 +177,11 @@ def execute_run_pipeline(
 
     from backend.app.services.orchestrator import run_orchestrator
 
+    viewports = run_store._run_viewports.get(run.run_id, ["desktop"])
     if background_tasks is not None:
-        background_tasks.add_task(run_orchestrator.execute_run, run.run_id, run.url)
+        background_tasks.add_task(run_orchestrator.execute_run, run.run_id, run.url, viewports=viewports)
     else:
-        run_orchestrator.execute_run(run.run_id, run.url)
+        run_orchestrator.execute_run(run.run_id, run.url, viewports=viewports)
 
     try:
         return run_store.get(clean_id) or run
@@ -167,7 +189,122 @@ def execute_run_pipeline(
         return run
 
 
+@router.get(
+    "/runs/export/csv",
+    status_code=status.HTTP_200_OK,
+    summary="Export inspection run history as CSV",
+    description="Generates a downloadable CSV containing all historical runs and severity breakdowns.",
+    responses={
+        200: {"description": "Inspection history CSV file"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def export_history_csv_endpoint(
+    status_filter: Optional[str] = None,
+    limit: int = 1000,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> Response:
+    """Export complete or status-filtered inspection history as CSV."""
+    from backend.app.services.export_service import generate_history_csv
+    from datetime import datetime, timezone
 
+    try:
+        user_id = current_user.id if isinstance(current_user, UserModel) else None
+        runs = run_store.list_runs_for_user(user_id=user_id, include_guest=(user_id is None))
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query runs for CSV export: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+    if status_filter and status_filter.strip().upper() != "ALL":
+        target_s = status_filter.strip().lower()
+        runs = [r for r in runs if (r.status or "").lower() == target_s]
+
+    if limit > 0:
+        runs = runs[:limit]
+
+    findings_map: dict[str, list[FindingResponse]] = {}
+    for r in runs:
+        try:
+            f = run_store.get_findings(r.run_id)
+            if f:
+                findings_map[r.run_id] = f
+        except Exception:
+            findings_map[r.run_id] = []
+
+    csv_data = generate_history_csv(runs, findings_map)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"omnisight_history_{ts}.csv"
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "text/csv; charset=utf-8",
+        },
+    )
+
+
+@router.get(
+    "/runs/export/pdf",
+    status_code=status.HTTP_200_OK,
+    summary="Export inspection history audit summary as PDF",
+    description="Generates a downloadable executive audit summary PDF for all historical runs.",
+    responses={
+        200: {"description": "Inspection history summary PDF file"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def export_history_pdf_endpoint(
+    status_filter: Optional[str] = None,
+    limit: int = 1000,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> Response:
+    """Export complete or status-filtered inspection history summary as PDF."""
+    from backend.app.services.export_service import generate_history_pdf
+    from datetime import datetime, timezone
+
+    try:
+        user_id = current_user.id if isinstance(current_user, UserModel) else None
+        runs = run_store.list_runs_for_user(user_id=user_id, include_guest=(user_id is None))
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query runs for PDF export: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+    if status_filter and status_filter.strip().upper() != "ALL":
+        target_s = status_filter.strip().lower()
+        runs = [r for r in runs if (r.status or "").lower() == target_s]
+
+    if limit > 0:
+        runs = runs[:limit]
+
+    findings_map: dict[str, list[FindingResponse]] = {}
+    for r in runs:
+        try:
+            f = run_store.get_findings(r.run_id)
+            if f:
+                findings_map[r.run_id] = f
+        except Exception:
+            findings_map[r.run_id] = []
+
+    pdf_data = generate_history_pdf(runs, findings_map)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"omnisight_history_{ts}.pdf"
+
+    return Response(
+        content=pdf_data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/pdf",
+        },
+    )
 
 
 @router.get(
@@ -186,7 +323,10 @@ def execute_run_pipeline(
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def get_run(run_id: str) -> RunResponse:
+def get_run(
+    run_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> RunResponse:
     """Retrieve run status and metadata by run_id from PostgreSQL."""
     clean_id = _validate_run_id(run_id)
     try:
@@ -204,7 +344,133 @@ def get_run(run_id: str) -> RunResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
         )
+    check_run_access(run, current_user)
     return run
+
+
+@router.get(
+    "/runs/{run_id}/export/csv",
+    status_code=status.HTTP_200_OK,
+    summary="Export detailed individual inspection run data as CSV",
+    description="Generates a downloadable CSV containing run metadata, defect findings, and repair proposals.",
+    responses={
+        200: {"description": "Detailed inspection run CSV file"},
+        400: {"model": ErrorResponse, "description": "Invalid run_id format"},
+        404: {"model": ErrorResponse, "description": "Run not found"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def export_run_csv_endpoint(
+    run_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> Response:
+    """Export single run details, findings, and repair proposals as CSV."""
+    from backend.app.services.export_service import generate_run_csv
+
+    clean_id = _validate_run_id(run_id)
+    try:
+        run = run_store.get(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query run for CSV export: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_id}' not found.",
+        )
+
+    check_run_access(run, current_user)
+
+    try:
+        findings = run_store.get_findings(clean_id) or []
+    except Exception:
+        findings = []
+
+    try:
+        proposals = run_store.list_proposals(clean_id) or []
+    except Exception:
+        proposals = []
+
+    csv_data = generate_run_csv(run, findings, proposals)
+    filename = f"omnisight_run_{clean_id}.csv"
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "text/csv; charset=utf-8",
+        },
+    )
+
+
+@router.get(
+    "/runs/{run_id}/export/pdf",
+    status_code=status.HTTP_200_OK,
+    summary="Export executive individual inspection report as PDF",
+    description="Generates a downloadable executive audit PDF report with findings, screenshots, and repair decisions.",
+    responses={
+        200: {"description": "Inspection report PDF file"},
+        400: {"model": ErrorResponse, "description": "Invalid run_id format"},
+        404: {"model": ErrorResponse, "description": "Run not found"},
+        503: {"model": ErrorResponse, "description": "Database connection unavailable"},
+    },
+)
+def export_run_pdf_endpoint(
+    run_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> Response:
+    """Export executive inspection report PDF with visual evidence and repair decisions."""
+    from backend.app.services.export_service import generate_run_pdf
+
+    clean_id = _validate_run_id(run_id)
+    try:
+        run = run_store.get(clean_id)
+    except DatabaseConnectionError as exc:
+        logger.error("Failed to query run for PDF export: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable. Please check database connection.",
+        ) from exc
+
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_id}' not found.",
+        )
+
+    check_run_access(run, current_user)
+
+    try:
+        findings = run_store.get_findings(clean_id) or []
+    except Exception:
+        findings = []
+
+    try:
+        proposals = run_store.list_proposals(clean_id) or []
+    except Exception:
+        proposals = []
+
+    try:
+        artifacts = run_store.get_artifacts(clean_id) or []
+    except Exception:
+        artifacts = []
+
+    pdf_data = generate_run_pdf(run, findings, proposals, artifacts)
+    filename = f"omnisight_report_{clean_id}.pdf"
+
+    return Response(
+        content=pdf_data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/pdf",
+        },
+    )
 
 
 @router.get(
@@ -224,10 +490,23 @@ def get_run(run_id: str) -> RunResponse:
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingResponse]:
+def get_run_findings(
+    run_id: str,
+    include_mock: bool = False,
+    viewport: Optional[str] = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> list[FindingResponse]:
     """Retrieve structured defect findings by run_id from PostgreSQL."""
     clean_id = _validate_run_id(run_id)
     try:
+        run = run_store.get(clean_id)
+        if not run:
+            logger.warning("Findings lookup failed: run_id '%s' not found.", clean_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run '{clean_id}' not found.",
+            )
+        check_run_access(run, current_user)
         findings = run_store.get_findings(clean_id)
     except DatabaseConnectionError as exc:
         logger.error("Failed to query findings in database: %s", str(exc))
@@ -244,7 +523,15 @@ def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingRes
         )
     if include_mock and not findings:
         from backend.app.services.run_store import create_mock_findings
-        return create_mock_findings(clean_id)
+        findings = create_mock_findings(clean_id)
+
+    if viewport:
+        target_vp = viewport.strip().lower()
+        findings = [
+            f for f in findings
+            if (getattr(f, "viewport", None) or "desktop").lower() == target_vp
+        ]
+
     return findings
 
 
@@ -264,10 +551,21 @@ def get_run_findings(run_id: str, include_mock: bool = False) -> list[FindingRes
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def get_run_artifacts(run_id: str) -> list[ArtifactResponse]:
+def get_run_artifacts(
+    run_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> list[ArtifactResponse]:
     """Retrieve recorded artifact metadata for a run."""
     clean_id = _validate_run_id(run_id)
     try:
+        run = run_store.get(clean_id)
+        if not run:
+            logger.warning("Artifacts lookup failed: run_id '%s' not found.", clean_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run '{clean_id}' not found.",
+            )
+        check_run_access(run, current_user)
         artifacts = run_store.get_artifacts(clean_id)
     except DatabaseConnectionError as exc:
         logger.error("Failed to query artifacts in database: %s", str(exc))
@@ -305,6 +603,7 @@ def repair_run_findings(
     finding_id: Optional[str] = None,
     verify_live: bool = False,
     payload: Optional[RepairRequest] = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> list[RepairResult]:
     """Execute autonomous locator repair for findings associated with run_id."""
     clean_id = _validate_run_id(run_id)
@@ -315,6 +614,7 @@ def repair_run_findings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
         )
+    check_run_access(run, current_user)
 
     findings = run_store.get_findings(clean_id) or []
 
@@ -374,9 +674,10 @@ def repair_run_findings(
 def get_run_repairs(
     run_id: str,
     finding_id: Optional[str] = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> list[RepairResult]:
     """Retrieve repair results for run_id."""
-    return repair_run_findings(run_id=run_id, finding_id=finding_id, payload=None)
+    return repair_run_findings(run_id=run_id, finding_id=finding_id, payload=None, current_user=current_user)
 
 
 # =============================================================================
@@ -428,6 +729,7 @@ def get_github_configuration() -> dict[str, Any]:
 async def create_or_generate_run_proposals(
     run_id: str,
     request: Request,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ):
     clean_id = _validate_run_id(run_id)
     run = run_store.get(clean_id)
@@ -436,6 +738,7 @@ async def create_or_generate_run_proposals(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
         )
+    check_run_access(run, current_user)
 
     body = {}
     try:
@@ -498,6 +801,7 @@ async def create_or_generate_run_proposals(
 def get_run_proposals(
     run_id: str,
     finding_id: Optional[str] = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ):
     clean_id = _validate_run_id(run_id)
     run = run_store.get(clean_id)
@@ -506,6 +810,7 @@ def get_run_proposals(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Run '{clean_id}' not found.",
         )
+    check_run_access(run, current_user)
 
     # 1. Database-backed proposals (Day 4/5 Human-in-the-Loop)
     db_proposals = run_store.list_proposals(clean_id, finding_id=finding_id)
@@ -557,9 +862,18 @@ def generate_proposal_patch_endpoint(
     run_id: str,
     proposal_id: str,
     payload: PatchGenerateRequest,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> PatchResult:
     """Generate a safe minimal diff for an approved proposal against a target file."""
     clean_id = _validate_run_id(run_id)
+    run = run_store.get(clean_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_id}' not found.",
+        )
+    check_run_access(run, current_user)
+
     proposal = run_store.get_proposal(clean_id, proposal_id)
     if not proposal:
         raise HTTPException(
@@ -597,9 +911,18 @@ def submit_proposal_pr_endpoint(
     run_id: str,
     proposal_id: str,
     payload: PullRequestSubmitRequest,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> PullRequestResult:
     """Submit an approved proposal to GitHub with an explicit human approval gate."""
     clean_id = _validate_run_id(run_id)
+    run = run_store.get(clean_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_id}' not found.",
+        )
+    check_run_access(run, current_user)
+
     proposal = run_store.get_proposal(clean_id, proposal_id)
     if not proposal:
         raise HTTPException(

@@ -35,6 +35,11 @@ class RunCreateRequest(BaseModel):
         description="Target web page URL to inspect",
         examples=["http://127.0.0.1:8000/"],
     )
+    viewports: list[Literal["desktop", "tablet", "mobile"]] = Field(
+        default_factory=lambda: ["desktop"],
+        description="Target viewports to inspect ('desktop', 'tablet', 'mobile')",
+        examples=[["desktop"], ["desktop", "mobile"], ["desktop", "tablet", "mobile"]],
+    )
 
 
 
@@ -46,10 +51,19 @@ class RunResponse(BaseModel):
         description="Unique identifier for the run",
         examples=["run_a1b2c3d4"],
     )
+    user_id: str | None = Field(
+        default=None,
+        description="Owner user ID if created by an authenticated user",
+    )
     url: str = Field(
         ...,
         description="Target web page URL being inspected",
         examples=["http://127.0.0.1:8000/"],
+    )
+    viewports: list[str] = Field(
+        default_factory=lambda: ["desktop"],
+        description="List of viewports inspected in this run",
+        examples=[["desktop"]],
     )
     status: Literal[
         "queued",

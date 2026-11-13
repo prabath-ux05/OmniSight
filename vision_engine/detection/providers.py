@@ -43,7 +43,7 @@ class VLMConfig:
 
     provider: str = "gemini"
     api_key: str | None = None
-    model: str = "gemini-1.5-flash"
+    model: str = "gemini-3.5-flash-lite"
     timeout_seconds: float = 30.0
     max_dom_chars: int = 15000
     base_url: str | None = None
@@ -76,7 +76,7 @@ class VLMConfig:
             # Default to gemini
             provider = "gemini"
             api_key = os.getenv("GEMINI_API_KEY")
-            model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+            model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
             base_url = os.getenv("GEMINI_BASE_URL")
 
         return cls(
@@ -331,7 +331,7 @@ def check_vlm_configuration(provider_name: str | None = None) -> dict[str, Any]:
         elif target_provider == "gemini":
             api_key = os.getenv("GEMINI_API_KEY")
             cfg.api_key = api_key.strip() if api_key else None
-            cfg.model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash").strip()
+            cfg.model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 
     key_present = bool(cfg.api_key and cfg.api_key.strip())
     masked_key = (

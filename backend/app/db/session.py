@@ -36,6 +36,7 @@ def create_app_engine(database_url: str):
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
+        connect_args={"connect_timeout": 3},
     )
 
 
@@ -60,6 +61,30 @@ def init_db(bind_engine=None, force: bool = False) -> None:
 
     target = bind_engine or engine
     Base.metadata.create_all(bind=target)
+
+    # Lightweight auto-migration: ensure findings.viewport and runs.user_id columns exist on existing databases
+    try:
+        with target.connect() as conn:
+            url_str = str(target.url)
+            if url_str.startswith("sqlite"):
+                tables = [r[0] for r in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]
+                if "findings" in tables:
+                    cols = [row[1] for row in conn.execute(text("PRAGMA table_info(findings)")).fetchall()]
+                    if "viewport" not in cols:
+                        conn.execute(text("ALTER TABLE findings ADD COLUMN viewport VARCHAR(32) DEFAULT 'desktop'"))
+                        conn.commit()
+                if "runs" in tables:
+                    cols = [row[1] for row in conn.execute(text("PRAGMA table_info(runs)")).fetchall()]
+                    if "user_id" not in cols:
+                        conn.execute(text("ALTER TABLE runs ADD COLUMN user_id VARCHAR(36)"))
+                        conn.commit()
+            elif url_str.startswith(("postgresql", "postgres")):
+                conn.execute(text("ALTER TABLE findings ADD COLUMN IF NOT EXISTS viewport VARCHAR(32) DEFAULT 'desktop'"))
+                conn.execute(text("ALTER TABLE runs ADD COLUMN IF NOT EXISTS user_id VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL"))
+                conn.commit()
+    except Exception as mig_err:
+        logger.debug("Database schema auto-migration check: %s", str(mig_err))
+
     logger.info("Initialized database tables on engine: %s", target.url)
 
 

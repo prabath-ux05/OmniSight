@@ -120,6 +120,32 @@ function parseApiErrorDetail(errorData, fallbackMessage) {
 }
 
 /**
+ * Extracts the Double-Submit CSRF cookie value ('omnisight_csrf') from document.cookie.
+ *
+ * @returns {string} Raw CSRF token string or empty string if not found or in non-browser environment.
+ */
+export function getCsrfToken() {
+  if (typeof document === 'undefined' || !document.cookie) return '';
+  const match = document.cookie.match(/(?:^|;\s*)omnisight_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+/**
+ * Merges standard auth and CSRF headers onto caller-supplied request headers.
+ *
+ * @param {Record<string, string>} [customHeaders={}]
+ * @returns {Record<string, string>}
+ */
+export function buildAuthHeaders(customHeaders = {}) {
+  const headers = { ...customHeaders };
+  const csrf = getCsrfToken();
+  if (csrf && !headers['X-CSRF-Token']) {
+    headers['X-CSRF-Token'] = csrf;
+  }
+  return headers;
+}
+
+/**
  * Check backend health status (GET /health)
  */
 export async function fetchHealth() {
@@ -151,9 +177,10 @@ export async function fetchHealth() {
  *
  * @param {string} targetUrl - Target web page URL to inspect
  * @param {boolean} autoExecute - Whether to automatically schedule browser and vision execution
+ * @param {string[]} viewports - List of viewports ('desktop', 'tablet', 'mobile')
  * @returns {Promise<{ ok: boolean, data?: object, error?: string, status?: number, isNetworkError?: boolean }>}
  */
-export async function createInspectionRun(targetUrl, autoExecute = true) {
+export async function createInspectionRun(targetUrl, autoExecute = true, viewports = ['desktop']) {
   const cleanUrl = (targetUrl || '').trim();
   if (!cleanUrl) {
     return { ok: false, error: 'Target website URL is required.' };
@@ -162,14 +189,20 @@ export async function createInspectionRun(targetUrl, autoExecute = true) {
   const query = autoExecute ? '?auto_execute=true' : '';
   const endpoint = `${API_BASE_URL}/api/v1/runs${query}`;
 
+  const payload = { url: cleanUrl };
+  if (Array.isArray(viewports) && viewports.length > 0) {
+    payload.viewports = viewports;
+  }
+
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: {
+      credentials: 'include',
+      headers: buildAuthHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json',
-      },
-      body: JSON.stringify({ url: cleanUrl }),
+      }),
+      body: JSON.stringify(payload),
     });
 
     if (res.status === 201) {
@@ -211,7 +244,8 @@ export async function executeRunPipeline(runId) {
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { Accept: 'application/json' },
+      credentials: 'include',
+      headers: buildAuthHeaders({ Accept: 'application/json' }),
     });
 
     if (res.ok) {
@@ -246,6 +280,26 @@ export function getArtifactUrl(runId, filename) {
 }
 
 /**
+ * Returns the accessible HTTP URL for a specific viewport and stage screenshot.
+ *
+ * @param {string} runId
+ * @param {string} viewport - 'desktop' | 'tablet' | 'mobile'
+ * @param {string} stage - 'before' | 'after'
+ * @returns {string} Accessible screenshot URL
+ */
+export function getViewportScreenshotUrl(runId, viewport = 'desktop', stage = 'before') {
+  if (!runId) return '';
+  const cleanRun = encodeURIComponent(runId.trim());
+  const vp = (viewport || 'desktop').toLowerCase();
+  const stg = stage && stage.toLowerCase() === 'after' ? 'after' : 'before';
+  const params = new URLSearchParams();
+  if (vp !== 'desktop') params.set('viewport', vp);
+  if (stg !== 'before') params.set('stage', stg);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  return `${API_BASE_URL}/api/v1/artifacts/${cleanRun}/screenshot${qs}`;
+}
+
+/**
  * Retrieve status and metadata for a run (GET /api/v1/runs/{run_id})
  */
 export async function fetchRun(runId) {
@@ -257,6 +311,7 @@ export async function fetchRun(runId) {
 
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
 
@@ -273,6 +328,7 @@ export async function fetchRun(runId) {
       ok: false,
       error: createNetworkErrorMessage(err),
       isNetworkError: true,
+      status: 0,
     };
   }
 }
@@ -282,17 +338,22 @@ export async function fetchRun(runId) {
  *
  * @param {string} runId - Unique identifier of the run
  * @param {boolean} includeMock - Whether to request mock findings for testing
+ * @param {string|null} viewport - Optional viewport filter ('desktop', 'tablet', 'mobile')
  */
-export async function fetchRunFindings(runId, includeMock = false) {
+export async function fetchRunFindings(runId, includeMock = false, viewport = null) {
   if (!runId || !runId.trim()) {
     return { ok: false, error: 'Run ID is required.' };
   }
 
-  const query = includeMock ? '?include_mock=true' : '';
-  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/findings${query}`;
+  const params = new URLSearchParams();
+  if (includeMock) params.set('include_mock', 'true');
+  if (viewport && viewport !== 'ALL') params.set('viewport', viewport);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/findings${qs}`;
 
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
 
@@ -326,6 +387,7 @@ export async function fetchInspectionRuns() {
   const endpoint = `${API_BASE_URL}/api/v1/runs`;
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -354,6 +416,7 @@ export async function fetchRunArtifacts(runId) {
   const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/artifacts`;
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -386,6 +449,7 @@ export async function fetchRunProposals(runId, findingId = null) {
   const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals${query}`;
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -415,10 +479,11 @@ export async function createRepairProposal(runId, payload) {
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: {
+      credentials: 'include',
+      headers: buildAuthHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json',
-      },
+      }),
       body: JSON.stringify(payload),
     });
     if (res.status === 201) {
@@ -439,20 +504,26 @@ export async function createRepairProposal(runId, payload) {
 
 /**
  * Approve a repair proposal (POST /api/v1/proposals/{proposal_id}/approve)
+ * Supports revisiting an already approved proposal when options.revisit is true.
  */
-export async function approveProposal(proposalId, reviewerNotes = '') {
+export async function approveProposal(proposalId, reviewerNotes = '', options = {}) {
   if (!proposalId || !proposalId.trim()) {
     return { ok: false, error: 'Proposal ID is required.' };
   }
+  const isRevisit = Boolean(options && options.revisit);
   const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/approve`;
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: {
+      credentials: 'include',
+      headers: buildAuthHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json',
-      },
-      body: JSON.stringify({ notes: reviewerNotes || null }),
+      }),
+      body: JSON.stringify({
+        notes: reviewerNotes || null,
+        revisit: isRevisit,
+      }),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -472,20 +543,26 @@ export async function approveProposal(proposalId, reviewerNotes = '') {
 
 /**
  * Reject a repair proposal (POST /api/v1/proposals/{proposal_id}/reject)
+ * Supports revisiting an approved proposal and revoking/rejecting it when options.revisit is true.
  */
-export async function rejectProposal(proposalId, reviewerNotes = '') {
+export async function rejectProposal(proposalId, reviewerNotes = '', options = {}) {
   if (!proposalId || !proposalId.trim()) {
     return { ok: false, error: 'Proposal ID is required.' };
   }
+  const isRevisit = Boolean(options && options.revisit);
   const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/reject`;
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: {
+      credentials: 'include',
+      headers: buildAuthHeaders({
         'Content-Type': 'application/json',
         Accept: 'application/json',
-      },
-      body: JSON.stringify({ notes: reviewerNotes || null }),
+      }),
+      body: JSON.stringify({
+        notes: reviewerNotes || null,
+        revisit: isRevisit,
+      }),
     });
     if (res.ok) {
       const updated = await res.json();
@@ -493,6 +570,78 @@ export async function rejectProposal(proposalId, reviewerNotes = '') {
     }
     const errData = await res.json().catch(() => null);
     const errorMsg = parseApiErrorDetail(errData, `Failed to reject proposal '${proposalId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Retrieve Before/After visual comparison details for a proposal (GET /api/v1/runs/{run_id}/proposals/{proposal_id}/comparison)
+ */
+export async function fetchVisualComparison(runId, proposalId, viewport = 'desktop') {
+  if (!proposalId || !proposalId.trim()) {
+    return { ok: false, error: 'Proposal ID is required.' };
+  }
+  const cleanProp = encodeURIComponent(proposalId.trim());
+  const cleanVp = encodeURIComponent((viewport || 'desktop').toLowerCase());
+  const endpoint = runId
+    ? `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals/${cleanProp}/comparison?viewport=${cleanVp}`
+    : `${API_BASE_URL}/api/v1/proposals/${cleanProp}/comparison?viewport=${cleanVp}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to fetch visual comparison for proposal '${proposalId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Simulate applying a repair patch within a controlled sandbox (POST /api/v1/runs/{run_id}/proposals/{proposal_id}/simulate-repair)
+ */
+export async function simulateControlledRepair(runId, proposalId, viewport = 'desktop') {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  if (!proposalId || !proposalId.trim()) {
+    return { ok: false, error: 'Proposal ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/proposals/${encodeURIComponent(proposalId.trim())}/simulate-repair`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      body: JSON.stringify({ viewport: (viewport || 'desktop').toLowerCase() }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Controlled repair simulation failed for proposal '${proposalId}'.`);
     return { ok: false, error: errorMsg, status: res.status };
   } catch (err) {
     return {
@@ -513,6 +662,7 @@ export async function fetchProposalStatus(proposalId) {
   const endpoint = `${API_BASE_URL}/api/v1/proposals/${encodeURIComponent(proposalId.trim())}/status`;
   try {
     const res = await fetch(endpoint, {
+      credentials: 'include',
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -549,7 +699,8 @@ export async function repairRunFinding(runId, findingId = null, verifyLive = fal
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { Accept: 'application/json' },
+      credentials: 'include',
+      headers: buildAuthHeaders({ Accept: 'application/json' }),
     });
 
     if (res.ok) {
@@ -698,6 +849,413 @@ export async function submitProposalPR(runId, proposalId, options = {}) {
     }
     const errData = await res.json().catch(() => null);
     const msg = parseApiErrorDetail(errData, `Pull request creation failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Send a conversational query to the OmniSight LLM Assistant (POST /api/v1/chat)
+ *
+ * @param {Object} payload - { message, history, context }
+ */
+export async function sendChatMessage(payload) {
+  if (!payload || !payload.message || !payload.message.trim()) {
+    return { ok: false, error: 'Message cannot be empty.' };
+  }
+
+  const endpoint = `${API_BASE_URL}/api/v1/chat`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      credentials: 'include',
+      body: JSON.stringify({
+        message: payload.message.trim(),
+        history: Array.isArray(payload.history) ? payload.history : [],
+        context: payload.context || null,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(
+      errData,
+      res.status === 503
+        ? 'LLM Chat service is currently unavailable. Please verify backend API key configuration.'
+        : `Chat request failed with status ${res.status}.`
+    );
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+      status: 0,
+    };
+  }
+}
+
+/**
+ * Fetch LLM assistant configuration status (GET /api/v1/chat/status)
+ */
+export async function fetchChatStatus() {
+  const endpoint = `${API_BASE_URL}/api/v1/chat/status`;
+
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    return {
+      ok: false,
+      configured: false,
+      error: `Status query returned ${res.status}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      configured: false,
+      error: createNetworkErrorMessage(err),
+    };
+  }
+}
+
+/**
+ * Fetch live scanning preview status and telemetry for a run (GET /api/v1/runs/{run_id}/preview)
+ */
+export async function fetchPreviewStatus(runId) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const endpoint = `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/preview`;
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+    const errData = await res.json().catch(() => null);
+    const errorMsg = parseApiErrorDetail(errData, `Failed to fetch preview for run '${runId}'.`);
+    return { ok: false, error: errorMsg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+      status: 0,
+    };
+  }
+}
+
+/**
+ * Construct Server-Sent Events (SSE) streaming URL for real-time live preview
+ */
+export function getPreviewStreamUrl(runId) {
+  if (!runId || !runId.trim()) return '';
+  return `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/preview/stream`;
+}
+
+/**
+ * Construct raw preview JPEG frame endpoint URL
+ */
+export function getPreviewFrameUrl(runId) {
+  if (!runId || !runId.trim()) return '';
+  return `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/preview/frame`;
+}
+
+// =============================================================================
+// Inspection History & Run Report Export APIs (CSV & PDF)
+// =============================================================================
+
+/**
+ * Construct URL for downloading history CSV export
+ */
+export function getHistoryExportCsvUrl(statusFilter = '') {
+  const query = statusFilter && statusFilter.toUpperCase() !== 'ALL'
+    ? `?status_filter=${encodeURIComponent(statusFilter)}`
+    : '';
+  return `${API_BASE_URL}/api/v1/runs/export/csv${query}`;
+}
+
+/**
+ * Construct URL for downloading history PDF export
+ */
+export function getHistoryExportPdfUrl(statusFilter = '') {
+  const query = statusFilter && statusFilter.toUpperCase() !== 'ALL'
+    ? `?status_filter=${encodeURIComponent(statusFilter)}`
+    : '';
+  return `${API_BASE_URL}/api/v1/runs/export/pdf${query}`;
+}
+
+/**
+ * Construct URL for downloading single run CSV export
+ */
+export function getRunExportCsvUrl(runId) {
+  if (!runId || !runId.trim()) return '';
+  return `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/export/csv`;
+}
+
+/**
+ * Construct URL for downloading single run PDF report
+ */
+export function getRunExportPdfUrl(runId) {
+  if (!runId || !runId.trim()) return '';
+  return `${API_BASE_URL}/api/v1/runs/${encodeURIComponent(runId.trim())}/export/pdf`;
+}
+
+/**
+ * Download a file from an endpoint via blob URL with fallback filename
+ */
+export async function downloadExportFile(url, fallbackFilename = 'omnisight_export') {
+  if (!url) {
+    return { ok: false, error: 'Export URL is required.' };
+  }
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return { ok: false, error: `Export failed (${res.status}): ${errText || res.statusText}` };
+    }
+    const blob = await res.blob();
+    let filename = fallbackFilename;
+    const disposition = res.headers.get('content-disposition');
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+      if (match && match[1]) {
+        filename = match[1].trim();
+      }
+    }
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    }
+    return { ok: true, filename };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Download failed.' };
+  }
+}
+
+/**
+ * Triggers export of all historical runs as CSV
+ */
+export async function exportInspectionHistoryCsv(statusFilter = '') {
+  const url = getHistoryExportCsvUrl(statusFilter);
+  return downloadExportFile(url, 'omnisight_inspection_history.csv');
+}
+
+/**
+ * Triggers export of historical audit log summary as PDF
+ */
+export async function exportInspectionHistoryPdf(statusFilter = '') {
+  const url = getHistoryExportPdfUrl(statusFilter);
+  return downloadExportFile(url, 'omnisight_inspection_history.pdf');
+}
+
+/**
+ * Triggers export of single inspection run findings as CSV
+ */
+export async function exportRunReportCsv(runId) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const url = getRunExportCsvUrl(runId);
+  return downloadExportFile(url, `omnisight_run_${runId.trim()}.csv`);
+}
+
+/**
+ * Triggers export of single inspection run executive report as PDF
+ */
+export async function exportRunReportPdf(runId) {
+  if (!runId || !runId.trim()) {
+    return { ok: false, error: 'Run ID is required.' };
+  }
+  const url = getRunExportPdfUrl(runId);
+  return downloadExportFile(url, `omnisight_report_${runId.trim()}.pdf`);
+}
+
+// =============================================================================
+// User Authentication & Session Management
+// =============================================================================
+
+/**
+ * Registers a new user account with email and password.
+ * On success, backend sets HTTP-only session cookie and returns user profile.
+ *
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} params.password
+ * @param {string} [params.fullName]
+ * @returns {Promise<{ ok: boolean, data?: Object, error?: string, status?: number }>}
+ */
+export async function registerUser({ email, password, fullName }) {
+  const endpoint = `${API_BASE_URL}/api/v1/auth/register`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      body: JSON.stringify({
+        email: (email || '').trim(),
+        password,
+        full_name: (fullName || '').trim() || undefined,
+      }),
+    });
+
+    if (res.status === 201) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Registration failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Authenticates user credentials and establishes an active session.
+ *
+ * @param {Object} params
+ * @param {string} params.email
+ * @param {string} params.password
+ * @returns {Promise<{ ok: boolean, data?: Object, error?: string, status?: number }>}
+ */
+export async function loginUser({ email, password }) {
+  const endpoint = `${API_BASE_URL}/api/v1/auth/login`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      }),
+      body: JSON.stringify({
+        email: (email || '').trim(),
+        password,
+      }),
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Login failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Resolves current user profile from active session cookie.
+ * Returns { ok: false, isUnauthenticated: true } when caller has no active session.
+ *
+ * @returns {Promise<{ ok: boolean, data?: Object, error?: string, isUnauthenticated?: boolean, status?: number }>}
+ */
+export async function fetchCurrentUser() {
+  const endpoint = `${API_BASE_URL}/api/v1/auth/me`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    if (res.status === 401) {
+      return { ok: false, isUnauthenticated: true, status: 401 };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Session lookup failed (HTTP ${res.status})`);
+    return { ok: false, error: msg, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: createNetworkErrorMessage(err),
+      isNetworkError: true,
+    };
+  }
+}
+
+/**
+ * Revokes active database session and clears authentication cookies.
+ *
+ * @returns {Promise<{ ok: boolean, data?: Object, error?: string, status?: number }>}
+ */
+export async function logoutUser() {
+  const endpoint = `${API_BASE_URL}/api/v1/auth/logout`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'include',
+      headers: buildAuthHeaders({
+        Accept: 'application/json',
+      }),
+    });
+
+    if (res.status === 200) {
+      const data = await res.json();
+      return { ok: true, data };
+    }
+
+    const errData = await res.json().catch(() => null);
+    const msg = parseApiErrorDetail(errData, `Logout failed (HTTP ${res.status})`);
     return { ok: false, error: msg, status: res.status };
   } catch (err) {
     return {

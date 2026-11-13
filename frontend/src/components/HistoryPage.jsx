@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import InspectionHistoryTable from './InspectionHistoryTable';
-import { fetchRunFindings } from '../services/api';
+import {
+  fetchRunFindings,
+  exportInspectionHistoryCsv,
+  exportInspectionHistoryPdf,
+  exportRunReportCsv,
+  exportRunReportPdf,
+} from '../services/api';
 
 /**
  * HistoryPage renders the dedicated, polished OmniSight Run History & Audit view.
@@ -33,10 +39,77 @@ export default function HistoryPage({
   const [findingsErrors, setFindingsErrors] = useState({});
   const [isLoadingRunFindings, setIsLoadingRunFindings] = useState(false);
   const [copiedSelector, setCopiedSelector] = useState(null);
+  const [isExportingHistoryCsv, setIsExportingHistoryCsv] = useState(false);
+  const [isExportingHistoryPdf, setIsExportingHistoryPdf] = useState(false);
+  const [exportingRunCsvId, setExportingRunCsvId] = useState(null);
+  const [exportingRunPdfId, setExportingRunPdfId] = useState(null);
+  const [exportAlert, setExportAlert] = useState(null);
 
   const copyTimeoutRef = useRef(null);
   const pendingRequestsRef = useRef(new Set());
   const activeRequestedRunIdRef = useRef(null);
+
+  const handleExportHistoryCsv = async () => {
+    setIsExportingHistoryCsv(true);
+    setExportAlert(null);
+    try {
+      const res = await exportInspectionHistoryCsv();
+      if (!res.ok) {
+        setExportAlert({ type: 'error', message: res.error || 'Failed to export history CSV.' });
+      }
+    } catch (err) {
+      setExportAlert({ type: 'error', message: err?.message || 'Failed to export history CSV.' });
+    } finally {
+      setIsExportingHistoryCsv(false);
+    }
+  };
+
+  const handleExportHistoryPdf = async () => {
+    setIsExportingHistoryPdf(true);
+    setExportAlert(null);
+    try {
+      const res = await exportInspectionHistoryPdf();
+      if (!res.ok) {
+        setExportAlert({ type: 'error', message: res.error || 'Failed to export history PDF.' });
+      }
+    } catch (err) {
+      setExportAlert({ type: 'error', message: err?.message || 'Failed to export history PDF.' });
+    } finally {
+      setIsExportingHistoryPdf(false);
+    }
+  };
+
+  const handleExportRunCsv = async (runId) => {
+    if (!runId) return;
+    setExportingRunCsvId(runId);
+    setExportAlert(null);
+    try {
+      const res = await exportRunReportCsv(runId);
+      if (!res.ok) {
+        setExportAlert({ type: 'error', message: res.error || `Failed to export CSV for run '${runId}'.` });
+      }
+    } catch (err) {
+      setExportAlert({ type: 'error', message: err?.message || `Failed to export CSV for run '${runId}'.` });
+    } finally {
+      setExportingRunCsvId(null);
+    }
+  };
+
+  const handleExportRunPdf = async (runId) => {
+    if (!runId) return;
+    setExportingRunPdfId(runId);
+    setExportAlert(null);
+    try {
+      const res = await exportRunReportPdf(runId);
+      if (!res.ok) {
+        setExportAlert({ type: 'error', message: res.error || `Failed to export PDF report for run '${runId}'.` });
+      }
+    } catch (err) {
+      setExportAlert({ type: 'error', message: err?.message || `Failed to export PDF report for run '${runId}'.` });
+    } finally {
+      setExportingRunPdfId(null);
+    }
+  };
 
   // Clean up any pending copy selector timeout on unmount
   useEffect(() => {
@@ -266,6 +339,28 @@ export default function HistoryPage({
           <div className="history-hero-actions">
             <button
               type="button"
+              className="export-action-btn export-action-btn-pdf"
+              onClick={handleExportHistoryPdf}
+              disabled={isExportingHistoryPdf}
+              title="Export complete inspection history audit summary as PDF"
+            >
+              {isExportingHistoryPdf ? (
+                <><span className="spinner-xs" /> Generating…</>
+              ) : '📄 Export PDF'}
+            </button>
+            <button
+              type="button"
+              className="export-action-btn export-action-btn-csv"
+              onClick={handleExportHistoryCsv}
+              disabled={isExportingHistoryCsv}
+              title="Export complete inspection history as CSV"
+            >
+              {isExportingHistoryCsv ? (
+                <><span className="spinner-xs" /> Exporting…</>
+              ) : '📊 Export CSV'}
+            </button>
+            <button
+              type="button"
               className="btn btn-primary btn-sm"
               onClick={() => onSelectView('inspection')}
             >
@@ -350,6 +445,25 @@ export default function HistoryPage({
         );
       })()}
 
+      {/* Export notification / error alert */}
+      {exportAlert && (
+        <div
+          className={`alert-box ${exportAlert.type === 'error' ? 'alert-error' : 'alert-success'}`}
+          role="alert"
+          style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <span>{exportAlert.message}</span>
+          <button
+            type="button"
+            className="btn-copy-sm"
+            onClick={() => setExportAlert(null)}
+            title="Dismiss notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* 3. Reused InspectionHistoryTable Component */}
       <InspectionHistoryTable
         runs={runs}
@@ -361,6 +475,13 @@ export default function HistoryPage({
         findingsMap={findingsCache}
         onLoadRunFindings={loadFindingsForRun}
         onInspectInStudio={handleInspectInStudio}
+        onExportHistoryCsv={handleExportHistoryCsv}
+        onExportHistoryPdf={handleExportHistoryPdf}
+        onExportRunCsv={handleExportRunCsv}
+        onExportRunPdf={handleExportRunPdf}
+        isExportingCsv={isExportingHistoryCsv}
+        isExportingPdf={isExportingHistoryPdf}
+        exportingRunId={exportingRunCsvId || exportingRunPdfId}
       />
 
       {/* 4. Selected Historical Run Audit Inspector Panel */}
@@ -393,6 +514,28 @@ export default function HistoryPage({
             </div>
 
             <div className="inspector-header-actions">
+              <button
+                type="button"
+                className="export-action-btn export-action-btn-pdf"
+                onClick={() => handleExportRunPdf(selectedHistoricalRun.run_id)}
+                disabled={exportingRunPdfId === selectedHistoricalRun.run_id}
+                title="Download executive PDF report for this run"
+              >
+                {exportingRunPdfId === selectedHistoricalRun.run_id ? (
+                  <><span className="spinner-xs" /> Generating…</>
+                ) : '📄 Export PDF'}
+              </button>
+              <button
+                type="button"
+                className="export-action-btn export-action-btn-csv"
+                onClick={() => handleExportRunCsv(selectedHistoricalRun.run_id)}
+                disabled={exportingRunCsvId === selectedHistoricalRun.run_id}
+                title="Download detailed CSV data for this run"
+              >
+                {exportingRunCsvId === selectedHistoricalRun.run_id ? (
+                  <><span className="spinner-xs" /> Exporting…</>
+                ) : '📊 Export CSV'}
+              </button>
               <button
                 type="button"
                 className="btn btn-primary btn-sm"

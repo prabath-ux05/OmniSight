@@ -1,10 +1,27 @@
 import React, { useState } from 'react';
 import { DEMO_STATES, constructDemoUrl, DEFAULT_DEMO_BASE_URL } from '../services/api';
 
+const VIEWPORT_OPTIONS = [
+  { id: 'desktop', label: '🖥️ Desktop', desc: '1280x800 Chromium Desktop' },
+  { id: 'tablet', label: '📱 Tablet', desc: '768x1024 iPad Touch Emulation' },
+  { id: 'mobile', label: '📲 Mobile', desc: '375x667 iPhone Touch Emulation' },
+];
+
 export default function InspectionForm({ onSubmit, isLoading }) {
   const [url, setUrl] = useState(() => constructDemoUrl('', 'clean'));
   const [selectedDemoState, setSelectedDemoState] = useState('clean');
+  const [selectedViewports, setSelectedViewports] = useState(['desktop']);
   const [validationError, setValidationError] = useState('');
+
+  const toggleViewport = (vpId) => {
+    setSelectedViewports((prev) => {
+      if (prev.includes(vpId)) {
+        if (prev.length <= 1) return prev; // At least one viewport must stay active
+        return prev.filter((id) => id !== vpId);
+      }
+      return [...prev, vpId];
+    });
+  };
 
   const handleSelectDemoState = (stateId) => {
     setSelectedDemoState(stateId);
@@ -24,8 +41,12 @@ export default function InspectionForm({ onSubmit, isLoading }) {
       setValidationError('URL must start with http:// or https://');
       return;
     }
+    if (!selectedViewports || selectedViewports.length === 0) {
+      setValidationError('Please select at least one viewport to inspect.');
+      return;
+    }
     setValidationError('');
-    onSubmit(trimmed);
+    onSubmit(trimmed, selectedViewports);
   };
 
   const handlePreset = (presetUrl) => {
@@ -39,7 +60,7 @@ export default function InspectionForm({ onSubmit, isLoading }) {
       <div className="card-header">
         <h2 className="card-title">Initiate Website Inspection</h2>
         <p className="card-description">
-          Select a target demo inspection state or enter a custom URL to dispatch an automated inspection through the OmniSight pipeline.
+          Select target demo inspection state and viewports, or enter a custom URL to dispatch an automated inspection through the OmniSight pipeline.
         </p>
       </div>
 
@@ -61,6 +82,31 @@ export default function InspectionForm({ onSubmit, isLoading }) {
                 title={ds.description}
               >
                 {ds.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="viewport-selector-group">
+        <div className="viewport-header">
+          <span className="viewport-label">Target Viewports:</span>
+          <span className="viewport-hint">Playwright device &amp; touch emulation (multi-select)</span>
+        </div>
+        <div className="viewport-pills">
+          {VIEWPORT_OPTIONS.map((vp) => {
+            const isSelected = selectedViewports.includes(vp.id);
+            return (
+              <button
+                key={vp.id}
+                type="button"
+                className={`btn btn-sm ${isSelected ? 'btn-viewport-active' : 'btn-secondary'}`}
+                onClick={() => toggleViewport(vp.id)}
+                disabled={isLoading}
+                title={vp.desc}
+                aria-pressed={isSelected}
+              >
+                {vp.label} {isSelected && '✓'}
               </button>
             );
           })}

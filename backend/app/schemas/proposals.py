@@ -38,6 +38,10 @@ class ProposalDecisionRequest(BaseModel):
         description="Optional reviewer notes or rationale for the approval/rejection decision",
         examples=["Approved after reviewing affected layout responsiveness."],
     )
+    revisit: bool = Field(
+        default=False,
+        description="Explicit flag allowing an already approved proposal decision to be revisited",
+    )
 
 
 class RepairProposalResponse(BaseModel):
@@ -95,6 +99,14 @@ class RepairProposalResponse(BaseModel):
         default=None,
         description="ISO-8601 UTC timestamp of last status change or review decision",
     )
+    reviewer_notes: str | None = Field(
+        default=None,
+        description="Reviewer notes or rationale recorded with approval or rejection decision",
+    )
+    can_revisit: bool = Field(
+        default=False,
+        description="Whether this decision can be revisited (approved proposals can be revisited; rejected cannot)",
+    )
 
 
 class ProposalStatusResponse(BaseModel):
@@ -107,3 +119,39 @@ class ProposalStatusResponse(BaseModel):
     verification_status: str = Field(..., description="Verification status ('unverified', 'verified_success', 'verified_failure', 'inconclusive')")
     github_pr_url: str | None = Field(default=None, description="GitHub pull request URL if created")
     updated_at: str | None = Field(default=None, description="ISO-8601 UTC timestamp of last update")
+
+
+class VisualComparisonResponse(BaseModel):
+    """Structured before-and-after visual comparison and repair audit details."""
+
+    run_id: str = Field(..., description="Inspection run identifier")
+    proposal_id: str = Field(..., description="Associated repair proposal identifier")
+    finding_id: str | None = Field(default=None, description="Linked defect finding identifier")
+    viewport: str = Field(default="desktop", description="Active comparison viewport ('desktop', 'tablet', 'mobile')")
+    before_screenshot_url: str = Field(..., description="Accessible URL for the original immutable defect screenshot")
+    after_screenshot_url: str | None = Field(default=None, description="Accessible URL for the repaired screenshot in controlled sandbox")
+    before_exists: bool = Field(default=True, description="Whether original before screenshot exists on disk")
+    after_exists: bool = Field(default=False, description="Whether simulated after screenshot exists on disk")
+    controlled_environment: str = Field(
+        default="Isolated Headless Sandbox (Local DOM Replay, Network Blocked)",
+        description="Description of the controlled sandbox environment",
+    )
+    target_live_website_modified: bool = Field(
+        default=False,
+        description="Explicit guarantee that the live external target website was NOT modified",
+    )
+    approval_status: str = Field(default="pending", description="Current review status ('pending', 'approved', 'rejected')")
+    execution_status: str = Field(default="unapplied", description="Patch execution status")
+    verification_status: str = Field(default="unverified", description="Post-repair verification status")
+    decision_timestamp: str | None = Field(default=None, description="Timestamp of reviewer decision")
+    reviewer_notes: str | None = Field(default=None, description="Reviewer justification or notes")
+    proposed_change: str = Field(..., description="Proposed CSS diff, DOM patch, or locator fix")
+    finding_summary: dict | None = Field(default=None, description="Associated defect finding details (category, severity, selector)")
+    diff_summary: str | None = Field(default=None, description="Summary of visual and structural differences")
+    can_revisit: bool = Field(default=False, description="Whether the decision can be revisited")
+
+
+class SimulateRepairRequest(BaseModel):
+    """Payload to simulate applying a repair in a controlled environment."""
+
+    viewport: str = Field(default="desktop", description="Target viewport to render ('desktop', 'tablet', 'mobile')")

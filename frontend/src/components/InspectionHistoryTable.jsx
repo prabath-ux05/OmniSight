@@ -14,6 +14,13 @@ export default function InspectionHistoryTable({
   findingsMap = null,
   onLoadRunFindings = null,
   onInspectInStudio = null,
+  onExportHistoryCsv = null,
+  onExportHistoryPdf = null,
+  onExportRunCsv = null,
+  onExportRunPdf = null,
+  isExportingCsv = false,
+  isExportingPdf = false,
+  exportingRunId = null,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -216,15 +223,39 @@ export default function InspectionHistoryTable({
             Complete historical audit log retrieved from PostgreSQL (<code>GET /api/v1/runs</code>).
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={onRefresh}
-          disabled={isLoading}
-          title="Refresh run history from backend"
-        >
-          {isLoading ? 'Refreshing...' : '↻ Refresh History'}
-        </button>
+        <div className="history-header-actions">
+          {onExportHistoryPdf && (
+            <button
+              type="button"
+              className="export-action-btn export-action-btn-pdf"
+              onClick={onExportHistoryPdf}
+              disabled={isExportingPdf}
+              title="Export complete inspection history summary as PDF"
+            >
+              {isExportingPdf ? '⏳ Generating…' : '📄 History PDF'}
+            </button>
+          )}
+          {onExportHistoryCsv && (
+            <button
+              type="button"
+              className="export-action-btn export-action-btn-csv"
+              onClick={onExportHistoryCsv}
+              disabled={isExportingCsv}
+              title="Export complete inspection history as CSV"
+            >
+              {isExportingCsv ? '⏳ Exporting…' : '📊 History CSV'}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={onRefresh}
+            disabled={isLoading}
+            title="Refresh run history from backend"
+          >
+            {isLoading ? 'Refreshing...' : '↻ Refresh History'}
+          </button>
+        </div>
       </div>
 
       {/* Enhanced Filter / Search Toolbar */}
@@ -383,6 +414,7 @@ export default function InspectionHistoryTable({
                 <th>Run ID</th>
                 <th>Target URL</th>
                 <th>Status</th>
+                <th>Viewports</th>
                 <th>Created At</th>
                 <th>Duration</th>
                 {findingsMap && <th>Findings</th>}
@@ -435,6 +467,29 @@ export default function InspectionHistoryTable({
                         </span>
                       )}
                     </td>
+                    <td>
+                      {/* Viewport pills for this run */}
+                      {(() => {
+                        const vps = Array.isArray(run.viewports) && run.viewports.length > 0
+                          ? run.viewports
+                          : run.viewport ? [run.viewport] : [];
+                        if (vps.length === 0) return <span className="text-muted" style={{ fontSize: '0.75rem' }}>—</span>;
+                        const icons = { desktop: '🖥️', tablet: '📱', mobile: '📲' };
+                        return (
+                          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                            {vps.map((vp) => (
+                              <span
+                                key={vp}
+                                className={`run-viewport-pill run-viewport-pill-${vp.toLowerCase()}`}
+                                title={`${vp} viewport`}
+                              >
+                                {icons[vp.toLowerCase()] || '🖥️'}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="timestamp-cell">
                       {formatTimestamp(run.created_at)}
                     </td>
@@ -476,6 +531,34 @@ export default function InspectionHistoryTable({
                             title="Open this run in the Live Inspection Studio"
                           >
                             Studio →
+                          </button>
+                        )}
+                        {onExportRunPdf && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs btn-export-row"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onExportRunPdf(run.run_id);
+                            }}
+                            disabled={exportingRunId === run.run_id}
+                            title={`Download PDF report for run ${run.run_id}`}
+                          >
+                            {exportingRunId === run.run_id ? '...' : '📄 PDF'}
+                          </button>
+                        )}
+                        {onExportRunCsv && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-xs btn-export-row"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onExportRunCsv(run.run_id);
+                            }}
+                            disabled={exportingRunId === run.run_id}
+                            title={`Download CSV for run ${run.run_id}`}
+                          >
+                            {exportingRunId === run.run_id ? '...' : '📊 CSV'}
                           </button>
                         )}
                       </div>

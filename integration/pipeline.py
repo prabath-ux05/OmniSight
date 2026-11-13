@@ -364,6 +364,7 @@ def execute_inspection_flow(
     navigator: Optional[Any] = None,
     detector: Optional[Callable[[Any], list[Any]]] = None,
     run_id: Optional[str] = None,
+    viewport: Optional[str] = None,
     metadata: Optional[dict[str, Any]] = None,
 ) -> PipelineResult:
     """Execute the end-to-end multimodal inspection flow.
@@ -425,7 +426,10 @@ def execute_inspection_flow(
         navigator = BrowserNavigator(timeout_ms=int(req.timeout * 1000))
 
     try:
-        nav_result = navigator.navigate(url=target_url, run_id=actual_run_id)
+        try:
+            nav_result = navigator.navigate(url=target_url, run_id=actual_run_id, viewport=viewport)
+        except TypeError:
+            nav_result = navigator.navigate(url=target_url, run_id=actual_run_id)
     except Exception as exc:
         failed_meta = dict(metadata or {})
         err_msg = str(exc).strip() or f"{exc.__class__.__name__}: browser navigation failed"
@@ -481,17 +485,32 @@ def execute_inspection_flow(
 
         # Step 4: Map Vision Engine findings to structured shared InspectionFindings
         findings = [vision_finding_to_inspection_finding(vf) for vf in raw_vision_findings]
+        vp_name = getattr(nav_result, "viewport_name", None) or viewport or "desktop"
+        for f in findings:
+            f.metadata["viewport"] = vp_name
+            if "evidence" not in f.metadata or not f.metadata["evidence"]:
+                f.metadata["evidence"] = {
+                    "screenshot_path": screenshot_path,
+                    "dom_snapshot_path": dom_snapshot_path,
+                }
+            else:
+                if not f.metadata["evidence"].get("screenshot_path") and screenshot_path:
+                    f.metadata["evidence"]["screenshot_path"] = screenshot_path
+                if not f.metadata["evidence"].get("dom_snapshot_path") and dom_snapshot_path:
+                    f.metadata["evidence"]["dom_snapshot_path"] = dom_snapshot_path
     except Exception as exc:
         failed_meta = dict(metadata or {})
         err_msg = str(exc).strip() or f"{exc.__class__.__name__}: vision detection failed"
         failed_meta.update({"error": err_msg, "run_id": actual_run_id, "url": target_url})
         return PipelineResult(request=req, success=False, metadata=failed_meta)
 
+    vp_name = getattr(nav_result, "viewport_name", None) or viewport or "desktop"
     run_meta = {
         "run_id": actual_run_id,
         "page_title": getattr(nav_result, "page_title", ""),
         "captured_at": getattr(nav_result, "captured_at", ""),
         "viewport": getattr(nav_result, "viewport", {}),
+        "viewport_name": vp_name,
         "screenshot_path": screenshot_path,
         "dom_snapshot_path": dom_snapshot_path,
         "console_errors": getattr(nav_result, "console_errors", []) or [],

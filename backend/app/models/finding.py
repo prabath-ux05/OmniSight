@@ -20,6 +20,7 @@ class FindingModel(Base):
     screenshot_path = Column(Text, nullable=True)
     dom_snapshot_path = Column(Text, nullable=True)
     source = Column(String(32), nullable=False, default="mock")
+    viewport = Column(String(32), nullable=True, default="desktop", index=True)
     created_at = Column(String(64), nullable=False)
 
     # Relationships

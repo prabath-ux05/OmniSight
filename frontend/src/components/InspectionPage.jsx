@@ -1,6 +1,7 @@
 import React from 'react';
 import InspectionForm from './InspectionForm';
 import RunStatusCard from './RunStatusCard';
+import LiveScanningPreview from './LiveScanningPreview';
 import FindingsSection from './FindingsSection';
 import EvidenceSection from './EvidenceSection';
 
@@ -50,6 +51,28 @@ export default function InspectionPage({
   const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
   const isTerminal = Boolean(currentRun && TERMINAL_STATUSES.includes(normalizedStatus));
   const isActive = Boolean(currentRun && !isTerminal && normalizedStatus);
+
+  // Collect viewports from the active run
+  const activeViewports = (() => {
+    if (!currentRun) return [];
+    if (Array.isArray(currentRun.viewports) && currentRun.viewports.length > 0) return currentRun.viewports;
+    if (currentRun.viewport) return [currentRun.viewport];
+    return [];
+  })();
+
+  const viewportLabels = { desktop: '🖥️ Desktop', tablet: '📱 Tablet', mobile: '📲 Mobile' };
+
+  const getScanningStatusLabel = (status) => {
+    switch (status) {
+      case 'queued': return 'Pipeline queued — waiting to execute';
+      case 'capturing': return 'Live browser capturing screenshots across viewports';
+      case 'analyzing': return 'Vision Engine analyzing captured screenshots';
+      case 'repair_pending': return 'Repair candidates awaiting review';
+      case 'repairing': return 'Generating self-healing locator candidates';
+      case 'verifying': return 'Verifying repaired locators on live page';
+      default: return `Inspection in progress (${status})`;
+    }
+  };
 
   return (
     <div className="inspection-studio-container">
@@ -122,6 +145,30 @@ export default function InspectionPage({
         />
       </section>
 
+      {/* 2b. Active Scanning Status Strip (shown only during active runs) */}
+      {isActive && (
+        <div className="scanning-status-strip" aria-live="polite" aria-label="Scanning status">
+          <span className="scanning-status-icon">
+            <span className="polling-pulse-dot" aria-hidden="true" />
+          </span>
+          <span className="scanning-status-text">
+            {getScanningStatusLabel(normalizedStatus)}
+          </span>
+          {activeViewports.length > 0 && (
+            <div className="scanning-viewport-badges">
+              {activeViewports.map((vp) => (
+                <span key={vp} className="badge-viewport-scanning">
+                  {viewportLabels[vp.toLowerCase()] || vp}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="scanning-progress-bar-wrapper" style={{ width: '100%' }}>
+            <div className="scanning-progress-bar-fill" />
+          </div>
+        </div>
+      )}
+
       {/* 3. Run Status & Execution Lifecycle Card (Reusing RunStatusCard) */}
       <section className="inspection-status-wrapper" aria-label="Run Status Card">
         <RunStatusCard
@@ -136,7 +183,16 @@ export default function InspectionPage({
         />
       </section>
 
-      {/* 4. Split Grid: Filterable Findings & Evidence Preview */}
+      {/* 4. Real-time Live Website Scanning & Visual Studio Preview */}
+      <section className="live-preview-wrapper" aria-label="Live Website Scanning Preview">
+        <LiveScanningPreview
+          run={currentRun}
+          selectedFindingId={selectedFinding?.finding_id}
+          onSelectFinding={onSelectFinding}
+        />
+      </section>
+
+      {/* 5. Split Grid: Filterable Findings & Evidence Preview */}
       <div className="dashboard-split-grid inspection-split-grid" aria-label="Findings and Evidence Split View">
         <FindingsSection
           findings={findings}

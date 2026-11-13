@@ -4,7 +4,7 @@ Provides optional and required current-user resolution, database session managem
 secure cookie assignment/clearing, and CSRF/origin validation.
 """
 
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 import secrets
 
@@ -68,6 +68,35 @@ def get_current_user_required(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
+
+
+def check_run_access(run: Any, current_user: Optional[UserModel]) -> None:
+    """Validate that current_user has access to the specified run.
+
+    Access Rules:
+    1. If run has no user_id (user_id is None): It is a guest/public run, accessible to anyone.
+    2. If run has user_id:
+       - If current_user is None: Unauthenticated caller cannot access private runs -> HTTP 401 Unauthorized.
+       - If current_user.id != run.user_id: Caller is a different user -> HTTP 403 Forbidden.
+       - If current_user.id == run.user_id: Access granted.
+    """
+    if not run:
+        return
+    owner_id = getattr(run, "user_id", None)
+    if not owner_id:
+        return
+    user = current_user if isinstance(current_user, UserModel) else None
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to access private inspection data.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.id != owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to private inspection data.",
+        )
 
 
 def set_auth_cookies(response: Response, session_token: str, csrf_token: str) -> None:

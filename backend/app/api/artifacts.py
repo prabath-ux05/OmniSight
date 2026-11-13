@@ -2,11 +2,15 @@
 
 import os
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, status
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
+from backend.app.api.deps import check_run_access, get_current_user_optional
 from backend.app.core.logging import logger
+from backend.app.models.user import UserModel
 from backend.app.schemas.artifacts import ArtifactResponse
 from backend.app.schemas.errors import ErrorResponse
+from backend.app.services.run_store import run_store
 
 router = APIRouter(prefix="/api/v1/artifacts", tags=["Artifacts"])
 
@@ -39,52 +43,87 @@ def _sanitize_path_component(component: str, name: str = "identifier") -> str:
 @router.get(
     "/{run_id}/screenshot",
     summary="Serve inspection run screenshot",
-    description="Streams the captured visual screenshot for an inspection run.",
+    description="Streams the captured visual screenshot for an inspection run. Supports optional ?viewport= filtering.",
     responses={
         200: {"description": "Screenshot image successfully streamed"},
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "Screenshot not found for run"},
     },
 )
-def get_run_screenshot(run_id: str):
-    """Serve the primary screenshot artifact for a specific run."""
+def get_run_screenshot(
+    run_id: str,
+    viewport: str | None = None,
+    stage: str = "before",
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+):
+    """Serve the primary, viewport-specific, or stage-specific ('before' / 'after') screenshot artifact."""
     clean_id = _sanitize_path_component(run_id, "run_id")
-    target_file = (ARTIFACTS_ROOT / clean_id / "before.png").resolve()
+    run = run_store.get(clean_id)
+    if run:
+        check_run_access(run, current_user)
+
+    clean_stage = "after" if stage and stage.lower() == "after" else "before"
+
+    if viewport:
+        clean_vp = _sanitize_path_component(viewport.lower(), "viewport")
+        vp_target = (ARTIFACTS_ROOT / clean_id / f"{clean_stage}_{clean_vp}.png").resolve()
+        if vp_target.is_file() and str(vp_target).startswith(str(ARTIFACTS_ROOT)):
+            return FileResponse(vp_target, media_type="image/png")
+
+    target_file = (ARTIFACTS_ROOT / clean_id / f"{clean_stage}.png").resolve()
 
     if target_file.is_file() and str(target_file).startswith(str(ARTIFACTS_ROOT)):
         return FileResponse(target_file, media_type="image/png")
 
-    from backend.app.services.run_store import run_store
-    art = run_store.get_artifact_by_type(clean_id, "screenshot")
+    art_type = f"screenshot_{clean_stage}_{viewport.lower()}" if viewport else f"screenshot_{clean_stage}"
+    art = (
+        run_store.get_artifact_by_type(clean_id, art_type)
+        or run_store.get_artifact_by_type(clean_id, f"screenshot_{clean_stage}")
+        or (run_store.get_artifact_by_type(clean_id, "screenshot") if clean_stage == "before" else None)
+    )
     if art and Path(art.storage_path).is_file():
         return FileResponse(Path(art.storage_path).resolve(), media_type="image/png")
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Screenshot artifact for run '{clean_id}' not found.",
+        detail=f"{clean_stage.capitalize()} screenshot artifact for run '{clean_id}' not found.",
     )
 
 
 @router.get(
     "/{run_id}/dom",
     summary="Serve inspection run DOM snapshot",
-    description="Streams the saved DOM HTML snapshot for an inspection run.",
+    description="Streams the saved DOM HTML snapshot for an inspection run. Supports optional ?viewport= filtering.",
     responses={
         200: {"description": "DOM HTML snapshot successfully streamed"},
         400: {"model": ErrorResponse, "description": "Invalid run_id format"},
         404: {"model": ErrorResponse, "description": "DOM snapshot not found for run"},
     },
 )
-def get_run_dom(run_id: str):
-    """Serve the primary DOM snapshot artifact for a specific run."""
+def get_run_dom(
+    run_id: str,
+    viewport: str | None = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+):
+    """Serve the primary or viewport-specific DOM snapshot artifact for a specific run."""
     clean_id = _sanitize_path_component(run_id, "run_id")
+    run = run_store.get(clean_id)
+    if run:
+        check_run_access(run, current_user)
+
+    if viewport:
+        clean_vp = _sanitize_path_component(viewport.lower(), "viewport")
+        vp_target = (ARTIFACTS_ROOT / clean_id / f"dom_{clean_vp}.html").resolve()
+        if vp_target.is_file() and str(vp_target).startswith(str(ARTIFACTS_ROOT)):
+            return FileResponse(vp_target, media_type="text/html")
+
     target_file = (ARTIFACTS_ROOT / clean_id / "dom.html").resolve()
 
     if target_file.is_file() and str(target_file).startswith(str(ARTIFACTS_ROOT)):
         return FileResponse(target_file, media_type="text/html")
 
-    from backend.app.services.run_store import run_store
-    art = run_store.get_artifact_by_type(clean_id, "dom_snapshot")
+    art_type = f"dom_snapshot_{viewport.lower()}" if viewport else "dom_snapshot"
+    art = run_store.get_artifact_by_type(clean_id, art_type) or run_store.get_artifact_by_type(clean_id, "dom_snapshot")
     if art and Path(art.storage_path).is_file():
         return FileResponse(Path(art.storage_path).resolve(), media_type="text/html")
 
@@ -107,10 +146,18 @@ def get_run_dom(run_id: str):
         404: {"model": ErrorResponse, "description": "Artifact file not found on disk"},
     },
 )
-def get_artifact(run_id: str, filename: str):
+def get_artifact(
+    run_id: str,
+    filename: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+):
     """Serve a screenshot or DOM artifact file for a specific run."""
     clean_run_id = _sanitize_path_component(run_id, "run_id")
     clean_filename = _sanitize_path_component(filename, "filename")
+
+    run = run_store.get(clean_run_id)
+    if run:
+        check_run_access(run, current_user)
 
     target_file = (ARTIFACTS_ROOT / clean_run_id / clean_filename).resolve()
 

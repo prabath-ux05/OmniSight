@@ -20,6 +20,7 @@ export default function FindingsSection({
 }) {
   const [severityFilter, setSeverityFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [viewportFilter, setViewportFilter] = useState('ALL');
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'category' | 'severity'
 
   const getSeverityBadgeClass = (severity) => {
@@ -69,7 +70,18 @@ export default function FindingsSection({
     return counts;
   }, [findings, isArray]);
 
-  // Filter findings by active category and severity filters
+  // Count findings by viewport
+  const viewportCounts = useMemo(() => {
+    const counts = { desktop: 0, tablet: 0, mobile: 0 };
+    if (!isArray) return counts;
+    findings.forEach((f) => {
+      const vp = (f.viewport || 'desktop').toLowerCase();
+      if (counts[vp] !== undefined) counts[vp]++;
+    });
+    return counts;
+  }, [findings, isArray]);
+
+  // Filter findings by active category, severity, and viewport filters
   const filteredFindings = useMemo(() => {
     if (!isArray) return [];
     return findings.filter((item) => {
@@ -77,9 +89,11 @@ export default function FindingsSection({
         severityFilter === 'ALL' || item.severity?.toLowerCase() === severityFilter.toLowerCase();
       const matchCategory =
         categoryFilter === 'ALL' || item.category === categoryFilter;
-      return matchSeverity && matchCategory;
+      const matchViewport =
+        viewportFilter === 'ALL' || (item.viewport || 'desktop').toLowerCase() === viewportFilter.toLowerCase();
+      return matchSeverity && matchCategory && matchViewport;
     });
-  }, [findings, isArray, severityFilter, categoryFilter]);
+  }, [findings, isArray, severityFilter, categoryFilter, viewportFilter]);
 
   // Group filtered findings when groupBy is active
   const groupedFindings = useMemo(() => {
@@ -123,6 +137,11 @@ export default function FindingsSection({
             <span className="badge badge-category">
               {getCategoryLabel(item.category)}
             </span>
+            {item.viewport && (
+              <span className={`badge badge-viewport badge-viewport-${item.viewport.toLowerCase()}`}>
+                {item.viewport === 'mobile' ? '📲 Mobile' : item.viewport === 'tablet' ? '📱 Tablet' : '🖥️ Desktop'}
+              </span>
+            )}
             {isEligibleForRepair && (
               findingRepair?.repaired ? (
                 <span className="badge badge-repair-success" title="Verified alternative locator found in DOM">
@@ -149,8 +168,8 @@ export default function FindingsSection({
           </div>
 
           {hasConfidence && (
-            <span className="finding-confidence">
-              Confidence: {Math.round(item.confidence * 100)}%
+            <span className="finding-confidence" title="Detection confidence score">
+              {Math.round(item.confidence * 100)}% confidence
             </span>
           )}
         </div>
@@ -161,6 +180,14 @@ export default function FindingsSection({
             <div className="finding-selector-container">
               <span className="selector-label">DOM Selector:</span>
               <code className="finding-selector">{item.selector}</code>
+            </div>
+          )}
+          {hasConfidence && (
+            <div className="finding-confidence-bar-wrapper" title={`Confidence: ${Math.round(item.confidence * 100)}%`}>
+              <div
+                className="finding-confidence-bar-fill"
+                style={{ width: `${Math.round(item.confidence * 100)}%` }}
+              />
             </div>
           )}
         </div>
@@ -401,6 +428,47 @@ export default function FindingsSection({
                 </div>
               </div>
 
+              {/* Viewport Filter Pills */}
+              <div className="filter-group">
+                <span className="filter-label">Viewport:</span>
+                <div className="filter-pills-row">
+                  <button
+                    type="button"
+                    className={`btn-filter-pill ${viewportFilter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setViewportFilter('ALL')}
+                  >
+                    All ({count})
+                  </button>
+                  {viewportCounts.desktop > 0 && (
+                    <button
+                      type="button"
+                      className={`btn-filter-pill pill-viewport-desktop ${viewportFilter === 'desktop' ? 'active' : ''}`}
+                      onClick={() => setViewportFilter(viewportFilter === 'desktop' ? 'ALL' : 'desktop')}
+                    >
+                      🖥️ Desktop ({viewportCounts.desktop})
+                    </button>
+                  )}
+                  {viewportCounts.tablet > 0 && (
+                    <button
+                      type="button"
+                      className={`btn-filter-pill pill-viewport-tablet ${viewportFilter === 'tablet' ? 'active' : ''}`}
+                      onClick={() => setViewportFilter(viewportFilter === 'tablet' ? 'ALL' : 'tablet')}
+                    >
+                      📱 Tablet ({viewportCounts.tablet})
+                    </button>
+                  )}
+                  {viewportCounts.mobile > 0 && (
+                    <button
+                      type="button"
+                      className={`btn-filter-pill pill-viewport-mobile ${viewportFilter === 'mobile' ? 'active' : ''}`}
+                      onClick={() => setViewportFilter(viewportFilter === 'mobile' ? 'ALL' : 'mobile')}
+                    >
+                      📲 Mobile ({viewportCounts.mobile})
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="filter-group-right">
                 {/* Category Dropdown */}
                 {availableCategories.length > 1 && (
@@ -438,13 +506,14 @@ export default function FindingsSection({
                 </div>
 
                 {/* Reset Filters */}
-                {(severityFilter !== 'ALL' || categoryFilter !== 'ALL') && (
+                {(severityFilter !== 'ALL' || categoryFilter !== 'ALL' || viewportFilter !== 'ALL') && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-xs btn-reset-filters"
                     onClick={() => {
                       setSeverityFilter('ALL');
                       setCategoryFilter('ALL');
+                      setViewportFilter('ALL');
                     }}
                   >
                     Reset Filters
@@ -459,7 +528,7 @@ export default function FindingsSection({
             <div className="empty-state empty-state-filtered">
               <p className="empty-state-title">No Findings Match Active Filters</p>
               <p className="empty-state-text">
-                No defects matched severity: <code>{severityFilter}</code> and category: <code>{categoryFilter}</code>.
+                No defects matched severity: <code>{severityFilter}</code>, category: <code>{categoryFilter}</code>, viewport: <code>{viewportFilter}</code>.
               </p>
               <button
                 type="button"
@@ -467,6 +536,7 @@ export default function FindingsSection({
                 onClick={() => {
                   setSeverityFilter('ALL');
                   setCategoryFilter('ALL');
+                  setViewportFilter('ALL');
                 }}
               >
                 Clear Active Filters

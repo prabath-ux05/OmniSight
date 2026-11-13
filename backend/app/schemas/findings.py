@@ -65,3 +65,7 @@ class FindingResponse(BaseModel):
         default="mock",
         description="Indicates whether the finding was mock-generated or from a real VLM",
     )
+    viewport: Literal["desktop", "tablet", "mobile"] | str = Field(
+        default="desktop",
+        description="Viewport/device emulation mode where the finding was detected ('desktop', 'tablet', 'mobile')",
+    )

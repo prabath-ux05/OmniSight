@@ -30,6 +30,7 @@ class UserModel(Base):
     # Relationships
     sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
     oauth_accounts = relationship("OAuthAccountModel", back_populates="user", cascade="all, delete-orphan")
+    runs = relationship("RunModel", back_populates="user")
 
     @validates("email")
     def validate_and_normalize_email(self, key, address):

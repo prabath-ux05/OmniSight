@@ -88,6 +88,36 @@ export default function RunStatusCard({
 
   const duration = run ? calculateDuration(run.created_at, run.completed_at) : null;
 
+  // Human-friendly active scan label derived from real run.status
+  const getActiveScanLabel = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'queued':
+        return 'Pipeline queued — waiting to start...';
+      case 'capturing':
+        return 'Capturing screenshots across selected viewports…';
+      case 'analyzing':
+        return 'Vision Engine analyzing screenshots for defects…';
+      case 'repair_pending':
+        return 'Repair candidates pending review…';
+      case 'repairing':
+        return 'Generating self-healing locator candidates…';
+      case 'verifying':
+        return 'Verifying repaired locators against live page…';
+      default:
+        return `Inspection in progress (${status})…`;
+    }
+  };
+
+  // Extract viewport list from run metadata if present
+  const runViewports = (() => {
+    if (!run) return [];
+    if (Array.isArray(run.viewports) && run.viewports.length > 0) return run.viewports;
+    if (run.viewport) return [run.viewport];
+    return [];
+  })();
+
+  const viewportIcons = { desktop: '🖥️', tablet: '📱', mobile: '📲' };
+
   return (
     <section className="card run-status-section">
       <div className="card-header-with-actions">
@@ -151,31 +181,62 @@ export default function RunStatusCard({
 
       {/* Distinction: Active Run vs Completed/Historical Run */}
       {run && (
-        <div className="run-mode-banner">
-          <div className="run-mode-left">
-            {isActiveRun ? (
-              <span className="badge badge-active-run">
-                <span className="polling-pulse-dot" aria-hidden="true"></span>
-                ACTIVE RUN IN PROGRESS
-              </span>
-            ) : run.status === 'completed' ? (
-              <span className="badge badge-completed-run">
-                ✓ HISTORICAL AUDIT (COMPLETED)
-              </span>
-            ) : (
-              <span className="badge badge-terminal-run">
-                ✕ TERMINAL RUN ({run.status.toUpperCase()})
+        <>
+          <div className="run-mode-banner">
+            <div className="run-mode-left">
+              {isActiveRun ? (
+                <span className="badge badge-active-run">
+                  <span className="polling-pulse-dot" aria-hidden="true"></span>
+                  ACTIVE RUN IN PROGRESS
+                </span>
+              ) : run.status === 'completed' ? (
+                <span className="badge badge-completed-run">
+                  ✓ HISTORICAL AUDIT (COMPLETED)
+                </span>
+              ) : (
+                <span className="badge badge-terminal-run">
+                  ✕ TERMINAL RUN ({run.status.toUpperCase()})
+                </span>
+              )}
+              <span className="run-id-highlight"><code>{run.run_id}</code></span>
+            </div>
+
+            {duration && (
+              <span className="run-duration-pill" title="Execution duration between created_at and completed_at">
+                ⏱ Execution Time: {duration}
               </span>
             )}
-            <span className="run-id-highlight"><code>{run.run_id}</code></span>
           </div>
 
-          {duration && (
-            <span className="run-duration-pill" title="Execution duration between created_at and completed_at">
-              ⏱ Execution Time: {duration}
-            </span>
+          {/* Viewport pills — shown when run has viewport metadata */}
+          {runViewports.length > 0 && (
+            <div className="run-viewport-pills">
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', fontWeight: 500 }}>Viewports:</span>
+              {runViewports.map((vp) => (
+                <span
+                  key={vp}
+                  className={`run-viewport-pill run-viewport-pill-${vp.toLowerCase()}`}
+                  title={`${vp} viewport inspected`}
+                >
+                  {viewportIcons[vp.toLowerCase()] || '🖥️'} {vp.charAt(0).toUpperCase() + vp.slice(1)}
+                </span>
+              ))}
+            </div>
           )}
-        </div>
+
+          {/* Active scanning status label with animated bar */}
+          {isActiveRun && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <div className="active-scan-label">
+                <span className="polling-pulse-dot" aria-hidden="true" />
+                {getActiveScanLabel(run.status)}
+              </div>
+              <div className="scanning-progress-bar-wrapper" style={{ marginTop: '0.5rem' }}>
+                <div className="scanning-progress-bar-fill" />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Pipeline Stages Progress Tracker (Derived strictly from real run.status) */}

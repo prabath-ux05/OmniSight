@@ -1,17 +1,23 @@
 """API endpoints managing self-healing repair proposals and review lifecycles."""
 
+from typing import Optional
 from urllib.parse import unquote
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from backend.app.api.deps import check_run_access, get_current_user_optional
 from backend.app.core.logging import logger
 from backend.app.db.session import DatabaseConnectionError
+from backend.app.models.user import UserModel
 from backend.app.schemas.errors import ErrorResponse
 from backend.app.schemas.proposals import (
     ProposalDecisionRequest,
     ProposalStatusResponse,
     RepairProposalCreateRequest,
     RepairProposalResponse,
+    SimulateRepairRequest,
+    VisualComparisonResponse,
 )
 from backend.app.services.run_store import ProposalConflictError, run_store
+from backend.app.services.visual_repair_simulator import visual_repair_simulator
 
 router = APIRouter(prefix="/api/v1", tags=["Repair Proposals"])
 
@@ -51,9 +57,17 @@ def _validate_identifier(identifier: str, name: str = "identifier") -> str:
 def create_repair_proposal(
     run_id: str,
     payload: RepairProposalCreateRequest,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> RepairProposalResponse:
     """Create a new repair proposal for an existing inspection run."""
     clean_run_id = _validate_identifier(run_id, "run_id")
+    run = run_store.get(clean_run_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_run_id}' not found.",
+        )
+    check_run_access(run, current_user)
     try:
         proposal = run_store.create_proposal(clean_run_id, payload)
         return proposal
@@ -89,9 +103,17 @@ def create_repair_proposal(
 def list_run_proposals(
     run_id: str,
     finding_id: str | None = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> list[RepairProposalResponse]:
     """Retrieve all repair proposals for a run."""
     clean_run_id = _validate_identifier(run_id, "run_id")
+    run = run_store.get(clean_run_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_run_id}' not found.",
+        )
+    check_run_access(run, current_user)
     try:
         proposals = run_store.list_proposals(clean_run_id, finding_id=finding_id)
     except DatabaseConnectionError as exc:
@@ -122,7 +144,10 @@ def list_run_proposals(
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def get_repair_proposal(proposal_id: str) -> RepairProposalResponse:
+def get_repair_proposal(
+    proposal_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> RepairProposalResponse:
     """Retrieve a repair proposal by proposal_id."""
     clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
     try:
@@ -139,6 +164,9 @@ def get_repair_proposal(proposal_id: str) -> RepairProposalResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repair proposal '{clean_prop_id}' not found.",
         )
+    run = run_store.get(proposal.run_id)
+    if run:
+        check_run_access(run, current_user)
     return proposal
 
 
@@ -163,13 +191,28 @@ def get_repair_proposal(proposal_id: str) -> RepairProposalResponse:
 def approve_repair_proposal(
     proposal_id: str,
     payload: ProposalDecisionRequest = None,
+    revisit: bool = False,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> RepairProposalResponse:
-    """Approve a repair proposal."""
+    """Approve a repair proposal. Supports revisiting an already approved proposal when revisit=True."""
     clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
     notes = payload.notes if payload else None
+    is_revisit = (payload.revisit if payload else False) or revisit
+
+    proposal = run_store.get_proposal(clean_prop_id)
+    if not proposal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repair proposal '{clean_prop_id}' not found.",
+        )
+    run = run_store.get(proposal.run_id)
+    if run:
+        check_run_access(run, current_user)
 
     try:
-        updated = run_store.update_proposal_approval(clean_prop_id, "approved", notes=notes)
+        updated = run_store.update_proposal_approval(
+            clean_prop_id, "approved", notes=notes, revisit=is_revisit
+        )
     except ProposalConflictError as conf_err:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -197,7 +240,8 @@ def approve_repair_proposal(
     summary="Reject a repair proposal",
     description=(
         "Records a rejection decision for a pending repair proposal. "
-        "Guards against duplicate rejections and conflicting state transitions."
+        "Allows revisiting an approved proposal and revoking/rejecting it when revisit=True. "
+        "Ensures rejected proposals strictly remain rejected."
     ),
     responses={
         200: {"model": RepairProposalResponse, "description": "Proposal successfully rejected"},
@@ -210,13 +254,28 @@ def approve_repair_proposal(
 def reject_repair_proposal(
     proposal_id: str,
     payload: ProposalDecisionRequest = None,
+    revisit: bool = False,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
 ) -> RepairProposalResponse:
-    """Reject a repair proposal."""
+    """Reject a repair proposal. Supports revisiting an approved proposal when revisit=True."""
     clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
     notes = payload.notes if payload else None
+    is_revisit = (payload.revisit if payload else False) or revisit
+
+    proposal = run_store.get_proposal(clean_prop_id)
+    if not proposal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repair proposal '{clean_prop_id}' not found.",
+        )
+    run = run_store.get(proposal.run_id)
+    if run:
+        check_run_access(run, current_user)
 
     try:
-        updated = run_store.update_proposal_approval(clean_prop_id, "rejected", notes=notes)
+        updated = run_store.update_proposal_approval(
+            clean_prop_id, "rejected", notes=notes, revisit=is_revisit
+        )
     except ProposalConflictError as conf_err:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -250,7 +309,10 @@ def reject_repair_proposal(
         503: {"model": ErrorResponse, "description": "Database connection unavailable"},
     },
 )
-def get_proposal_status(proposal_id: str) -> ProposalStatusResponse:
+def get_proposal_status(
+    proposal_id: str,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> ProposalStatusResponse:
     """Retrieve the current approval and execution status of a repair proposal."""
     clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
     try:
@@ -267,6 +329,9 @@ def get_proposal_status(proposal_id: str) -> ProposalStatusResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Repair proposal '{clean_prop_id}' not found.",
         )
+    run = run_store.get(proposal.run_id)
+    if run:
+        check_run_access(run, current_user)
 
     return ProposalStatusResponse(
         proposal_id=proposal.proposal_id,
@@ -277,3 +342,133 @@ def get_proposal_status(proposal_id: str) -> ProposalStatusResponse:
         github_pr_url=proposal.github_pr_url,
         updated_at=proposal.updated_at,
     )
+
+
+@router.get(
+    "/runs/{run_id}/proposals/{proposal_id}/comparison",
+    response_model=VisualComparisonResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Before/After visual comparison details for a proposal",
+    description=(
+        "Retrieves the original defect screenshot ('before') and proposed repaired screenshot ('after') "
+        "along with linked finding evidence, proposal metadata, and governance decision status."
+    ),
+    responses={
+        200: {"model": VisualComparisonResponse, "description": "Comparison details retrieved"},
+        400: {"model": ErrorResponse, "description": "Invalid run_id or proposal_id"},
+        404: {"model": ErrorResponse, "description": "Run or proposal not found"},
+    },
+)
+def get_visual_comparison(
+    run_id: str,
+    proposal_id: str,
+    viewport: str = "desktop",
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> VisualComparisonResponse:
+    """Retrieve before/after visual comparison details for a run finding and repair proposal."""
+    clean_run_id = _validate_identifier(run_id, "run_id")
+    clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
+
+    run = run_store.get(clean_run_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_run_id}' not found.",
+        )
+    check_run_access(run, current_user)
+
+    try:
+        comparison = visual_repair_simulator.get_comparison(
+            clean_run_id, clean_prop_id, viewport=viewport
+        )
+        return comparison
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(val_err),
+        ) from val_err
+    except Exception as exc:
+        logger.error("Failed to fetch visual comparison: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate visual comparison: {str(exc)}",
+        ) from exc
+
+
+@router.get(
+    "/proposals/{proposal_id}/comparison",
+    response_model=VisualComparisonResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get Before/After visual comparison by proposal ID",
+    description="Retrieves visual comparison details directly using proposal_id.",
+)
+def get_proposal_visual_comparison(
+    proposal_id: str,
+    viewport: str = "desktop",
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> VisualComparisonResponse:
+    """Retrieve visual comparison details directly by proposal ID."""
+    clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
+    proposal = run_store.get_proposal(clean_prop_id)
+    if not proposal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{clean_prop_id}' not found.",
+        )
+    run = run_store.get(proposal.run_id)
+    if run:
+        check_run_access(run, current_user)
+    return get_visual_comparison(proposal.run_id, clean_prop_id, viewport=viewport, current_user=current_user)
+
+
+@router.post(
+    "/runs/{run_id}/proposals/{proposal_id}/simulate-repair",
+    response_model=VisualComparisonResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Simulate repair patch in a controlled sandbox",
+    description=(
+        "Applies the proposed repair patch exclusively in a controlled local sandbox. "
+        "Strictly guarantees the external target website is NEVER modified. "
+        "Preserves original before.png evidence immutably and captures after_{viewport}.png."
+    ),
+    responses={
+        200: {"model": VisualComparisonResponse, "description": "Repair simulated successfully"},
+        400: {"model": ErrorResponse, "description": "Invalid run_id or proposal_id"},
+        404: {"model": ErrorResponse, "description": "Run or proposal not found"},
+    },
+)
+def simulate_repair(
+    run_id: str,
+    proposal_id: str,
+    payload: SimulateRepairRequest = None,
+    current_user: Optional[UserModel] = Depends(get_current_user_optional),
+) -> VisualComparisonResponse:
+    """Simulate applying proposed repair within a controlled, network-isolated sandbox."""
+    clean_run_id = _validate_identifier(run_id, "run_id")
+    clean_prop_id = _validate_identifier(proposal_id, "proposal_id")
+    viewport = payload.viewport if payload else "desktop"
+
+    run = run_store.get(clean_run_id)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{clean_run_id}' not found.",
+        )
+    check_run_access(run, current_user)
+
+    try:
+        comparison = visual_repair_simulator.simulate_controlled_repair(
+            clean_run_id, clean_prop_id, viewport=viewport
+        )
+        return comparison
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(val_err),
+        ) from val_err
+    except Exception as exc:
+        logger.error("Failed to simulate controlled repair: %s", str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Controlled repair simulation failed: {str(exc)}",
+        ) from exc

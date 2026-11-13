@@ -118,7 +118,7 @@ The Vision Engine implements three complementary detection strategies:
 
 When configured with API credentials, `detect_vlm()` sends the screenshot and DOM context to an LLM provider:
 - **`GeminiVLMProvider`:**
-  - Reads `GEMINI_API_KEY`. Defaults to model `gemini-1.5-flash`.
+  - Reads `GEMINI_API_KEY`. Defaults to model `gemini-3.5-flash-lite`.
   - Base64-encodes the screenshot PNG and submits it via Google's `v1beta:generateContent` endpoint using `httpx`.
   - Sends a structured prompt requiring a strict JSON output matching `VLM_DEFECT_DETECTION_SCHEMA`.
 - **`OpenAIVLMProvider`:**

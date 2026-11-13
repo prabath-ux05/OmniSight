@@ -78,8 +78,9 @@ class Settings:
     @property
     def DATABASE_URL(self) -> str:
         """Return the active database connection string based on the running environment."""
-        if self.APP_ENV == "test":
-            return self.TEST_DATABASE_URL
+        active_env = os.getenv("APP_ENV", self.APP_ENV).lower()
+        if active_env == "test":
+            return os.getenv("TEST_DATABASE_URL", self.TEST_DATABASE_URL)
 
         if self._raw_database_url:
             # Normalize postgres:// to postgresql+psycopg2:// if needed

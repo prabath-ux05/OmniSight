@@ -14,6 +14,15 @@ export default function EvidenceSection({
   const [imageError, setImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [activeViewportPreview, setActiveViewportPreview] = useState(null);
+
+  React.useEffect(() => {
+    if (finding) {
+      setActiveViewportPreview(finding.viewport || 'desktop');
+      setIsImageLoading(true);
+      setImageError(false);
+    }
+  }, [finding?.finding_id, finding?.viewport]);
 
   if (!finding) {
     return (
@@ -33,6 +42,7 @@ export default function EvidenceSection({
   const evidence = finding.evidence || {};
   const isMock = finding.source === 'mock' || (finding.description && finding.description.includes('[MOCK]'));
   const isEligible = finding.category === 'missing_visible_element';
+  const effectiveViewport = activeViewportPreview || finding.viewport || 'desktop';
 
   // Calculate real HTTP-accessible artifact URLs via backend /api/v1/artifacts
   // Extract basename whether path uses forward slash or backslash (Windows)
@@ -43,7 +53,14 @@ export default function EvidenceSection({
     return name || fallback;
   };
 
-  const screenshotFilename = extractFilename(evidence.screenshot_path, 'before.png');
+  const getEffectiveScreenshotFilename = () => {
+    if (effectiveViewport === (finding.viewport || 'desktop')) {
+      return extractFilename(evidence.screenshot_path, `before_${effectiveViewport}.png`);
+    }
+    return `before_${effectiveViewport}.png`;
+  };
+
+  const screenshotFilename = getEffectiveScreenshotFilename();
   const domFilename = extractFilename(evidence.dom_snapshot_path, 'dom.html');
 
   const accessibleScreenshotUrl = (runId && screenshotFilename)
@@ -88,7 +105,12 @@ export default function EvidenceSection({
         <div>
           <h2 className="card-title">Evidence &amp; Artifact Details</h2>
           <p className="card-description">
-            Associated visual evidence for finding <code className="finding-id-highlight">{finding.finding_id}</code>.
+            Associated visual evidence for finding <code className="finding-id-highlight">{finding.finding_id}</code>
+            {finding.viewport && (
+              <> &bull; Viewport: <span className={`badge badge-viewport badge-viewport-${finding.viewport.toLowerCase()}`}>
+                {finding.viewport === 'mobile' ? '📲 Mobile (375x667)' : finding.viewport === 'tablet' ? '📱 Tablet (768x1024)' : '🖥️ Desktop (1280x800)'}
+              </span></>
+            )}
           </p>
         </div>
         {onNavigateToRepair && (
@@ -118,6 +140,32 @@ export default function EvidenceSection({
                 Open Full Size ↗
               </a>
             )}
+          </div>
+
+          {/* Viewport Preview Tabs */}
+          <div className="viewport-preview-toolbar">
+            <span className="viewport-preview-label">Preview Viewport:</span>
+            <div className="viewport-preview-tabs">
+              {[
+                { id: 'desktop', label: '🖥️ Desktop' },
+                { id: 'tablet', label: '📱 Tablet' },
+                { id: 'mobile', label: '📲 Mobile' },
+              ].map((vp) => (
+                <button
+                  key={vp.id}
+                  type="button"
+                  className={`btn-viewport-tab ${effectiveViewport === vp.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveViewportPreview(vp.id);
+                    setIsImageLoading(true);
+                    setImageError(false);
+                  }}
+                  title={`Preview ${vp.id} screenshot`}
+                >
+                  {vp.label} {finding.viewport === vp.id && '(finding)'}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="evidence-preview-box">

@@ -79,10 +79,11 @@ class ScreenshotManager:
         page,
         run_id: str,
         artifact_root: str = "artifacts",
-        stage: str = "before"
+        stage: str = "before",
+        viewport: str | None = None,
     ) -> str:
 
-        if stage not in ("before", "after"):
+        if stage not in ("before", "after") and not any(stage.startswith(s) for s in ("before", "after")):
             raise ValueError(
                 "stage must be 'before' or 'after'"
             )
@@ -93,7 +94,8 @@ class ScreenshotManager:
         )
 
         run_id = run_id.strip()
-        screenshot_path = run_dir / f"{stage}.png"
+        filename = f"{stage}_{viewport}.png" if viewport else f"{stage}.png"
+        screenshot_path = run_dir / filename
 
         # Capture full-page screenshot
         page.screenshot(
@@ -112,6 +114,12 @@ class ScreenshotManager:
                 "Screenshot file is empty"
             )
 
+        # Ensure backward-compatible stage.png exists (e.g. before.png)
+        legacy_path = run_dir / f"{stage}.png"
+        if viewport and (viewport == "desktop" or not legacy_path.is_file()):
+            import shutil
+            shutil.copyfile(screenshot_path, legacy_path)
+
         dimensions = (
             ScreenshotManager.get_screenshot_dimensions(
                 str(screenshot_path)
@@ -121,6 +129,7 @@ class ScreenshotManager:
         metadata = {
             "run_id": run_id,
             "stage": stage,
+            "viewport_name": viewport or "desktop",
             "url": page.url,
             "page_title": page.title(),
             "captured_at": datetime.now(
@@ -133,9 +142,8 @@ class ScreenshotManager:
             "viewport": page.viewport_size
         }
 
-        metadata_path = (
-            run_dir / f"{stage}_metadata.json"
-        )
+        metadata_filename = f"{stage}_{viewport}_metadata.json" if viewport else f"{stage}_metadata.json"
+        metadata_path = run_dir / metadata_filename
 
         with open(
             metadata_path,
@@ -148,5 +156,10 @@ class ScreenshotManager:
                 indent=4,
                 ensure_ascii=False
             )
+
+        legacy_meta_path = run_dir / f"{stage}_metadata.json"
+        if viewport and (viewport == "desktop" or not legacy_meta_path.is_file()):
+            import shutil
+            shutil.copyfile(metadata_path, legacy_meta_path)
 
         return str(screenshot_path)
