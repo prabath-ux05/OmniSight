@@ -9,21 +9,14 @@
 services:
   - type: web
     name: omnisight-backend
-    runtime: python
+    runtime: docker
     plan: starter
     region: oregon
     autoDeploy: true
 
-    # Build phase: install Python dependencies and Playwright Chromium with Linux libraries
-    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
-
-    # Pre-deploy phase: runs migrations once on a single container before traffic cutover
-    # Eliminates concurrent migration race conditions across multiple instances
-    preDeployCommand: alembic upgrade head
-
-    # Service execution: binds Uvicorn to all interfaces on Render's assigned $PORT
-    # --proxy-headers enables reading X-Forwarded-Proto and X-Forwarded-For from Render's edge
-    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    # Docker build configuration: uses repository root Dockerfile based on official Playwright image
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
 
     # Health check probe: Render verifies HTTP 200 before routing live traffic
     healthCheckPath: /health
@@ -31,7 +24,7 @@ services:
     # Persistent disk for inspection screenshots, DOM snapshots, and artifacts
     disk:
       name: omnisight-artifacts
-      mountPath: /opt/render/project/src/artifacts
+      mountPath: /app/artifacts
       sizeGB: 10
 
     envVars:
@@ -40,9 +33,6 @@ services:
 
       - key: APP_DEBUG
         value: "false"
-
-      - key: PYTHON_VERSION
-        value: 3.11.9
 
       # Internal PostgreSQL connection string provided by the attached Render database
       - key: DATABASE_URL
