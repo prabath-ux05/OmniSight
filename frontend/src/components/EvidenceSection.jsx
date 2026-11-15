@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { getArtifactUrl } from '../services/api';
 import RepairProposalWorkflow from './RepairProposalWorkflow';
+import DefectHighlightOverlay from './DefectHighlightOverlay';
 
 export default function EvidenceSection({
   finding,
+  allFindings = [],
+  onSelectFinding = null,
   runId,
   repair,
   isRepairing,
@@ -170,24 +173,15 @@ export default function EvidenceSection({
 
           <div className="evidence-preview-box">
             {accessibleScreenshotUrl && !imageError ? (
-              <div className="screenshot-container">
-                {isImageLoading && (
-                  <div className="screenshot-loading-spinner">
-                    <span className="spinner-sm"></span>
-                    <span>Loading screenshot artifact...</span>
-                  </div>
-                )}
-                <img
-                  src={accessibleScreenshotUrl}
-                  alt={`Screenshot artifact for run ${runId}`}
-                  className={`screenshot-img ${isImageLoading ? 'screenshot-img-hidden' : ''}`}
-                  onLoad={() => setIsImageLoading(false)}
-                  onError={() => {
-                    setIsImageLoading(false);
-                    setImageError(true);
-                  }}
-                />
-              </div>
+              <DefectHighlightOverlay
+                imageSrc={accessibleScreenshotUrl}
+                alt={`Screenshot artifact for run ${runId} - ${effectiveViewport}`}
+                findings={allFindings && allFindings.length > 0 ? allFindings : (finding ? [finding] : [])}
+                selectedFindingId={finding?.finding_id}
+                onSelectFinding={onSelectFinding}
+                viewport={effectiveViewport}
+                stage="before"
+              />
             ) : (
               <div className="screenshot-fallback-box">
                 <div className="fallback-icon">🖼️</div>

@@ -119,6 +119,14 @@ def map_inspection_finding_to_response(
     raw_source = finding.metadata.get("source", "mock")
     source = "vlm" if raw_source == "vlm" else "mock"
 
+    bounding_box = finding.metadata.get("bounding_box") or finding.metadata.get("box")
+    if not bounding_box and hasattr(finding, "bounding_box") and finding.bounding_box:
+        bounding_box = (
+            finding.bounding_box.model_dump()
+            if hasattr(finding.bounding_box, "model_dump")
+            else dict(finding.bounding_box)
+        )
+
     return FindingResponse(
         finding_id=finding_id,
         category=category,
@@ -129,6 +137,7 @@ def map_inspection_finding_to_response(
         evidence=evidence,
         source=source,
         viewport=viewport,
+        bounding_box=bounding_box,
     )
 
 
@@ -442,7 +451,7 @@ class RunOrchestrator:
                     "selector": f.selector,
                     "description": f.description,
                     "viewport": getattr(f, "viewport", "desktop") or "desktop",
-                    "box": None,
+                    "box": getattr(f, "bounding_box", None),
                 })
             preview_service.update_status(
                 run_id,

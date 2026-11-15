@@ -43,6 +43,7 @@ class DatabaseRunStore:
         self._proposals: dict[str, Any] = {}
         self._run_viewports: dict[str, list[str]] = {}
         self._proposal_notes: dict[str, str] = {}
+        self._finding_boxes: dict[str, dict] = {}
         try:
             init_db()
         except Exception as exc:
@@ -97,6 +98,7 @@ class DatabaseRunStore:
                 dom_snapshot_path=finding.dom_snapshot_path,
             ),
             source=finding.source,
+            bounding_box=self._finding_boxes.get(finding.finding_id),
         )
 
     def _model_to_artifact_response(self, art: ArtifactModel) -> ArtifactResponse:
@@ -273,6 +275,8 @@ class DatabaseRunStore:
 
                 created_at = datetime.now(timezone.utc).isoformat()
                 for item in findings:
+                    if getattr(item, "bounding_box", None):
+                        self._finding_boxes[item.finding_id] = item.bounding_box
                     model = FindingModel(
                         finding_id=item.finding_id,
                         run_id=run_id,
@@ -620,6 +624,7 @@ class DatabaseRunStore:
         self._proposals.clear()
         self._run_viewports.clear()
         self._proposal_notes.clear()
+        self._finding_boxes.clear()
         try:
             with get_db_session(self._session_factory) as db:
                 db.execute(delete(RepairProposalModel))
@@ -640,6 +645,11 @@ run_store = DatabaseRunStore()
 
 def create_mock_findings(run_id: str) -> list[FindingResponse]:
     """Generate clearly labelled mock defect findings for early milestone development."""
+    f1_box = {"x": 280, "y": 140, "width": 720, "height": 380}
+    f2_box = {"x": 320, "y": 540, "width": 460, "height": 220}
+    run_store._finding_boxes[f"defect_{run_id}_001"] = f1_box
+    run_store._finding_boxes[f"defect_{run_id}_002"] = f2_box
+
     return [
         FindingResponse(
             finding_id=f"defect_{run_id}_001",
@@ -653,6 +663,7 @@ def create_mock_findings(run_id: str) -> list[FindingResponse]:
                 dom_snapshot_path=f"artifacts/{run_id}/dom.html",
             ),
             source="mock",
+            bounding_box=f1_box,
         ),
         FindingResponse(
             finding_id=f"defect_{run_id}_002",
@@ -665,5 +676,6 @@ def create_mock_findings(run_id: str) -> list[FindingResponse]:
                 screenshot_path=f"artifacts/{run_id}/before.png",
             ),
             source="mock",
+            bounding_box=f2_box,
         ),
     ]

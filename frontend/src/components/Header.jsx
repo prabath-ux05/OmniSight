@@ -1,4 +1,5 @@
 import React from 'react';
+import { getUserInitial, getUserDisplayName } from '../utils/user';
 
 export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: '🏠', desc: 'System overview & quick actions' },
@@ -30,12 +31,9 @@ export default function Header({
   onToggleMenu = () => {},
   onCloseMenu = () => {},
 }) {
-  // Derive user initial if real authenticated session exists
-  const userInitial = user?.firstName
-    ? user.firstName.charAt(0).toUpperCase()
-    : user?.name
-    ? user.name.charAt(0).toUpperCase()
-    : null;
+  // Derive dynamic user initial and display name from profile data
+  const userInitial = getUserInitial(user);
+  const userDisplayName = getUserDisplayName(user);
 
   const isNavActive = (itemId) => {
     if (currentView === itemId) return true;
@@ -130,13 +128,13 @@ export default function Header({
               type="button"
               className="user-profile-avatar-btn"
               onClick={() => onSelectView('profile')}
-              title={`Signed in as ${user.firstName || user.name || 'User'} - Click to view Profile`}
-              aria-label={`User profile: ${user.firstName || user.name || 'User'}`}
+              title={`Signed in as ${userDisplayName} - Click to view Profile`}
+              aria-label={`User profile: ${userDisplayName}`}
             >
-              {user.avatar || user.avatarUrl || user.picture ? (
+              {user.avatar || user.avatarUrl || user.avatar_url || user.picture ? (
                 <img
-                  src={user.avatar || user.avatarUrl || user.picture}
-                  alt={user.name || user.firstName || 'User'}
+                  src={user.avatar || user.avatarUrl || user.avatar_url || user.picture}
+                  alt={userDisplayName}
                   className="user-profile-avatar-img"
                 />
               ) : (
@@ -225,13 +223,13 @@ export default function Header({
                   type="button"
                   className="drawer-profile-btn"
                   onClick={() => handleDrawerNav('profile')}
-                  title="View Profile"
-                  aria-label="View Profile"
+                  title={`View Profile: ${userDisplayName}`}
+                  aria-label={`View Profile: ${userDisplayName}`}
                 >
-                  {user.avatar || user.avatarUrl || user.picture ? (
+                  {user.avatar || user.avatarUrl || user.avatar_url || user.picture ? (
                     <img
-                      src={user.avatar || user.avatarUrl || user.picture}
-                      alt={user.name || user.firstName || 'User profile'}
+                      src={user.avatar || user.avatarUrl || user.avatar_url || user.picture}
+                      alt={userDisplayName}
                       className="drawer-profile-avatar-img"
                     />
                   ) : (
@@ -241,7 +239,7 @@ export default function Header({
                   )}
                   <div className="drawer-profile-info">
                     <span className="drawer-profile-name">
-                      {user.name || user.firstName || 'User'}
+                      {userDisplayName}
                     </span>
                     {user.email && (
                       <span className="drawer-profile-email">{user.email}</span>

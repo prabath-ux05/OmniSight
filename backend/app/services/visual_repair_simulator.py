@@ -80,6 +80,8 @@ class VisualRepairSimulator:
                     "description": matched.description,
                     "selector": matched.selector,
                     "viewport": getattr(matched, "viewport", clean_vp),
+                    "confidence": getattr(matched, "confidence", 1.0),
+                    "bounding_box": getattr(matched, "bounding_box", None),
                 }
 
         diff_summary = None

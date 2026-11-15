@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import VisualComparisonSplitView from './VisualComparisonSplitView';
+import DefectHighlightOverlay from './DefectHighlightOverlay';
 import { FindingRepairWorkflow, RunProposalsDashboard } from './RepairProposalWorkflow';
 import { fetchChatStatus, getArtifactUrl, repairRunFinding, sendChatMessage } from '../services/api';
 
@@ -885,6 +886,7 @@ export default function RepairWorkspacePage({
                       onDecisionUpdated={() => {
                         if (refreshProposals) refreshProposals();
                       }}
+                      onClose={() => setActivePreviewTab('before')}
                     />
                   ) : (
                     <div className="preview-fallback-box">
@@ -920,24 +922,18 @@ export default function RepairWorkspacePage({
 
                   <div className="preview-viewport-box">
                     {beforeScreenshotUrl && !imageError ? (
-                      <div className="preview-img-container">
-                        {isImageLoading && (
-                          <div className="screenshot-loading-spinner">
-                            <span className="spinner-sm"></span>
-                            <span>Loading viewport screenshot...</span>
-                          </div>
-                        )}
-                        <img
-                          src={beforeScreenshotUrl}
-                          alt="Before Defect Viewport"
-                          className={`preview-img ${isImageLoading ? 'preview-img-hidden' : ''}`}
-                          onLoad={() => setIsImageLoading(false)}
-                          onError={() => {
-                            setIsImageLoading(false);
-                            setImageError(true);
-                          }}
-                        />
-                      </div>
+                      <DefectHighlightOverlay
+                        imageSrc={beforeScreenshotUrl}
+                        alt="Before Defect Viewport"
+                        findings={findings}
+                        selectedFindingId={currentFinding?.finding_id}
+                        onSelectFinding={(fid) => {
+                          const target = findings.find((f) => f.finding_id === fid);
+                          if (target) onSelectFinding(target);
+                        }}
+                        viewport={effectiveViewport}
+                        stage="before"
+                      />
                     ) : (
                       <div className="preview-fallback-box">
                         <span className="fallback-icon">🖼️</span>

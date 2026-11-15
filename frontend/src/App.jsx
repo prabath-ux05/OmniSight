@@ -31,6 +31,7 @@ import {
   logoutUser,
 } from './services/api';
 import { MAX_CONSECUTIVE_POLL_ERRORS } from './utils/findingsState';
+import { getUserInitial, getUserDisplayName } from './utils/user';
 import './App.css';
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
@@ -995,19 +996,19 @@ export default function App() {
               {user ? (
                 <div className="profile-details-card">
                   <div className="profile-details-avatar-row">
-                    {user.avatar || user.avatarUrl || user.picture ? (
+                    {user.avatar || user.avatarUrl || user.avatar_url || user.picture ? (
                       <img
-                        src={user.avatar || user.avatarUrl || user.picture}
-                        alt={user.name || user.firstName || 'User'}
+                        src={user.avatar || user.avatarUrl || user.avatar_url || user.picture}
+                        alt={getUserDisplayName(user)}
                         className="profile-details-avatar-img"
                       />
                     ) : (
                       <div className="user-profile-avatar profile-large-avatar">
-                        {user.firstName?.charAt(0).toUpperCase() || user.name?.charAt(0).toUpperCase() || 'U'}
+                        {getUserInitial(user)}
                       </div>
                     )}
                     <div className="profile-details-info">
-                      <h4 className="profile-details-name">{user.name || user.firstName || 'User'}</h4>
+                      <h4 className="profile-details-name">{getUserDisplayName(user)}</h4>
                       <p className="profile-details-email">{user.email || 'No email associated'}</p>
                       <div className="profile-badge-row">
                         <span className="badge badge-success">Authenticated</span>
@@ -1021,11 +1022,11 @@ export default function App() {
                   <div className="profile-details-grid">
                     <div className="profile-detail-item">
                       <span className="profile-detail-label">Full Name</span>
-                      <span className="profile-detail-value">{user.name || user.full_name || 'Not provided'}</span>
+                      <span className="profile-detail-value">{getUserDisplayName(user)}</span>
                     </div>
                     <div className="profile-detail-item">
                       <span className="profile-detail-label">Email Address</span>
-                      <span className="profile-detail-value">{user.email}</span>
+                      <span className="profile-detail-value">{user.email || 'Not provided'}</span>
                     </div>
                     <div className="profile-detail-item">
                       <span className="profile-detail-label">Workspace Isolation</span>

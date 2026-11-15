@@ -1,6 +1,6 @@
 """Data schemas for OmniSight UI defect findings."""
 
-from typing import Literal
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -68,4 +68,8 @@ class FindingResponse(BaseModel):
     viewport: Literal["desktop", "tablet", "mobile"] | str = Field(
         default="desktop",
         description="Viewport/device emulation mode where the finding was detected ('desktop', 'tablet', 'mobile')",
+    )
+    bounding_box: dict[str, Any] | None = Field(
+        default=None,
+        description="Bounding box coordinates {x, y, width, height} of detected defect, if identified",
     )

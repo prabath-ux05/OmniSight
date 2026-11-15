@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import DefectHighlightOverlay from './DefectHighlightOverlay';
 import {
   approveProposal,
   fetchVisualComparison,
@@ -62,6 +63,25 @@ export default function VisualComparisonSplitView({
   // Dragging state for slider
   const sliderContainerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Handle Escape key to dismiss visual comparison overlay
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && onClose) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  // Handle backdrop click to close overlay (clicks inside the card are protected)
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget && onClose) {
+      onClose();
+    }
+  };
 
   // Load comparison details
   const loadComparison = useCallback(async () => {
@@ -204,14 +224,66 @@ export default function VisualComparisonSplitView({
   const afterUrl = comparisonData?.after_screenshot_url;
   const targetFinding = comparisonData?.finding_summary || finding;
 
+  // Derive verification result state across the 6 auditable lifecycle states
+  const getVerificationState = () => {
+    if (comparisonData?.verification_status === 'verified_success') {
+      return {
+        label: 'Verification Passed',
+        explanation: 'Proposed fix resolved the defect in the local controlled sandbox under identical viewport conditions. No visual regression observed.',
+        badge: 'badge-success',
+      };
+    }
+    if (comparisonData?.verification_status === 'verified_failure') {
+      return {
+        label: 'Verification Failed',
+        explanation: 'Proposed fix failed to resolve the defect during controlled sandbox re-inspection, or introduced layout errors.',
+        badge: 'badge-danger',
+      };
+    }
+    if (comparisonData?.verification_status === 'inconclusive') {
+      return {
+        label: 'Verification Inconclusive',
+        explanation: 'Simulation completed but post-repair evidence did not conclusively verify full resolution. Human review recommended.',
+        badge: 'badge-warning',
+      };
+    }
+    if (afterUrl) {
+      return {
+        label: 'Patch Applied',
+        explanation: 'Repair patch successfully injected into the local sandbox DOM. Visual capture ready for human authorization.',
+        badge: 'badge-accent',
+      };
+    }
+    if (isPending) {
+      return {
+        label: 'Awaiting Approval',
+        explanation: 'Repair patch formulated with candidate locators and CSS rules. Pending reviewer inspection and decision.',
+        badge: 'badge-warning',
+      };
+    }
+    return {
+      label: 'Patch Proposed',
+      explanation: 'Repair candidate synthesized from defect findings and DOM tree. Ready for sandbox simulation.',
+      badge: 'badge-neutral',
+    };
+  };
+
+  const verificationInfo = getVerificationState();
+
   return (
-    <div className="visual-comparison-modal-overlay">
-      <div className="visual-comparison-card card">
+    <div
+      className="visual-comparison-modal-overlay"
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="visual-comparison-title"
+    >
+      <div className="visual-comparison-card card" onClick={(e) => e.stopPropagation()}>
         {/* Header Bar */}
         <div className="visual-comparison-header">
           <div className="header-meta">
             <span className="badge badge-accent">Visual Comparison &amp; Review</span>
-            <h3 className="comparison-title">
+            <h3 id="visual-comparison-title" className="comparison-title">
               Before / After Repair Verification
               <span className="proposal-id-pill">Proposal: <code>{proposalId}</code></span>
             </h3>
@@ -227,11 +299,13 @@ export default function VisualComparisonSplitView({
             {onClose && (
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                className="visual-comparison-close-btn"
                 onClick={onClose}
-                title="Close Visual Comparison"
+                title="Close Visual Comparison (Esc)"
+                aria-label="Close Visual Comparison"
               >
-                ✕ Close
+                <span className="close-icon" aria-hidden="true">✕</span>
+                <span className="close-text">Close</span>
               </button>
             )}
           </div>
@@ -243,6 +317,53 @@ export default function VisualComparisonSplitView({
           <div className="banner-text">
             <strong>Controlled Sandbox Guarantee:</strong> OmniSight applies proposed fixes strictly within an isolated local sandbox.
             The external live target website is <strong>never modified</strong> automatically. Original screenshots are preserved immutably.
+          </div>
+        </div>
+
+        {/* Verifiable Repair Lifecycle Sequence Stepper */}
+        <div className="workflow-sequence-stepper" aria-label="Repair Verification Stages">
+          <div className="step-item step-completed">
+            <span className="step-circle">1</span>
+            <div className="step-info">
+              <span className="step-label">Original Evidence</span>
+              <span className="step-sub">{targetFinding ? `#${targetFinding.finding_id.slice(-6)}` : 'Captured'}</span>
+            </div>
+          </div>
+          <div className="step-connector"></div>
+
+          <div className="step-item step-completed">
+            <span className="step-circle">2</span>
+            <div className="step-info">
+              <span className="step-label">Repair Proposal</span>
+              <span className="step-sub">{proposalId ? String(proposalId).slice(-6) : 'Drafted'}</span>
+            </div>
+          </div>
+          <div className="step-connector"></div>
+
+          <div className={`step-item ${afterUrl ? 'step-completed' : (isSimulating ? 'step-active' : 'step-pending')}`}>
+            <span className="step-circle">3</span>
+            <div className="step-info">
+              <span className="step-label">Controlled Sandbox</span>
+              <span className="step-sub">{isSimulating ? 'Simulating…' : (afterUrl ? 'Isolated Sandbox' : 'Ready')}</span>
+            </div>
+          </div>
+          <div className="step-connector"></div>
+
+          <div className={`step-item ${afterUrl ? 'step-completed' : 'step-pending'}`}>
+            <span className="step-circle">4</span>
+            <div className="step-info">
+              <span className="step-label">After Repair Evidence</span>
+              <span className="step-sub">{afterUrl ? `${activeViewport.toUpperCase()} Captured` : 'Pending Sandbox'}</span>
+            </div>
+          </div>
+          <div className="step-connector"></div>
+
+          <div className={`step-item ${isApproved ? 'step-approved' : isRejected ? 'step-rejected' : 'step-active'}`}>
+            <span className="step-circle">5</span>
+            <div className="step-info">
+              <span className="step-label">Verification &amp; Audit</span>
+              <span className="step-sub">{approvalStatus.toUpperCase()}</span>
+            </div>
           </div>
         </div>
 
@@ -332,10 +453,14 @@ export default function VisualComparisonSplitView({
 
                   <div className="panel-image-container">
                     {beforeUrl ? (
-                      <img
-                        src={beforeUrl}
+                      <DefectHighlightOverlay
+                        imageSrc={beforeUrl}
                         alt={`Before Defect - ${activeViewport}`}
-                        className="comparison-img"
+                        findings={targetFinding ? [targetFinding] : []}
+                        selectedFindingId={targetFinding?.finding_id}
+                        viewport={activeViewport}
+                        stage="before"
+                        showLegend={false}
                       />
                     ) : (
                       <div className="panel-fallback-empty">
@@ -483,6 +608,35 @@ export default function VisualComparisonSplitView({
             )}
           </div>
         )}
+
+        {/* Verifiable Sequence Outcome & Evidence Card */}
+        <div className="verification-audit-card">
+          <div className="verification-audit-header">
+            <span className="audit-header-title">Verification Outcome &amp; Evidence</span>
+            <span className={`badge ${verificationInfo.badge}`}>
+              {verificationInfo.label}
+            </span>
+          </div>
+          <div className="verification-audit-body">
+            <p className="verification-explanation-text">
+              {verificationInfo.explanation}
+            </p>
+            <div className="verification-checklist">
+              <span className={`check-item ${beforeUrl ? 'pass' : 'fail'}`}>
+                {beforeUrl ? '✓' : '✕'} Original Defect Evidence Preserved ({activeViewport.toUpperCase()})
+              </span>
+              <span className={`check-item ${afterUrl ? 'pass' : (isSimulating ? 'pending' : 'pending')}`}>
+                {afterUrl ? '✓' : '○'} Controlled Local Sandbox Simulation
+              </span>
+              <span className="check-item pass">
+                ✓ Target Live Website Unmodified
+              </span>
+              <span className={`check-item ${isApproved ? 'pass' : isRejected ? 'fail' : 'pending'}`}>
+                {isApproved ? '✓ Human Decision Authorized' : isRejected ? '✕ Decision Permanently Rejected' : '○ Awaiting Developer Decision'}
+              </span>
+            </div>
+          </div>
+        </div>
 
         {/* Decision & Governance Section */}
         <div className="governance-decision-section">

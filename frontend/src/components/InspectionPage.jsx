@@ -214,6 +214,8 @@ export default function InspectionPage({
 
         <EvidenceSection
           finding={selectedFinding}
+          allFindings={findings}
+          onSelectFinding={onSelectFinding}
           runId={currentRun?.run_id}
           repair={selectedFinding ? repairs[selectedFinding.finding_id] : null}
           isRepairing={selectedFinding && repairingFindingId === selectedFinding.finding_id}
