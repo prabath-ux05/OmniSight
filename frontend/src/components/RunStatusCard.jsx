@@ -124,7 +124,7 @@ export default function RunStatusCard({
         <div>
           <h2 className="card-title">Run Status &amp; Execution Metadata</h2>
           <p className="card-description">
-            Live lifecycle details retrieved from <code>GET /api/v1/runs/{'{run_id}'}</code>.
+            Live lifecycle status, execution timing, and inspection metadata.
           </p>
         </div>
 

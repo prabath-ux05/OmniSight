@@ -284,13 +284,6 @@ export default function EvidenceSection({
               </span>
             </div>
           </div>
-
-          <div className="artifact-storage-note">
-            <span className="note-title">Artifact Serving Architecture:</span>
-            <p className="note-body">
-              Local filesystem paths are securely served over HTTP at <code>/api/v1/artifacts/{'{run_id}'}/{'{filename}'}</code>. Path traversal is strictly protected, ensuring only verified run artifacts are accessible.
-            </p>
-          </div>
         </div>
       </div>
 

@@ -331,7 +331,7 @@ export default function HistoryPage({
             </span>
             <h1 className="shell-hero-title">Inspection Run History &amp; Audit Log</h1>
             <p className="shell-hero-desc">
-              Audit past web inspections persisted in PostgreSQL. Filter across target URLs,
+              Review past web inspection records and defect trends. Filter across target URLs,
               lifecycle statuses, and creation dates, and inspect visual defect findings and evidence.
             </p>
           </div>
@@ -384,7 +384,7 @@ export default function HistoryPage({
           <div className="history-stat-card">
             <span className="history-stat-label">Total Audited Runs</span>
             <span className="history-stat-val">{isLoading ? '...' : stats.total}</span>
-            <span className="history-stat-sub">Persisted in PostgreSQL</span>
+            <span className="history-stat-sub">Recorded in database</span>
           </div>
 
           <div className="history-stat-card">

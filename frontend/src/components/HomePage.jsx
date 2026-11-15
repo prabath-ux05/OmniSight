@@ -205,7 +205,7 @@ export default function HomePage({
                 className="btn-link overview-ping-btn"
                 onClick={onRefreshRuns}
                 disabled={isRunsLoading}
-                title="Refresh run count from PostgreSQL"
+                title="Refresh run count"
               >
                 {isRunsLoading ? 'Refreshing...' : '↻ Refresh'}
               </button>
@@ -215,7 +215,7 @@ export default function HomePage({
                 {isRunsLoading ? '...' : runsList.length}
               </span>
               <span className="overview-card-subtext">
-                Audited in PostgreSQL
+                Total Audited Runs
               </span>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function HomePage({
             <span className="shell-feature-icon" aria-hidden="true">📋</span>
             <h3 className="shell-feature-title">Run History &amp; Audit</h3>
             <p className="shell-feature-desc">
-              Browse the complete audit log of all historical inspection runs persisted in PostgreSQL.
+              Browse the complete history of all past inspection runs and defect summaries.
               Filter by URL or Run ID and review terminal completion statuses.
             </p>
             <button
@@ -377,7 +377,7 @@ export default function HomePage({
           <div>
             <h2 className="card-title">Recent Activity</h2>
             <p className="card-description">
-              Recent inspection runs recorded in PostgreSQL (<code>GET /api/v1/runs</code>).
+              Recent inspection runs and defect detection history.
             </p>
           </div>
           <button

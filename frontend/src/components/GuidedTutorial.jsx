@@ -53,7 +53,7 @@ export const TUTORIAL_STEPS = [
     icon: '📋',
     title: 'Run History & Audit Database',
     description:
-      'Every inspection run is persistently stored in PostgreSQL (port 5433). Browse past runs, filter by status or date range, copy run IDs, and inspect historical defect breakdowns in read-only mode without re-triggering pipelines.',
+      'Every inspection run is persistently stored in the audit history. Browse past runs, filter by status or date range, copy run IDs, and inspect historical defect breakdowns in read-only mode without re-triggering pipelines.',
     tips: [
       'Filter by status (Completed, Failed, In-Progress) and date intervals',
       'Click any row to open the in-place Historical Run Inspector',

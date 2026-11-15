@@ -227,7 +227,7 @@ export default function SettingsPage({
           <div className="settings-info">
             <span className="settings-title">FastAPI Backend API</span>
             <span className="settings-desc">
-              Connected via endpoint <code>{backendUrl}/health</code>
+              Connected to backend service ({backendUrl})
             </span>
           </div>
 
@@ -269,7 +269,7 @@ export default function SettingsPage({
               Audit log and defect findings persistence store.
               <br />
               <span className="text-dim">
-                Note: The <code>/health</code> endpoint confirms FastAPI API process health only; relational database connectivity is queried and verified during active run operations.
+                Relational database connectivity is managed and verified during active inspection operations.
               </span>
             </span>
           </div>

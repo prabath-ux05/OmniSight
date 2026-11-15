@@ -250,7 +250,7 @@ export default function FindingsSection({
         <div>
           <h2 className="card-title">Defect Findings &amp; Visual Analysis</h2>
           <p className="card-description">
-            Retrieved from <code>GET /api/v1/runs/{'{run_id}'}/findings</code>.
+            Detailed visual and DOM anomalies identified during the inspection.
           </p>
         </div>
 

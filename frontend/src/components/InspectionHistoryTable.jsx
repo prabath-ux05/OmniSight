@@ -220,7 +220,7 @@ export default function InspectionHistoryTable({
         <div>
           <h2 className="card-title">Inspection Run Audit Table</h2>
           <p className="card-description">
-            Complete historical audit log retrieved from PostgreSQL (<code>GET /api/v1/runs</code>).
+            Complete historical audit log of inspection runs and findings.
           </p>
         </div>
         <div className="history-header-actions">
@@ -379,7 +379,7 @@ export default function InspectionHistoryTable({
       {isLoading && (!runs || runs.length === 0) ? (
         <div className="empty-state">
           <span className="spinner-sm" aria-hidden="true"></span>
-          <p className="empty-state-text">Loading historical inspection runs from PostgreSQL...</p>
+          <p className="empty-state-text">Loading historical inspection runs...</p>
         </div>
       ) : filteredRuns.length === 0 ? (
         /* Empty state */
@@ -393,7 +393,7 @@ export default function InspectionHistoryTable({
           <p className="empty-state-text">
             {hasActiveFilters
               ? 'No runs match the specified query, status, or date range. Try clearing your filters.'
-              : 'Start a new inspection to record your first run in PostgreSQL.'}
+              : 'Start a new inspection to record your first run.'}
           </p>
           {hasActiveFilters && (
             <button

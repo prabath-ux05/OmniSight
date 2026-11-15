@@ -94,7 +94,7 @@ export default function InspectionPage({
                     Live Pipeline In Progress ({statusUpper})
                   </span>
                 ) : normalizedStatus === 'completed' ? (
-                  <span className="badge badge-completed-run" title="Inspection completed and audited in PostgreSQL">
+                  <span className="badge badge-completed-run" title="Inspection completed and recorded in audit log">
                     ✓ Audited Run (Completed)
                   </span>
                 ) : (
