@@ -42,6 +42,7 @@ export default function InspectionPage({
   repairError,
   proposalsCount = 0,
   onNavigateToRepair,
+  onNavigateToProposals,
   onSelectView,
 }) {
   const rawStatus = currentRun?.status;
@@ -128,10 +129,24 @@ export default function InspectionPage({
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => onSelectView('repair')}
+              onClick={() => {
+                if (onNavigateToProposals) {
+                  onNavigateToProposals(currentRun?.run_id);
+                } else {
+                  onSelectView('proposals');
+                }
+              }}
               title="Review repair proposals and pull request governance"
             >
-              🛡️ Repair Workflow ({proposalsCount}) →
+              🛡️ Repair Proposals ({proposalsCount}) →
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => onSelectView('repair')}
+              title="Open locator repair synthesizer & assistant"
+            >
+              🔧 Repair Workspace →
             </button>
           </div>
         </div>
@@ -180,6 +195,7 @@ export default function InspectionPage({
           onLookupRun={onLookupRun}
           onExecutePipeline={onExecutePipeline}
           isExecuting={isExecuting}
+          onNavigateToProposals={onNavigateToProposals}
         />
       </section>
 
@@ -239,10 +255,16 @@ export default function InspectionPage({
             </div>
             <button
               type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => onNavigateToRepair ? onNavigateToRepair() : onSelectView('repair')}
+              className="btn btn-primary btn-sm btn-go-to-proposals"
+              onClick={() => {
+                if (onNavigateToProposals) {
+                  onNavigateToProposals(currentRun.run_id);
+                } else if (onSelectView) {
+                  onSelectView('proposals');
+                }
+              }}
             >
-              Go to Repair Workflow ({proposalsCount}) →
+              🛡️ Go to Repair Proposal ({proposalsCount}) →
             </button>
           </div>
         </section>

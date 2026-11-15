@@ -8745,6 +8745,21 @@ select.form-input:focus,
   border-left-color: #eab308;
 }
 
+.proposal-card.proposal-selected-highlight {
+  border: 2px solid var(--color-primary, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 8px 24px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-go-to-proposals {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
 /* Large approve / reject button row */
 .review-buttons-group {
   display: flex;

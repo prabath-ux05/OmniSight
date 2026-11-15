@@ -9,6 +9,7 @@ export default function RunStatusCard({
   onLookupRun,
   onExecutePipeline,
   isExecuting,
+  onNavigateToProposals,
 }) {
   const [lookupId, setLookupId] = useState('');
   const [lookupError, setLookupError] = useState('');
@@ -165,6 +166,16 @@ export default function RunStatusCard({
                 )}
               </button>
 
+              {run.status === 'completed' && onNavigateToProposals && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm btn-go-to-proposals"
+                  onClick={() => onNavigateToProposals(run.run_id)}
+                  title="View and review repair proposals for this completed run"
+                >
+                  🛡️ Go to Repair Proposal →
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
@@ -380,6 +391,16 @@ export default function RunStatusCard({
           {isTerminalStatus && (
             <div className="terminal-status-notice">
               <span>Run has reached terminal state (<code>{run.status}</code>). Auto-refresh stopped.</span>
+              {run.status === 'completed' && onNavigateToProposals && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-xs btn-go-to-proposals"
+                  style={{ marginLeft: '0.75rem', verticalAlign: 'middle' }}
+                  onClick={() => onNavigateToProposals(run.run_id)}
+                >
+                  🛡️ Go to Repair Proposal →
+                </button>
+              )}
             </div>
           )}
         </>

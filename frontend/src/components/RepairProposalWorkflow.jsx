@@ -439,6 +439,8 @@ export function RunProposalsDashboard({
   findings = [],
   proposals = [],
   isLoading = false,
+  selectedProposalId = null,
+  onSelectProposal = () => {},
   onRefreshProposals,
   onApprove,
   onReject,
@@ -448,6 +450,20 @@ export function RunProposalsDashboard({
   const [actionInProgress, setActionInProgress] = useState({});
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [selectedComparisonProposal, setSelectedComparisonProposal] = useState(null);
+
+  // Auto-synchronize comparison or focus when selectedProposalId changes
+  useEffect(() => {
+    if (selectedProposalId && Array.isArray(proposals)) {
+      const matched = proposals.find((p) => p.proposal_id === selectedProposalId);
+      if (matched) {
+        // Scroll matched card into view smoothly
+        const el = document.getElementById(`proposal-card-${selectedProposalId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  }, [selectedProposalId, proposals]);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState('');
@@ -743,12 +759,16 @@ export function RunProposalsDashboard({
             const isRejected = proposal.approval_status === 'rejected';
             const inProgressAction = actionInProgress[proposal.proposal_id];
 
+            const isSelected = selectedProposalId === proposal.proposal_id;
+
             return (
               <div
                 key={proposal.proposal_id}
+                id={`proposal-card-${proposal.proposal_id}`}
                 className={`proposal-card ${
                   isApproved ? 'proposal-approved' : isRejected ? 'proposal-rejected' : 'proposal-pending'
-                }`}
+                } ${isSelected ? 'proposal-selected-highlight' : ''}`}
+                onClick={() => onSelectProposal(proposal.proposal_id)}
               >
                 <div className="proposal-card-header">
                   <div className="proposal-title-group">

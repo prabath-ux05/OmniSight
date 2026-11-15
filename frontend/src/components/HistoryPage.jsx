@@ -371,10 +371,22 @@ export default function HistoryPage({
               className="btn btn-secondary btn-sm"
               onClick={() => {
                 if (selectedHistoricalRun) onSelectRun(selectedHistoricalRun);
+                onSelectView('proposals');
+              }}
+              title="Review repair proposals and pull request governance"
+            >
+              🛡️ Repair Proposals →
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                if (selectedHistoricalRun) onSelectRun(selectedHistoricalRun);
                 onSelectView('repair');
               }}
+              title="Open locator repair synthesizer and assistant"
             >
-              🛡️ Repair Workflow →
+              🔧 Repair Workspace →
             </button>
           </div>
         </div>
@@ -549,11 +561,22 @@ export default function HistoryPage({
                 className="btn btn-secondary btn-sm"
                 onClick={() => {
                   onSelectRun(selectedHistoricalRun);
-                  onSelectView('repair');
+                  onSelectView('proposals');
                 }}
                 title="Open repair proposals review for this run"
               >
-                Repair Workflow →
+                🛡️ Repair Proposals →
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  onSelectRun(selectedHistoricalRun);
+                  onSelectView('repair');
+                }}
+                title="Open locator repair synthesizer for this run"
+              >
+                🔧 Repair Workspace →
               </button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import EvidenceSection from './components/EvidenceSection';
 import InspectionHistoryTable from './components/InspectionHistoryTable';
 import HistoryPage from './components/HistoryPage';
 import RepairWorkspacePage from './components/RepairWorkspacePage';
+import RepairProposalPage from './components/RepairProposalPage';
 import RepairProposalWorkflow from './components/RepairProposalWorkflow';
 import AboutPage from './components/AboutPage';
 import SettingsPage from './components/SettingsPage';
@@ -32,16 +33,38 @@ import {
 } from './services/api';
 import { MAX_CONSECUTIVE_POLL_ERRORS } from './utils/findingsState';
 import { getUserInitial, getUserDisplayName } from './utils/user';
+import {
+  ROUTES,
+  parseRoute,
+  formatRoute,
+  navigateRoute,
+  subscribeToNavigation,
+} from './utils/router';
 import './App.css';
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
 
 export default function App() {
-  // Navigation tabs: 'live' | 'history' | 'proposals'
-  const [activeTab, setActiveTab] = useState('live');
+  // Derive initial route from window.location
+  const initialRoute = typeof window !== 'undefined' ? parseRoute(window.location) : { view: 'home' };
 
-  // Shared Application Shell view: 'home' | 'inspection' | 'history' | 'repair' | 'about' | 'settings'
-  const [currentView, setCurrentView] = useState('inspection');
+  // Shared Application Shell view: 'home' | 'inspection' | 'history' | 'proposals' | 'repair' | 'about' | 'profile' | 'settings'
+  const [currentView, setCurrentView] = useState(() => {
+    let v = initialRoute.view || 'home';
+    if (v === 'results') v = 'inspection';
+    return v;
+  });
+
+  // Navigation tabs: 'live' | 'history' | 'proposals' | 'repair'
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialRoute.view === 'proposals') return 'proposals';
+    if (initialRoute.view === 'repair') return 'repair';
+    if (initialRoute.view === 'history') return 'history';
+    return 'live';
+  });
+
+  // Selected proposal ID (for deep linking and focused comparison)
+  const [selectedProposalId, setSelectedProposalId] = useState(initialRoute.proposalId || null);
 
   // Responsive navigation drawer state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -482,39 +505,69 @@ export default function App() {
   };
 
   // ---------------------------------------------------------------------------
-  // View Routing & Sub-Tab Synchronization
+  // View Routing & Sub-Tab Synchronization (HTML5 History API)
   // ---------------------------------------------------------------------------
-  const handleSelectView = (viewId) => {
+  const handleSelectView = (viewId, customParams = {}) => {
     setIsMenuOpen(false);
-    if (viewId === 'home') {
-      setCurrentView('home');
-    } else if (viewId === 'inspection' || viewId === 'live') {
-      setCurrentView('inspection');
+    let normalized = viewId || 'home';
+    if (normalized === 'live') normalized = 'inspection';
+
+    setCurrentView(normalized);
+
+    const targetRunId = customParams.runId !== undefined ? customParams.runId : (currentRun?.run_id || null);
+    const targetProposalId = customParams.proposalId !== undefined ? customParams.proposalId : (normalized === 'proposals' ? selectedProposalId : null);
+    const targetFindingId = customParams.findingId !== undefined ? customParams.findingId : (normalized === 'repair' ? selectedFinding?.finding_id : null);
+
+    if (normalized === 'home') {
       setActiveTab('live');
-    } else if (viewId === 'history') {
-      setCurrentView('history');
+    } else if (normalized === 'inspection' || normalized === 'results') {
+      setActiveTab('live');
+    } else if (normalized === 'history') {
       setActiveTab('history');
       loadRunsList();
-    } else if (viewId === 'repair' || viewId === 'proposals') {
-      setCurrentView('repair');
+    } else if (normalized === 'proposals') {
       setActiveTab('proposals');
-      if (currentRun?.run_id) {
-        loadProposals(currentRun.run_id);
+      if (targetRunId) {
+        loadProposals(targetRunId);
       }
-    } else if (viewId === 'about') {
-      setCurrentView('about');
-    } else if (viewId === 'profile') {
-      setCurrentView('profile');
-    } else if (viewId === 'settings') {
-      setCurrentView('settings');
+    } else if (normalized === 'repair') {
+      setActiveTab('repair');
+      if (targetRunId) {
+        loadProposals(targetRunId);
+      }
     }
+
+    // Keep browser URL and history entries cleanly synchronized
+    navigateRoute({
+      view: normalized,
+      runId: targetRunId,
+      proposalId: targetProposalId,
+      findingId: targetFindingId,
+      replace: customParams.replace || false,
+    });
+  };
+
+  const handleNavigateToProposals = (runId, proposalId = null) => {
+    const effectiveRunId = runId || currentRun?.run_id || null;
+    if (proposalId) {
+      setSelectedProposalId(proposalId);
+    }
+    if (effectiveRunId && effectiveRunId !== currentRun?.run_id) {
+      handleLookupRun(effectiveRunId);
+    } else if (effectiveRunId) {
+      loadProposals(effectiveRunId);
+    }
+    handleSelectView('proposals', { runId: effectiveRunId, proposalId });
   };
 
   const handleNavigateToRepair = (finding) => {
     if (finding) {
       setSelectedFinding(finding);
     }
-    handleSelectView('repair');
+    handleSelectView('repair', {
+      runId: currentRun?.run_id,
+      findingId: finding?.finding_id,
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -593,9 +646,8 @@ export default function App() {
     setRepairError('');
 
     setCurrentRun(run);
-    if (targetView) {
-      handleSelectView(targetView);
-    }
+    const destView = targetView || (currentView === 'proposals' ? 'proposals' : currentView === 'repair' ? 'repair' : 'inspection');
+    handleSelectView(destView, { runId: run.run_id });
 
     setErrorMessage('');
     setSuccessMessage(`Selected run '${run.run_id}'.`);
@@ -806,6 +858,52 @@ export default function App() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // 14. Browser Back/Forward (PopState) & Deep-Link Synchronization
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    // 1. Initial deep-link resolution on mount
+    const init = parseRoute(typeof window !== 'undefined' ? window.location : '/');
+    if (init.runId) {
+      handleLookupRun(init.runId);
+    }
+    if (init.proposalId) {
+      setSelectedProposalId(init.proposalId);
+    }
+
+    // 2. Subscribe to browser popstate (Back/Forward) & internal routing events
+    const unsubscribe = subscribeToNavigation((route) => {
+      let navigatedView = route.view || 'home';
+      if (navigatedView === 'results') navigatedView = 'inspection';
+
+      setCurrentView(navigatedView);
+      if (navigatedView === 'proposals') setActiveTab('proposals');
+      else if (navigatedView === 'repair') setActiveTab('repair');
+      else if (navigatedView === 'history') setActiveTab('history');
+      else setActiveTab('live');
+
+      if (route.proposalId) {
+        setSelectedProposalId(route.proposalId);
+      } else {
+        setSelectedProposalId(null);
+      }
+
+      if (route.findingId && Array.isArray(findings)) {
+        const matched = findings.find((f) => f.finding_id === route.findingId);
+        if (matched) setSelectedFinding(matched);
+      }
+
+      // If the navigated route has a runId that differs from current active run, load it
+      if (route.runId && route.runId !== activeFindingsRunIdRef.current) {
+        handleLookupRun(route.runId);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   return (
     <div className="dashboard-layout">
       {/* 1. Shared Header with branding, navigation, health, theme & auth */}
@@ -827,29 +925,36 @@ export default function App() {
       />
 
       <main className="dashboard-container">
-        {/* Secondary Sub-navigation Tabs (for Inspection, History & Repair views) */}
-        {['inspection', 'live', 'history', 'repair', 'proposals'].includes(currentView) && (
+        {/* Secondary Sub-navigation Tabs (for Inspection, History, Proposals & Repair views) */}
+        {['inspection', 'live', 'results', 'history', 'repair', 'proposals'].includes(currentView) && (
           <nav className="dashboard-nav-tabs" aria-label="Dashboard views">
             <button
               type="button"
-              className={`nav-tab-btn ${activeTab === 'live' ? 'nav-tab-active' : ''}`}
+              className={`nav-tab-btn ${currentView === 'inspection' || currentView === 'results' ? 'nav-tab-active' : ''}`}
               onClick={() => handleSelectView('inspection')}
             >
-              🔍 Live Inspection &amp; Evidence
+              🔍 Live Inspection Studio
             </button>
             <button
               type="button"
-              className={`nav-tab-btn ${activeTab === 'history' ? 'nav-tab-active' : ''}`}
+              className={`nav-tab-btn ${currentView === 'history' ? 'nav-tab-active' : ''}`}
               onClick={() => handleSelectView('history')}
             >
               📋 Run History ({runsList.length})
             </button>
             <button
               type="button"
-              className={`nav-tab-btn ${activeTab === 'proposals' ? 'nav-tab-active' : ''}`}
-              onClick={() => handleSelectView('repair')}
+              className={`nav-tab-btn ${currentView === 'proposals' ? 'nav-tab-active' : ''}`}
+              onClick={() => handleSelectView('proposals')}
             >
               🛡️ Repair Proposals ({proposalsList.length})
+            </button>
+            <button
+              type="button"
+              className={`nav-tab-btn ${currentView === 'repair' ? 'nav-tab-active' : ''}`}
+              onClick={() => handleSelectView('repair')}
+            >
+              🔧 Repair Workspace
             </button>
           </nav>
         )}
@@ -895,8 +1000,8 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 2: Dedicated Live Inspection Studio */}
-        {(currentView === 'inspection' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'live')) && (
+        {/* VIEW 2: Dedicated Live Inspection Studio & Results */}
+        {(currentView === 'inspection' || currentView === 'results') && (
           <InspectionPage
             onStartInspection={handleStartInspection}
             isRunLoading={isRunLoading}
@@ -921,12 +1026,13 @@ export default function App() {
             repairError={repairError}
             proposalsCount={proposalsList.length}
             onNavigateToRepair={handleNavigateToRepair}
+            onNavigateToProposals={handleNavigateToProposals}
             onSelectView={handleSelectView}
           />
         )}
 
         {/* VIEW 3: Dedicated Inspection Run History Page */}
-        {(currentView === 'history' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'history')) && (
+        {currentView === 'history' && (
           <HistoryPage
             runs={runsList}
             isLoading={isRunsLoading}
@@ -942,8 +1048,28 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 4: Dedicated Self-Healing Repair Workspace & Assistant */}
-        {(currentView === 'repair' || (currentView !== 'home' && currentView !== 'about' && currentView !== 'profile' && currentView !== 'settings' && activeTab === 'proposals')) && (
+        {/* VIEW 4: Dedicated Repair Proposals Page */}
+        {currentView === 'proposals' && (
+          <RepairProposalPage
+            run={currentRun}
+            runsList={runsList}
+            onSelectRun={(targetRun) => handleSelectRun(targetRun, 'proposals')}
+            findings={findings || []}
+            proposals={proposalsList}
+            isLoading={isProposalsLoading}
+            selectedProposalId={selectedProposalId}
+            onSelectProposal={(propId) => setSelectedProposalId(propId)}
+            onRefreshProposals={() => currentRun && loadProposals(currentRun.run_id)}
+            onApproveProposal={handleApproveProposal}
+            onRejectProposal={handleRejectProposal}
+            onCreateProposal={handleCreateProposal}
+            onSelectView={handleSelectView}
+            onNavigateToRepair={handleNavigateToRepair}
+          />
+        )}
+
+        {/* VIEW 5: Dedicated Self-Healing Repair Workspace & Assistant */}
+        {currentView === 'repair' && (
           <RepairWorkspacePage
             run={currentRun}
             runsList={runsList}

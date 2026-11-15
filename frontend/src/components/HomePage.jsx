@@ -107,9 +107,16 @@ export default function HomePage({
           <button
             type="button"
             className="btn btn-secondary"
+            onClick={() => onSelectView('proposals')}
+          >
+            🛡️ Repair Proposals
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
             onClick={() => onSelectView('repair')}
           >
-            🛡️ Repair Workspace
+            🔧 Repair Workspace
           </button>
         </div>
       </section>
@@ -139,6 +146,16 @@ export default function HomePage({
                 onClick={() => onSelectRun(currentRun)}
               >
                 Open in Live Studio →
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  onSelectRun(currentRun);
+                  onSelectView('proposals');
+                }}
+              >
+                🛡️ Repair Proposals →
               </button>
             </div>
           </div>
@@ -204,7 +221,15 @@ export default function HomePage({
           </div>
 
           {/* Card 4: Evidence-Based Repair Proposals */}
-          <div className="shell-feature-card capability-card">
+          <div
+            className="shell-feature-card capability-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelectView('proposals')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectView('proposals'); }}
+            style={{ cursor: 'pointer' }}
+            title="Navigate to Repair Proposals"
+          >
             <div className="feature-icon-wrapper icon-cyan">
               <span className="shell-feature-icon" aria-hidden="true">💡</span>
             </div>
@@ -216,11 +241,20 @@ export default function HomePage({
             <div className="capability-card-footer">
               <span className="feature-tag">Self-Healing</span>
               <span className="feature-tag">Unified Diff</span>
+              <span className="btn-link btn-link-sm" style={{ marginLeft: 'auto' }}>Open Proposals →</span>
             </div>
           </div>
 
           {/* Card 5: Controlled Sandbox Repair */}
-          <div className="shell-feature-card capability-card">
+          <div
+            className="shell-feature-card capability-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelectView('repair')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectView('repair'); }}
+            style={{ cursor: 'pointer' }}
+            title="Navigate to Repair Workspace"
+          >
             <div className="feature-icon-wrapper icon-emerald">
               <span className="shell-feature-icon" aria-hidden="true">🔒</span>
             </div>
@@ -232,6 +266,7 @@ export default function HomePage({
             <div className="capability-card-footer">
               <span className="feature-tag">Local Sandbox</span>
               <span className="feature-tag">Live Site Protected</span>
+              <span className="btn-link btn-link-sm" style={{ marginLeft: 'auto' }}>Open Workspace →</span>
             </div>
           </div>
 
