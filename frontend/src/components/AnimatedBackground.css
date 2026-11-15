@@ -1,0 +1,336 @@
+/* ==========================================================================
+   OmniSight Animated Background — Meridian Command Environment
+   All elements: position fixed/absolute, pointer-events: none, z-index: 0
+   Safe for `prefers-reduced-motion`, hidden in light theme.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Root container
+   -------------------------------------------------------------------------- */
+.omnisight-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  /* Smooth cross-fade when switching section variants */
+  transition: opacity 0.6s ease;
+}
+
+/* --------------------------------------------------------------------------
+   Nebula / ambient glow blobs
+   -------------------------------------------------------------------------- */
+.bg-nebula {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform, opacity;
+}
+
+.bg-nebula-primary {
+  width: min(70vw, 900px);
+  height: min(70vw, 900px);
+  top: -20%;
+  left: -15%;
+  background: radial-gradient(ellipse, rgba(0, 201, 167, 0.12) 0%, transparent 65%);
+  animation: nebulaDriftA 28s ease-in-out infinite alternate;
+}
+
+.bg-nebula-secondary {
+  width: min(55vw, 700px);
+  height: min(55vw, 700px);
+  bottom: -15%;
+  right: -10%;
+  background: radial-gradient(ellipse, rgba(245, 166, 35, 0.07) 0%, transparent 65%);
+  animation: nebulaDriftB 34s ease-in-out infinite alternate;
+}
+
+.bg-nebula-accent {
+  width: min(40vw, 500px);
+  height: min(40vw, 500px);
+  top: 30%;
+  right: 20%;
+  background: radial-gradient(ellipse, rgba(167, 139, 250, 0.06) 0%, transparent 65%);
+  animation: nebulaDriftC 22s ease-in-out infinite alternate;
+}
+
+@keyframes nebulaDriftA {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  33%  { transform: translate(3%, 5%) scale(1.05); opacity: 1; }
+  66%  { transform: translate(-2%, 3%) scale(0.98); opacity: 0.9; }
+  100% { transform: translate(4%, -4%) scale(1.08); opacity: 0.75; }
+}
+
+@keyframes nebulaDriftB {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50%  { transform: translate(-4%, -6%) scale(1.1); opacity: 1; }
+  100% { transform: translate(3%, 4%) scale(0.95); opacity: 0.8; }
+}
+
+@keyframes nebulaDriftC {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50%  { transform: translate(5%, 3%) scale(1.12); opacity: 0.9; }
+  100% { transform: translate(-3%, -5%) scale(0.9); opacity: 0.5; }
+}
+
+/* --------------------------------------------------------------------------
+   Perspective grid
+   -------------------------------------------------------------------------- */
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 201, 167, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 201, 167, 0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridDrift 60s linear infinite;
+}
+
+@keyframes gridDrift {
+  from { background-position: 0 0; }
+  to   { background-position: 60px 60px; }
+}
+
+/* --------------------------------------------------------------------------
+   Floating particle nodes
+   -------------------------------------------------------------------------- */
+.anim-node {
+  position: absolute;
+  border-radius: 50%;
+  background: #00C9A7;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: nodeFloat linear infinite;
+}
+
+.anim-node-1 {
+  width: 4px; height: 4px; left: 8%;
+  animation-duration: 18s; animation-delay: 0s;
+  box-shadow: 0 0 6px rgba(0, 201, 167, 0.6);
+}
+.anim-node-2 {
+  width: 3px; height: 3px; left: 23%;
+  animation-duration: 24s; animation-delay: 3.5s;
+  background: rgba(245, 166, 35, 0.9);
+  box-shadow: 0 0 5px rgba(245, 166, 35, 0.5);
+}
+.anim-node-3 {
+  width: 5px; height: 5px; left: 41%;
+  animation-duration: 20s; animation-delay: 7s;
+  box-shadow: 0 0 8px rgba(0, 201, 167, 0.5);
+}
+.anim-node-4 {
+  width: 3px; height: 3px; left: 58%;
+  animation-duration: 28s; animation-delay: 1.5s;
+  background: rgba(167, 139, 250, 0.9);
+  box-shadow: 0 0 5px rgba(167, 139, 250, 0.5);
+}
+.anim-node-5 {
+  width: 4px; height: 4px; left: 72%;
+  animation-duration: 22s; animation-delay: 10s;
+  box-shadow: 0 0 6px rgba(0, 201, 167, 0.6);
+}
+.anim-node-6 {
+  width: 2px; height: 2px; left: 86%;
+  animation-duration: 16s; animation-delay: 5s;
+  background: rgba(245, 166, 35, 0.8);
+  box-shadow: 0 0 4px rgba(245, 166, 35, 0.4);
+}
+.anim-node-7 {
+  width: 4px; height: 4px; left: 15%;
+  animation-duration: 30s; animation-delay: 13s;
+  background: rgba(167, 139, 250, 0.8);
+  box-shadow: 0 0 7px rgba(167, 139, 250, 0.4);
+}
+.anim-node-8 {
+  width: 3px; height: 3px; left: 95%;
+  animation-duration: 19s; animation-delay: 8s;
+  box-shadow: 0 0 5px rgba(0, 201, 167, 0.5);
+}
+
+@keyframes nodeFloat {
+  0%   { transform: translateY(100vh) translateX(0px); opacity: 0; }
+  5%   { opacity: 0.7; }
+  85%  { opacity: 0.4; }
+  100% { transform: translateY(-10vh) translateX(20px); opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   Pulsing concentric rings
+   -------------------------------------------------------------------------- */
+.anim-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 201, 167, 0.15);
+  will-change: transform, opacity;
+  animation: ringPulse ease-out infinite;
+}
+
+.anim-ring-1 {
+  width: 300px; height: 300px;
+  top: 15%; left: 5%;
+  animation-duration: 10s; animation-delay: 0s;
+}
+.anim-ring-2 {
+  width: 200px; height: 200px;
+  bottom: 20%; right: 8%;
+  border-color: rgba(167, 139, 250, 0.12);
+  animation-duration: 14s; animation-delay: 3s;
+}
+.anim-ring-3 {
+  width: 400px; height: 400px;
+  top: 50%; left: 50%;
+  border-color: rgba(0, 201, 167, 0.07);
+  animation-name: ringPulseCenter;
+  animation-duration: 18s; animation-delay: 6s;
+}
+
+@keyframes ringPulse {
+  0%   { transform: scale(0.6); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* Centered ring must include translate so it stays centered during scale */
+@keyframes ringPulseCenter {
+  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   Horizontal scan-line sweeps
+   -------------------------------------------------------------------------- */
+.bg-scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 201, 167, 0.3) 30%,
+    rgba(0, 201, 167, 0.5) 50%,
+    rgba(0, 201, 167, 0.3) 70%,
+    transparent 100%
+  );
+  box-shadow: 0 0 8px rgba(0, 201, 167, 0.2);
+  will-change: top, opacity;
+  animation: scanSweep linear infinite;
+}
+
+@keyframes scanSweep {
+  0%   { top: -2px; opacity: 0; }
+  3%   { opacity: 0.6; }
+  97%  { opacity: 0.3; }
+  100% { top: 100vh; opacity: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   SVG decorative layer
+   -------------------------------------------------------------------------- */
+.bg-svg-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.svg-hex-group {
+  animation: hexFloat 40s ease-in-out infinite alternate;
+}
+
+.svg-circuit-group {
+  animation: circuitFade 20s ease-in-out infinite alternate;
+}
+
+@keyframes hexFloat {
+  0%   { transform: translateY(0px); }
+  100% { transform: translateY(-15px); }
+}
+
+@keyframes circuitFade {
+  0%, 100% { opacity: 0.04; }
+  50%       { opacity: 0.09; }
+}
+
+/* --------------------------------------------------------------------------
+   Film-grain / noise overlay for depth and texture
+   -------------------------------------------------------------------------- */
+.bg-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ==========================================================================
+   Section variants — different atmosphere per dashboard view
+   ========================================================================== */
+
+/* Home: calm, welcoming — no scan lines, softer grid */
+.omnisight-bg--home .bg-scan-line { display: none; }
+.omnisight-bg--home .bg-grid      { opacity: 0.6; }
+
+/* Scan / Inspection: amber alert, faster nebula, full grid */
+.omnisight-bg--scan .bg-nebula-primary {
+  background: radial-gradient(ellipse, rgba(245, 166, 35, 0.1) 0%, transparent 65%);
+  animation-duration: 18s;
+}
+.omnisight-bg--scan .bg-nebula-secondary {
+  background: radial-gradient(ellipse, rgba(0, 201, 167, 0.09) 0%, transparent 65%);
+}
+.omnisight-bg--scan .bg-grid { opacity: 0.9; }
+
+/* Repair / Proposals: violet-accented, subdued scan lines */
+.omnisight-bg--repair .bg-nebula-accent {
+  opacity: 1;
+  background: radial-gradient(ellipse, rgba(167, 139, 250, 0.1) 0%, transparent 65%);
+}
+.omnisight-bg--repair .bg-scan-line { opacity: 0.5; }
+
+/* Archive / History: slow, cool, minimal movement */
+.omnisight-bg--archive .bg-nebula-primary {
+  background: radial-gradient(ellipse, rgba(0, 201, 167, 0.07) 0%, transparent 65%);
+  animation-duration: 40s;
+}
+.omnisight-bg--archive .bg-nebula-secondary { opacity: 0.4; }
+.omnisight-bg--archive .bg-nebula-accent    { opacity: 0.3; }
+.omnisight-bg--archive .bg-scan-line        { display: none; }
+.omnisight-bg--archive .bg-grid             { opacity: 0.4; }
+
+/* Calm: settings / profile / about — very subtle */
+.omnisight-bg--calm .bg-nebula-primary  { opacity: 0.5; }
+.omnisight-bg--calm .bg-nebula-secondary{ opacity: 0.3; }
+.omnisight-bg--calm .bg-nebula-accent   { opacity: 0.2; }
+.omnisight-bg--calm .bg-scan-line       { display: none; }
+.omnisight-bg--calm .bg-grid            { opacity: 0.3; }
+.omnisight-bg--calm .anim-ring          { opacity: 0.4; }
+
+/* Child element opacity transitions between variants */
+.omnisight-bg > * { transition: opacity 0.8s ease; }
+
+/* ==========================================================================
+   Light theme — hide background entirely for a clean, minimal look
+   ========================================================================== */
+[data-theme="light"] .omnisight-bg { display: none; }
+
+/* ==========================================================================
+   Reduced motion — pause all animations, hide scan lines
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .omnisight-bg * { animation-play-state: paused !important; }
+  .bg-scan-line   { display: none !important; }
+}
+
+/* ==========================================================================
+   Mobile — lighter blur, fewer rings, no grain
+   ========================================================================== */
+@media (max-width: 768px) {
+  .bg-nebula   { filter: blur(50px); }
+  .anim-ring-1,
+  .anim-ring-3 { display: none; }
+  .bg-grain    { display: none; }
+}

@@ -3,6 +3,8 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  isolation: isolate;
 }
 
 .dashboard-container {
@@ -14,6 +16,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 /* Header */
@@ -27,6 +31,8 @@
   flex-wrap: wrap;
   gap: 1rem;
   backdrop-filter: blur(8px);
+  position: relative;
+  z-index: 2;
 }
 
 .header-brand {
@@ -9579,4 +9585,1677 @@ select.form-input:focus,
   color: #fbbf24;
   border-color: rgba(251, 191, 36, 0.3);
   background: rgba(251, 191, 36, 0.08);
+}
+
+
+/* ==========================================================================
+   BATCH 4 — GLOBAL MOTION SYSTEM
+   View transitions, enhanced page entrances, loading states.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Enhanced view entrance keyframe
+   Replaces the basic fadeIn on all view containers.
+   -------------------------------------------------------------------------- */
+@keyframes viewEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* Override the basic fadeIn on all major view containers */
+.home-view-container,
+.inspection-studio-container,
+.history-page-container,
+.repair-proposal-page-container,
+.about-page-container,
+.settings-page-container,
+.profile-page-container {
+  animation: viewEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --------------------------------------------------------------------------
+   View transition wrapper — keyed by currentView in App.jsx
+   -------------------------------------------------------------------------- */
+.view-transition-wrapper {
+  display: contents; /* Invisible wrapper — doesn't affect layout */
+  animation: viewEnter 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --------------------------------------------------------------------------
+   Global .reveal utility — reused across non-HomePage views
+   -------------------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity  0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* --------------------------------------------------------------------------
+   Card hover depth + inner glow (global cards)
+   -------------------------------------------------------------------------- */
+.card {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(0, 201, 167, 0.07) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 0;
+}
+.card:hover::after { opacity: 1; }
+
+/* Keep all card children above the pseudo-element glow */
+.card > * { position: relative; z-index: 1; }
+
+/* --------------------------------------------------------------------------
+   Shell feature card hover — depth lift + ring glow
+   -------------------------------------------------------------------------- */
+.shell-feature-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.shell-feature-card:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 201, 167, 0.15), var(--shadow-teal);
+}
+
+/* --------------------------------------------------------------------------
+   History table row hover — slide-in indicator
+   -------------------------------------------------------------------------- */
+.history-row {
+  transition: background 0.15s ease;
+  position: relative;
+}
+.history-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-prime);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.history-row:hover::before { opacity: 1; }
+
+/* --------------------------------------------------------------------------
+   Badge entrance animation (all badges site-wide)
+   -------------------------------------------------------------------------- */
+.badge {
+  animation: badgePop 0.3s cubic-bezier(0.34, 1.26, 0.64, 1) both;
+}
+@keyframes badgePop {
+  from { transform: scale(0.8); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   Spinner enhancements — smoother, Meridian-tinted
+   -------------------------------------------------------------------------- */
+.spinner-sm {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 201, 167, 0.15);
+  border-top-color: var(--accent-prime);
+  border-radius: 50%;
+  animation: spinnerRotate 0.75s linear infinite;
+}
+@keyframes spinnerRotate {
+  to { transform: rotate(360deg); }
+}
+
+/* --------------------------------------------------------------------------
+   Empty state entrance
+   -------------------------------------------------------------------------- */
+.empty-state {
+  animation: emptyStateReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes emptyStateReveal {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.empty-state-icon {
+  animation: emptyIconFloat 3s ease-in-out infinite;
+}
+@keyframes emptyIconFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* --------------------------------------------------------------------------
+   Button micro-interactions — press feedback
+   -------------------------------------------------------------------------- */
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+/* Shimmer ripple on primary button click */
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+.btn-primary:hover::before {
+  animation: btnShimmer 0.6s ease;
+}
+@keyframes btnShimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* --------------------------------------------------------------------------
+   Nav tab active indicator — smooth sliding underline
+   -------------------------------------------------------------------------- */
+.nav-tab-btn {
+  position: relative;
+  transition: color 0.2s ease;
+}
+.nav-tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  right: 50%;
+  height: 2px;
+  background: var(--accent-prime);
+  border-radius: 1px;
+  transition: left 0.25s ease, right 0.25s ease;
+}
+.nav-tab-btn.nav-tab-active::after {
+  left: 0;
+  right: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard footer subtle fade-in
+   -------------------------------------------------------------------------- */
+.dashboard-footer {
+  animation: footerReveal 0.6s ease 0.3s both;
+}
+@keyframes footerReveal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* --------------------------------------------------------------------------
+   Global prefers-reduced-motion override
+   Disables all Batch 4 motion system animations.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .view-transition-wrapper,
+  .home-view-container,
+  .inspection-studio-container,
+  .history-page-container,
+  .repair-proposal-page-container,
+  .about-page-container,
+  .settings-page-container,
+  .profile-page-container,
+  .reveal,
+  .reveal.is-visible,
+  .card::after,
+  .shell-feature-card,
+  .badge,
+  .empty-state,
+  .empty-state-icon,
+  .dashboard-footer,
+  .btn,
+  .btn-primary::before,
+  .nav-tab-btn::after,
+  .history-row::before {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+  }
+}
+
+
+/* =============================================================================
+   BATCH 5 — ADVANCED VISUAL SURFACES & INTERACTIVE GRAPHICS
+   OmniSight · Meridian Design System
+   =============================================================================
+   Contents
+   1.  Finding card — severity glow, hover depth, selected pulse
+   2.  Finding selector  — terminal surface treatment
+   3.  Finding confidence — graphical meter upgrade
+   4.  Proposal card — illuminated top-edge, state ambient, animated selected
+   5.  Proposal card header — gradient separator
+   6.  Severity badge upgrades — richer colours, pulse, status dots
+   7.  Evidence section — terminal preview, inset meta card
+   8.  Gradient separators — tabs, section dividers
+   9.  Run status card — illuminated surface
+   10. Reduced-motion guard
+   ============================================================================= */
+
+/* @property for conic-gradient border-angle animation (progressive enhancement) */
+@property --border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0turn;
+}
+
+/* ---------------------------------------------------------------------------
+   1. FINDING CARDS — severity glow on hover, enhanced selected state, depth
+   --------------------------------------------------------------------------- */
+
+/* Increase left-border width for stronger severity signal */
+.finding-card {
+  border-left-width: 4px !important;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Severity-keyed inner glow on hover */
+.finding-card:has(.badge-critical):hover {
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.35),
+    inset 3px 0 18px rgba(239, 68, 68, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.finding-card:has(.badge-high):hover {
+  box-shadow:
+    0 0 0 1px rgba(249, 115, 22, 0.3),
+    inset 3px 0 18px rgba(249, 115, 22, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.finding-card:has(.badge-medium):hover {
+  box-shadow:
+    0 0 0 1px rgba(234, 179, 8, 0.28),
+    inset 3px 0 14px rgba(234, 179, 8, 0.07),
+    0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.finding-card:has(.badge-low):hover {
+  box-shadow:
+    0 0 0 1px rgba(0, 201, 167, 0.28),
+    inset 3px 0 14px rgba(0, 201, 167, 0.07),
+    0 8px 20px rgba(0, 0, 0, 0.28);
+}
+
+/* Selected state — animated teal ring pulse */
+.finding-card-selected {
+  animation: findingSelectedPulse 2.4s ease-in-out infinite !important;
+}
+
+@keyframes findingSelectedPulse {
+  0%,  100% { box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.32), 0 4px 16px rgba(0, 0, 0, 0.2); }
+  50%        { box-shadow: 0 0 0 4px rgba(0, 201, 167, 0.18), 0 4px 24px rgba(0, 0, 0, 0.25); }
+}
+
+/* Scan line sweep on hover — the ::after covers the full top edge */
+.finding-card::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0, 201, 167, 0.5), transparent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.2s ease;
+}
+
+.finding-card:hover::after {
+  opacity: 1;
+  animation: findingScan 1.2s ease-in-out forwards;
+}
+
+@keyframes findingScan {
+  0%   { top: -3px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   2. FINDING SELECTOR  — terminal surface treatment
+   --------------------------------------------------------------------------- */
+
+.finding-selector-container {
+  background: rgba(5, 10, 9, 0.75) !important;
+  border: 1px solid rgba(0, 201, 167, 0.18) !important;
+  border-radius: 5px !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Scanline texture */
+.finding-selector-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 201, 167, 0.013) 2px,
+    rgba(0, 201, 167, 0.013) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+[data-theme="light"] .finding-selector-container {
+  background: rgba(241, 245, 249, 0.9) !important;
+  border-color: rgba(0, 143, 119, 0.22) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   3. FINDING CONFIDENCE — graphical segmented meter
+   --------------------------------------------------------------------------- */
+
+/* Replace plain text confidence with a visual bar when
+   the wrapper/fill elements are present (from previous batches) */
+.finding-confidence-bar-wrapper {
+  height: 4px !important;
+  border-radius: 2px !important;
+  margin-top: 0.4rem !important;
+  position: relative;
+  overflow: visible !important;
+}
+
+/* Glow on the fill bar */
+.finding-confidence-bar-fill {
+  background: linear-gradient(90deg, #008F77, #00C9A7, #67e8d4) !important;
+  box-shadow: 0 0 6px rgba(0, 201, 167, 0.5);
+  border-radius: 2px;
+  position: relative;
+}
+
+/* Animated shimmer sweep over the fill */
+.finding-confidence-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: confidenceShimmer 2.5s ease-in-out infinite;
+}
+
+@keyframes confidenceShimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ---------------------------------------------------------------------------
+   4. PROPOSAL CARDS — illuminated top-edge, state ambient, animated selected
+   --------------------------------------------------------------------------- */
+
+.proposal-card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+/* Pending — amber ambient top-edge illumination */
+.proposal-card.proposal-pending {
+  border-left-color: #f59e0b !important;
+  border-left-width: 4px !important;
+  box-shadow: inset 0 2px 24px rgba(245, 158, 11, 0.07);
+}
+
+.proposal-card.proposal-pending::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(245, 158, 11, 0.6) 40%,
+    rgba(245, 158, 11, 0.8) 50%,
+    rgba(245, 158, 11, 0.6) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Approved — green top edge + success ambient */
+.proposal-card.proposal-approved {
+  border-left-color: #22c55e !important;
+  border-left-width: 4px !important;
+  box-shadow: inset 0 2px 24px rgba(34, 197, 94, 0.06);
+}
+
+.proposal-card.proposal-approved::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(34, 197, 94, 0.7) 40%,
+    rgba(34, 197, 94, 0.9) 50%,
+    rgba(34, 197, 94, 0.7) 60%,
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Rejected — muted red + reduced opacity */
+.proposal-card.proposal-rejected {
+  border-left-color: #ef4444 !important;
+  border-left-width: 4px !important;
+  opacity: 0.78;
+  box-shadow: inset 0 2px 20px rgba(239, 68, 68, 0.06);
+}
+
+.proposal-card.proposal-rejected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(239, 68, 68, 0.5) 40%,
+    rgba(239, 68, 68, 0.7) 50%,
+    rgba(239, 68, 68, 0.5) 60%,
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.proposal-card.proposal-rejected:hover {
+  opacity: 0.9;
+}
+
+/* Selected highlight — animated conic gradient border */
+.proposal-card.proposal-selected-highlight {
+  --border-angle: 0turn;
+  border: none !important;
+  padding: 1px !important;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 25%,
+    rgba(0, 201, 167, 0.8) 50%,
+    rgba(167, 139, 250, 0.5) 65%,
+    transparent 75%
+  ) !important;
+  animation:
+    proposalBorderSpin 3s linear infinite,
+    findingSelectedPulse 2.4s ease-in-out infinite;
+  border-radius: 10px !important;
+  transform: translateY(-2px);
+}
+
+/* Inner surface for selected proposal — prevents gradient showing inside */
+.proposal-card.proposal-selected-highlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+.proposal-card.proposal-selected-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: var(--bg-card, #162220);
+  border-radius: 9px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@keyframes proposalBorderSpin {
+  to { --border-angle: 1turn; }
+}
+
+@supports not (background: conic-gradient(from 1turn, red, red)) {
+  .proposal-card.proposal-selected-highlight {
+    border: 2px solid var(--accent-prime) !important;
+    background: var(--bg-card) !important;
+    animation: findingSelectedPulse 2.4s ease-in-out infinite;
+  }
+  .proposal-card.proposal-selected-highlight::after {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   5. PROPOSAL CARD HEADER — gradient separator line
+   --------------------------------------------------------------------------- */
+
+.proposal-card-header {
+  border-bottom: none !important;
+  position: relative;
+  padding-bottom: 0.85rem !important;
+}
+
+.proposal-card-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 201, 167, 0.35) 0%,
+    rgba(255, 255, 255, 0.07) 60%,
+    transparent 100%
+  );
+}
+
+[data-theme="light"] .proposal-card-header::after {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 143, 119, 0.3) 0%,
+    rgba(0, 0, 0, 0.06) 60%,
+    transparent 100%
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   6. SEVERITY BADGE UPGRADES — richer colours, micro-pulse, status dot
+   --------------------------------------------------------------------------- */
+
+/* Critical — saturated red with subtle pulse */
+.badge-critical {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(239, 68, 68, 0.6) !important;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
+  animation: criticalPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes criticalPulse {
+  0%,  100% { box-shadow: 0 0 6px rgba(239, 68, 68, 0.2); }
+  50%        { box-shadow: 0 0 10px rgba(239, 68, 68, 0.38); }
+}
+
+/* High — warm orange with subtle glow */
+.badge-high {
+  background-color: rgba(249, 115, 22, 0.22) !important;
+  color: #fed7aa !important;
+  border: 1px solid rgba(249, 115, 22, 0.55) !important;
+  font-weight: 700;
+  box-shadow: 0 0 5px rgba(249, 115, 22, 0.15);
+}
+
+/* Medium — amber, cleaner */
+.badge-medium {
+  background-color: rgba(234, 179, 8, 0.2) !important;
+  color: #fef08a !important;
+  border: 1px solid rgba(234, 179, 8, 0.5) !important;
+  font-weight: 700;
+}
+
+/* Low — teal, refined */
+.badge-low {
+  background-color: rgba(0, 201, 167, 0.14) !important;
+  color: var(--accent-prime) !important;
+  border: 1px solid rgba(0, 201, 167, 0.38) !important;
+  font-weight: 700;
+  box-shadow: 0 0 5px rgba(0, 201, 167, 0.1);
+}
+
+/* Light-theme overrides — keep accessible contrast */
+[data-theme="light"] .badge-critical {
+  animation: none;
+  box-shadow: none;
+}
+
+[data-theme="light"] .badge-high,
+[data-theme="light"] .badge-medium,
+[data-theme="light"] .badge-low {
+  box-shadow: none;
+}
+
+/* Status dot + label badge — a slim pill with a live/static indicator dot */
+.badge-status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.22rem 0.65rem 0.22rem 0.5rem;
+  border-radius: 9999px;
+  letter-spacing: 0.03em;
+  border: 1px solid;
+}
+
+.badge-status-dot::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badge-status-dot.dot-live::before {
+  animation: dotLivePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dotLivePulse {
+  0%,  100% { opacity: 1; transform: scale(1); }
+  50%        { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* ---------------------------------------------------------------------------
+   7. EVIDENCE SECTION — terminal preview box, inset meta card
+   --------------------------------------------------------------------------- */
+
+.evidence-preview-box {
+  background: rgba(5, 10, 9, 0.82) !important;
+  border: 1px solid rgba(0, 201, 167, 0.18) !important;
+  border-style: solid !important;
+  box-shadow:
+    inset 0 2px 10px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(0, 201, 167, 0.07);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Scanline texture on evidence preview */
+.evidence-preview-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 201, 167, 0.011) 3px,
+    rgba(0, 201, 167, 0.011) 6px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.evidence-preview-box > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Scan line sweep on evidence hover */
+.evidence-preview-box::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 201, 167, 0.5),
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.evidence-preview-box:hover::after {
+  opacity: 1;
+  animation: findingScan 1.3s ease-in-out forwards;
+}
+
+[data-theme="light"] .evidence-preview-box {
+  background: rgba(241, 245, 249, 0.92) !important;
+  border-color: rgba(0, 143, 119, 0.2) !important;
+}
+
+/* Evidence meta card — inset surface with left accent */
+.evidence-meta-card {
+  background: rgba(10, 18, 16, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-left: 3px solid rgba(0, 201, 167, 0.4) !important;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: border-left-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.evidence-meta-card:hover {
+  border-left-color: rgba(0, 201, 167, 0.75) !important;
+  box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.35), inset 2px 0 10px rgba(0, 201, 167, 0.05);
+}
+
+[data-theme="light"] .evidence-meta-card {
+  background: rgba(248, 250, 252, 0.9) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  border-left-color: rgba(0, 143, 119, 0.4) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   8. GRADIENT SEPARATORS — navigation tabs, section dividers
+   --------------------------------------------------------------------------- */
+
+/* Dashboard nav tabs — replace plain border-bottom with gradient line */
+.dashboard-nav-tabs {
+  border-bottom: none !important;
+  position: relative;
+}
+
+.dashboard-nav-tabs::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 201, 167, 0.5) 0%,
+    rgba(0, 201, 167, 0.15) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+[data-theme="light"] .dashboard-nav-tabs::after {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 143, 119, 0.4) 0%,
+    rgba(0, 143, 119, 0.1) 50%,
+    transparent 100%
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   9. RUN STATUS CARD — illuminated surface treatment
+   --------------------------------------------------------------------------- */
+
+.run-status-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(0, 201, 167, 0.18) !important;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(0, 201, 167, 0.1);
+}
+
+/* Animated teal beam across top of run status card */
+.run-status-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 201, 167, 0.0) 25%,
+    rgba(0, 201, 167, 0.85) 50%,
+    rgba(0, 201, 167, 0.0) 75%,
+    transparent 100%
+  );
+  animation: runStatusBeam 4s ease-in-out infinite 0.5s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes runStatusBeam {
+  0%   { transform: translateX(-50%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(50%); opacity: 0; }
+}
+
+[data-theme="light"] .run-status-card {
+  border-color: rgba(0, 143, 119, 0.2) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   10. REDUCED-MOTION GUARD — disable all Batch 5 motion in one block
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .finding-card::after,
+  .finding-card-selected,
+  .badge-critical,
+  .badge-status-dot.dot-live::before,
+  .finding-confidence-bar-fill::after,
+  .proposal-card.proposal-pending::before,
+  .proposal-card.proposal-approved::before,
+  .proposal-card.proposal-rejected::before,
+  .proposal-card.proposal-selected-highlight,
+  .evidence-preview-box::after,
+  .run-status-card::before,
+  .surface-illuminated::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+
+  .finding-card-selected {
+    box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.32) !important;
+    animation: none !important;
+  }
+
+  .badge-critical {
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.2) !important;
+    animation: none !important;
+  }
+}
+
+
+/* =============================================================================
+   BATCH 6 — FINAL UI/UX POLISH & RESPONSIVE REFINEMENT
+   OmniSight · Meridian Design System
+   =============================================================================
+   Contents
+   1.  Global typography & spacing refinements
+   2.  Keyboard focus-visible styles (accessibility)
+   3.  Page hero banner Meridian consistency (History, Settings, About)
+   4.  Inspection page container animation consistency
+   5.  Dashboard container responsive padding
+   6.  Section heading hierarchy improvements
+   7.  Interaction state consistency (hover / focus / disabled / loading)
+   8.  Mobile breakpoints — 480 px and 375 px gaps
+   9.  Tablet breakpoints — 768 px gaps
+   10. Light theme polish
+   11. Reduced-motion master guard (covers Batch 5 + Batch 6)
+   12. Misc cleanup: z-index layering, scrollbar styling, selection colour
+   ============================================================================= */
+
+/* ---------------------------------------------------------------------------
+   1. GLOBAL TYPOGRAPHY & SPACING REFINEMENTS
+   --------------------------------------------------------------------------- */
+
+/* Improve body text legibility */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  line-height: 1.6;
+}
+
+/* Consistent heading hierarchy across all pages */
+.page-title,
+.shell-hero-title,
+.history-hero-title,
+.settings-hero-title,
+.about-hero-title,
+.inspection-hero-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--text-main);
+}
+
+/* Section headings — unified size and weight */
+.section-heading {
+  font-size: 1.3rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.2 !important;
+}
+
+/* Section hints — slightly more readable */
+.section-hint {
+  font-size: 0.8375rem !important;
+  line-height: 1.55 !important;
+  color: var(--text-muted);
+}
+
+/* Card title typography — slightly larger for hierarchy */
+.card-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Mono text — always use system fallback stack from token */
+code,
+.font-mono,
+.finding-selector,
+.selector-label,
+.finding-id-tag,
+.proposal-id-tag code,
+.proposal-finding-tag code,
+.active-session-run-id code {
+  font-family: var(--font-mono);
+}
+
+/* Improve link readability */
+a {
+  color: var(--accent-prime);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--accent-prime-hover);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   2. KEYBOARD FOCUS-VISIBLE STYLES (accessibility)
+   Covers all interactive elements. Uses :focus-visible so mouse users
+   don't see the outline, but keyboard users always do.
+   --------------------------------------------------------------------------- */
+
+/* Global focus-visible baseline */
+*:focus-visible {
+  outline: 2px solid var(--accent-prime);
+  outline-offset: 2px;
+}
+
+/* Remove default focus ring (we use focus-visible) */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Buttons — slightly larger ring */
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-danger:focus-visible,
+.btn-sm:focus-visible,
+.btn-link:focus-visible {
+  outline: 2px solid var(--accent-prime);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--accent-prime-glow);
+}
+
+/* Nav tabs */
+.nav-tab-btn:focus-visible,
+.dashboard-nav-tab:focus-visible {
+  outline: 2px solid var(--accent-prime);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Cards used as interactive buttons */
+[role="button"]:focus-visible,
+.finding-card:focus-visible,
+.cap-card:focus-visible,
+.legend-pill:focus-visible,
+.theme-pill-btn:focus-visible,
+.auth-tab-btn:focus-visible {
+  outline: 2px solid var(--accent-prime);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-prime-glow);
+}
+
+/* Form inputs — consistent ring */
+.form-input:focus-visible,
+.text-input:focus-visible,
+.auth-input:focus-visible,
+select.form-input:focus-visible,
+.filter-select:focus-visible,
+.form-select:focus-visible {
+  outline: none; /* box-shadow ring already applied by :focus rules above */
+  box-shadow: 0 0 0 3px var(--accent-prime-glow);
+  border-color: var(--border-focus);
+}
+
+/* Icon buttons */
+.icon-btn:focus-visible,
+.hamburger-btn:focus-visible,
+.auth-modal-close-btn:focus-visible,
+.auth-password-toggle-btn:focus-visible {
+  outline: 2px solid var(--accent-prime);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+   3. PAGE HERO BANNER — MERIDIAN COLOUR CONSISTENCY
+   The old banners on History, Settings, About, and RepairProposal used
+   rgba(30, 41, 59, ...) / rgba(15, 23, 42, ...) which are slate-blue
+   palette — not Meridian obsidian-teal. Override to Meridian tokens.
+   --------------------------------------------------------------------------- */
+
+/* History hero */
+.history-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 201, 167, 0.07) 0%,
+    var(--bg-card) 60%,
+    var(--bg-secondary) 100%
+  ) !important;
+  border-color: rgba(0, 201, 167, 0.18) !important;
+}
+
+[data-theme="light"] .history-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 143, 119, 0.05) 0%,
+    var(--bg-card) 60%,
+    var(--bg-secondary) 100%
+  ) !important;
+}
+
+/* Settings hero */
+.settings-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 201, 167, 0.07) 0%,
+    var(--bg-card) 60%,
+    var(--bg-secondary) 100%
+  ) !important;
+  border-color: rgba(0, 201, 167, 0.18) !important;
+}
+
+[data-theme="light"] .settings-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 143, 119, 0.05) 0%,
+    var(--bg-card) 60%,
+    var(--bg-secondary) 100%
+  ) !important;
+}
+
+/* About hero */
+.about-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 201, 167, 0.07) 0%,
+    var(--bg-card) 55%,
+    var(--bg-secondary) 100%
+  ) !important;
+  border-color: rgba(0, 201, 167, 0.18) !important;
+}
+
+[data-theme="light"] .about-hero-banner {
+  background: linear-gradient(
+    135deg,
+    rgba(0, 143, 119, 0.05) 0%,
+    var(--bg-card) 55%,
+    var(--bg-secondary) 100%
+  ) !important;
+}
+
+/* Page badge — sky-blue is fine (--accent-sky), but align with Meridian accent token */
+.history-hero-badge,
+.settings-hero-badge,
+.about-hero-badge {
+  color: var(--accent-sky) !important;
+  background-color: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.28) !important;
+}
+
+[data-theme="light"] .history-hero-badge,
+[data-theme="light"] .settings-hero-badge,
+[data-theme="light"] .about-hero-badge {
+  color: var(--accent-sky-hover) !important;
+  background-color: rgba(2, 132, 199, 0.08) !important;
+  border-color: rgba(2, 132, 199, 0.22) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   4. INSPECTION PAGE CONTAINER — use viewEnter animation (not fadeIn)
+   --------------------------------------------------------------------------- */
+
+.inspection-studio-container {
+  animation: viewEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+/* ---------------------------------------------------------------------------
+   5. DASHBOARD CONTAINER — improved responsive padding
+   --------------------------------------------------------------------------- */
+
+@media (min-width: 1400px) {
+  .dashboard-container {
+    max-width: 1360px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 1rem 0.875rem 2.5rem;
+    gap: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 0.875rem 0.75rem 2rem;
+    gap: 1rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   6. SECTION HEADING HIERARCHY — teal glow on section-heading in dark mode
+   --------------------------------------------------------------------------- */
+
+[data-theme="dark"] .section-heading,
+:root:not([data-theme="light"]) .section-heading {
+  text-shadow: 0 0 24px rgba(0, 201, 167, 0.12);
+}
+
+/* ---------------------------------------------------------------------------
+   7. INTERACTION STATE CONSISTENCY
+   --------------------------------------------------------------------------- */
+
+/* Disabled state — global, consistent */
+.btn:disabled,
+.btn[disabled],
+button:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+/* Loading state text — don't shrink during spinner */
+.btn .spinner-sm {
+  flex-shrink: 0;
+}
+
+/* Card hover — ensure consistent lift across all card variants */
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-prime);
+}
+
+/* Shell stat box — teal left border on hover matches brand */
+.shell-stat-box:hover {
+  box-shadow: var(--shadow-teal) !important;
+  border-left-color: var(--accent-prime) !important;
+}
+
+/* Settings section card hover depth */
+.settings-section-card {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.settings-section-card:hover {
+  border-color: rgba(0, 201, 167, 0.2);
+  box-shadow: var(--shadow-md);
+}
+
+/* Inspection form section cards — focus-within highlight */
+.inspection-form-section:focus-within {
+  border-left-color: var(--accent-prime) !important;
+  box-shadow: 0 0 0 1px rgba(0, 201, 167, 0.12) inset;
+}
+
+/* Theme pill group — improve active tap target */
+.theme-pill-btn {
+  min-height: 36px;
+  min-width: 56px;
+  justify-content: center;
+}
+
+/* Nav tab button — minimum tap target */
+.nav-tab-btn {
+  min-height: 40px;
+  padding-inline: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   8. MOBILE BREAKPOINTS — 480 px and 375 px
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+  /* Page hero banners */
+  .history-hero-banner,
+  .settings-hero-banner,
+  .about-hero-banner {
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
+  }
+
+  .history-hero-title,
+  .settings-hero-title,
+  .about-hero-title {
+    font-size: 1.25rem;
+  }
+
+  /* Shell hero */
+  .shell-hero-card {
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
+  }
+
+  .shell-hero-title {
+    font-size: 1.3rem;
+  }
+
+  /* Section headings */
+  .section-heading {
+    font-size: 1.1rem !important;
+  }
+
+  /* Inspection studio */
+  .inspection-studio-hero {
+    padding: 1.25rem 1rem;
+  }
+
+  /* Cards */
+  .card {
+    padding: 1rem 1.125rem;
+    border-radius: 10px;
+  }
+
+  /* Shell stat boxes — single column */
+  .shell-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Shell grid — single column */
+  .shell-grid-cards {
+    grid-template-columns: 1fr;
+  }
+
+  /* Settings rows — stack fully */
+  .settings-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Theme pill group — full width */
+  .theme-pill-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .theme-pill-btn {
+    flex: 1;
+  }
+
+  /* Badge wrapping */
+  .inspection-hero-badge-row,
+  .settings-hero-badge-row,
+  .about-hero-badge-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* History table actions */
+  .history-header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  /* Proposal card header — stack */
+  .proposal-title-group {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Evidence preview min-height reduction */
+  .evidence-preview-box {
+    min-height: 120px !important;
+  }
+
+  /* Auth modal */
+  .auth-modal-card {
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 375px) {
+  .dashboard-container {
+    padding: 0.75rem 0.625rem 1.75rem;
+  }
+
+  .header-title {
+    font-size: 1.1rem;
+  }
+
+  .btn {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  .shell-hero-title,
+  .history-hero-title {
+    font-size: 1.15rem;
+  }
+
+  .section-heading {
+    font-size: 1rem !important;
+  }
+
+  .card {
+    padding: 0.875rem;
+    border-radius: 8px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   9. TABLET BREAKPOINTS — 768 px gaps
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  /* Shell hero — tighten */
+  .shell-hero-desc {
+    font-size: 0.9rem;
+  }
+
+  /* Section heading — tablet */
+  .section-heading {
+    font-size: 1.15rem !important;
+  }
+
+  /* Settings section cards — reduce padding */
+  .settings-section-card {
+    padding: 1.25rem;
+  }
+
+  /* History hero desc */
+  .history-hero-desc {
+    font-size: 0.8375rem;
+  }
+
+  /* Shell grid — 2 columns on tablet */
+  .shell-grid-cards {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  /* Profile details grid */
+  .profile-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Proposal badge row — wrap cleanly */
+  .proposal-badge-row {
+    gap: 0.5rem;
+  }
+
+  /* Finding card footer — stack */
+  .finding-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   10. LIGHT THEME POLISH
+   --------------------------------------------------------------------------- */
+
+/* Light theme — darken text muted for better contrast (WCAG AA) */
+[data-theme="light"] .text-muted,
+[data-theme="light"] .section-hint,
+[data-theme="light"] .shell-hero-desc,
+[data-theme="light"] .history-hero-desc,
+[data-theme="light"] .settings-desc,
+[data-theme="light"] .shell-feature-desc {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Light theme — card shadows are softer */
+[data-theme="light"] .card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-prime);
+}
+
+/* Light theme — badge contrast improvements */
+[data-theme="light"] .badge-neutral {
+  background-color: rgba(100, 116, 139, 0.1);
+  color: #334155;
+  border-color: rgba(100, 116, 139, 0.2);
+}
+
+[data-theme="light"] .badge-warning {
+  background-color: #fffbeb;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+
+/* Light theme — spinner uses darker teal track */
+[data-theme="light"] .spinner-sm {
+  border-color: rgba(0, 143, 119, 0.15);
+  border-top-color: var(--accent-prime);
+}
+
+/* Light theme — form inputs with stronger border */
+[data-theme="light"] .form-input,
+[data-theme="light"] .text-input,
+[data-theme="light"] .auth-input {
+  border-color: var(--border-input);
+  background-color: var(--bg-input);
+}
+
+/* Light theme — finding card severity glow adjustment */
+[data-theme="light"] .finding-card:has(.badge-critical):hover {
+  box-shadow:
+    0 0 0 1px rgba(220, 38, 38, 0.3),
+    inset 3px 0 14px rgba(220, 38, 38, 0.06),
+    0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .finding-card:has(.badge-high):hover {
+  box-shadow:
+    0 0 0 1px rgba(234, 88, 12, 0.25),
+    inset 3px 0 14px rgba(234, 88, 12, 0.05),
+    0 6px 16px rgba(0, 0, 0, 0.07);
+}
+
+/* Light theme — reduce badge glow effects */
+[data-theme="light"] .badge-critical {
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+[data-theme="light"] .badge-high,
+[data-theme="light"] .badge-low {
+  box-shadow: none !important;
+}
+
+/* Light theme — run status card beam (less intense) */
+[data-theme="light"] .run-status-card::before {
+  opacity: 0.6;
+}
+
+/* Light theme — pipeline terminal surface */
+[data-theme="light"] .home-pipeline {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   11. REDUCED-MOTION MASTER GUARD (Covers Batch 4, 5, 6)
+   Single comprehensive block to disable all motion.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Batch 6 additions */
+  .card::after,
+  .card:hover,
+  .shell-feature-card:hover,
+  .settings-section-card:hover,
+  .finding-card-selected,
+  .badge-critical,
+  .badge-status-dot.dot-live::before,
+  .finding-confidence-bar-fill::after,
+  .proposal-card.proposal-selected-highlight,
+  .evidence-preview-box::after,
+  .finding-card::after,
+  .run-status-card::before,
+  .surface-illuminated::after,
+  .home-pipeline::after,
+  .illuminatedBeam,
+  .runStatusBeam,
+  .confidenceShimmer,
+  .criticalPulse,
+  .dotLivePulse,
+  .findingScan,
+  .borderScanSlide,
+  .illuminatedBeam,
+  .proposalBorderSpin {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Keep transforms disabled globally for all animated elements */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Essential transitions we want to keep even in reduced-motion */
+  .btn,
+  .card,
+  .finding-card,
+  .nav-tab-btn {
+    transition: color 0.1s ease, background-color 0.1s ease, border-color 0.1s ease !important;
+  }
+
+  /* Ensure reveal items are always visible */
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  /* Disable hero glow pseudo */
+  .home-hero.cursor-glow::before,
+  .cap-card--featured.cursor-glow::before,
+  .cursor-glow::before {
+    display: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   12. MISC POLISH — scrollbar, text selection, z-index, visual separators
+   --------------------------------------------------------------------------- */
+
+/* Custom scrollbar — teal Meridian accent, subtle */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 201, 167, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 201, 167, 0.4);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 143, 119, 0.2);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 143, 119, 0.4);
+}
+
+/* Text selection accent */
+::selection {
+  background: rgba(0, 201, 167, 0.28);
+  color: var(--text-main);
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(0, 143, 119, 0.22);
+}
+
+/* Ensure all major page-level view containers have consistent max-width */
+.inspection-studio-container,
+.history-page-container,
+.repair-proposal-page-container,
+.about-page-container,
+.settings-page-container,
+.profile-page-container,
+.profile-view-container,
+.shell-view-container {
+  width: 100%;
+}
+
+/* Footer separator line */
+.dashboard-footer {
+  border-top: 1px solid rgba(0, 201, 167, 0.1);
+}
+
+[data-theme="light"] .dashboard-footer {
+  border-top-color: rgba(0, 143, 119, 0.1);
+}
+
+/* Proposal card — restore content z-index above ::after pseudo overlay */
+.proposal-card.proposal-selected-highlight > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Finding card — make selector container content always above scanlines */
+.finding-selector-container > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Evidence grid — better spacing on small screens */
+@media (max-width: 600px) {
+  .evidence-grid {
+    gap: 1rem;
+  }
+
+  .evidence-meta-card {
+    padding: 0.75rem 0.875rem;
+  }
 }

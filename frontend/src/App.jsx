@@ -40,6 +40,7 @@ import {
   subscribeToNavigation,
 } from './utils/router';
 import './App.css';
+import AnimatedBackground from './components/AnimatedBackground';
 
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
 
@@ -901,6 +902,9 @@ export default function App() {
 
   return (
     <div className="dashboard-layout">
+      {/* Immersive animated background — Meridian Command Environment */}
+      <AnimatedBackground view={currentView} />
+
       {/* 1. Shared Header with branding, navigation, health, theme & auth */}
       <Header
         health={health}
@@ -969,6 +973,9 @@ export default function App() {
             onDismiss={() => setInfoMessage('')}
           />
         )}
+
+        {/* View transition wrapper — keyed by currentView triggers re-mount + CSS viewEnter animation */}
+        <div key={currentView} className="view-transition-wrapper">
 
         {/* VIEW 1: Polished Home Landing View */}
         {currentView === 'home' && (
@@ -1204,6 +1211,8 @@ export default function App() {
             onSelectView={handleSelectView}
           />
         )}
+
+        </div>{/* end view-transition-wrapper */}
       </main>
 
       {/* 6-Step Guided Onboarding Tour Overlay */}

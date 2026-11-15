@@ -1,0 +1,333 @@
+/* =============================================================================
+   OmniSight — Surface System  (surfaces.css)
+   Batch 5 · Advanced Visual Surfaces & Interactive Graphics
+   -----------------------------------------------------------------------------
+   Utility surface classes that give each card a distinct visual treatment
+   instead of repeating the same glassmorphism on every panel.
+
+   Classes
+   -------
+   .surface-glass        — frosted glass  (existing identity, alias)
+   .surface-solid        — dark matte solid, crisp 1-px border
+   .surface-inset        — recessed / darker than bg-card
+   .surface-elevated     — lighter, more prominent, raised shadow
+   .surface-terminal     — near-black, monospace context, dashed accent border
+   .surface-illuminated  — solid card with animated teal beam along the top edge
+   .cursor-glow          — cursor-responsive radial highlight (needs JS hook)
+   .border-gradient      — conic animated gradient border via ::before
+   .border-scan          — single sweep scan-line on hover
+   ============================================================================= */
+
+/* ---------------------------------------------------------------------------
+   Base surface reset — opt-in isolation so surfaces work inside any container
+   --------------------------------------------------------------------------- */
+
+.surface-glass,
+.surface-solid,
+.surface-inset,
+.surface-elevated,
+.surface-terminal,
+.surface-illuminated {
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-glass  — tinted frosted glass (matches existing identity)
+   --------------------------------------------------------------------------- */
+
+.surface-glass {
+  background: var(--bg-glass, rgba(22, 34, 32, 0.72));
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] .surface-glass {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(0, 0, 0, 0.07);
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-solid  — dark matte, no blur, crisp border
+   --------------------------------------------------------------------------- */
+
+.surface-solid {
+  background: var(--bg-card, #162220);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.09));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .surface-solid {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-inset  — recessed, darker than the card background
+   --------------------------------------------------------------------------- */
+
+.surface-inset {
+  background: rgba(8, 15, 13, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .surface-inset {
+  background: rgba(241, 245, 249, 0.85);
+  border-color: rgba(0, 0, 0, 0.09);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-elevated  — lighter, more prominent, raised shadow
+   --------------------------------------------------------------------------- */
+
+.surface-elevated {
+  background: var(--bg-card-hover, #1c2d2a);
+  border: 1px solid rgba(0, 201, 167, 0.14);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="light"] .surface-elevated {
+  background: #ffffff;
+  border-color: rgba(0, 143, 119, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-terminal  — near-black with monospace / code context feel
+   --------------------------------------------------------------------------- */
+
+.surface-terminal {
+  background: rgba(5, 10, 9, 0.88);
+  border: 1px solid rgba(0, 201, 167, 0.18);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 201, 167, 0.07),
+    0 2px 10px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+}
+
+/* Subtle horizontal scanline texture on terminal surfaces */
+.surface-terminal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 201, 167, 0.012) 2px,
+    rgba(0, 201, 167, 0.012) 4px
+  );
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.surface-terminal > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme="light"] .surface-terminal {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(0, 143, 119, 0.22);
+}
+
+[data-theme="light"] .surface-terminal::before {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 143, 119, 0.015) 2px,
+    rgba(0, 143, 119, 0.015) 4px
+  );
+}
+
+/* ---------------------------------------------------------------------------
+   .surface-illuminated  — solid card with an animated teal beam along the
+   top edge.  Uses ::after so it doesn't conflict with terminal scanlines.
+   --------------------------------------------------------------------------- */
+
+.surface-illuminated {
+  background: var(--bg-card, #162220);
+  border: 1px solid rgba(0, 201, 167, 0.18);
+  overflow: hidden;
+}
+
+.surface-illuminated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 201, 167, 0.0) 20%,
+    rgba(0, 201, 167, 0.9) 50%,
+    rgba(0, 201, 167, 0.0) 80%,
+    transparent 100%
+  );
+  animation: illuminatedBeam 3.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes illuminatedBeam {
+  0%   { transform: translateX(-50%); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(50%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface-illuminated::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+[data-theme="light"] .surface-illuminated {
+  background: #ffffff;
+  border-color: rgba(0, 143, 119, 0.2);
+}
+
+/* ---------------------------------------------------------------------------
+   .cursor-glow  — cursor-responsive radial highlight
+   Requires JS hook that sets --glow-x / --glow-y on the element.
+   --------------------------------------------------------------------------- */
+
+.cursor-glow {
+  --glow-x: 50%;
+  --glow-y: -20%;
+  --glow-color: rgba(0, 201, 167, 0.09);
+  --glow-size: 320px;
+}
+
+.cursor-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    var(--glow-size) circle at var(--glow-x) var(--glow-y),
+    var(--glow-color),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cursor-glow:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-glow::before {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   .border-gradient  — animated conic-gradient spinning border.
+   Wrap content: <div class="border-gradient"><div class="border-gradient-inner">…</div></div>
+   Or use on a card with position:relative + overflow:hidden.
+   --------------------------------------------------------------------------- */
+
+.border-gradient {
+  --border-angle: 0turn;
+  padding: 1px;
+  border-radius: 10px;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 25%,
+    rgba(0, 201, 167, 0.7) 50%,
+    rgba(167, 139, 250, 0.5) 65%,
+    transparent 75%
+  );
+  animation: borderGradientSpin 4s linear infinite;
+}
+
+@keyframes borderGradientSpin {
+  to { --border-angle: 1turn; }
+}
+
+/* Fallback: browsers that don't support @property animation use a static border */
+@supports not (background: conic-gradient(from 1turn, red, red)) {
+  .border-gradient {
+    background: linear-gradient(135deg, rgba(0, 201, 167, 0.5), rgba(167, 139, 250, 0.4)) border-box;
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .border-gradient {
+    animation: none;
+  }
+}
+
+.border-gradient-inner {
+  background: var(--bg-card, #162220);
+  border-radius: 9px;
+  width: 100%;
+  height: 100%;
+}
+
+[data-theme="light"] .border-gradient-inner {
+  background: #ffffff;
+}
+
+/* ---------------------------------------------------------------------------
+   .border-scan  — a single sweep scan-line slides top → bottom on hover
+   --------------------------------------------------------------------------- */
+
+.border-scan {
+  overflow: hidden;
+}
+
+.border-scan::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 201, 167, 0.6),
+    transparent
+  );
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  transition: opacity 0.2s ease;
+}
+
+.border-scan:hover::after {
+  opacity: 1;
+  animation: borderScanSlide 1.4s ease-in-out forwards;
+}
+
+@keyframes borderScanSlide {
+  0%   { top: -4px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .border-scan::after {
+    display: none;
+  }
+}
