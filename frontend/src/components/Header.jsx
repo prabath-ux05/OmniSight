@@ -104,27 +104,7 @@ export default function Header({
           </div>
         </div>
 
-        {/* 3. Main Dashboard Header: ONLY Home, Inspection, History, Repair Workflow */}
-        <nav className="desktop-nav-menu" aria-label="Primary Navigation">
-          {NAV_ITEMS.map((item) => {
-            const active = isNavActive(item.id);
-            return (
-              <button
-                key={item.id}
-                type="button"
-                data-tour-nav={item.id}
-                className={`desktop-nav-item ${active ? 'active' : ''}`}
-                onClick={() => onSelectView(item.id)}
-                title={item.desc}
-              >
-                <span className="nav-item-icon" aria-hidden="true">{item.icon}</span>
-                <span className="nav-item-label">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* 4. Far-Right Header Action: Exactly One Login / Sign Up Button or Profile Avatar */}
+        {/* Far-Right Header Action: Exactly One Login / Sign Up Button or Profile Avatar */}
         <div className="header-actions">
           {user ? (
             <button
