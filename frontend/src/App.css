@@ -323,7 +323,7 @@ select.form-input:focus,
 }
 
 .btn-demo-active {
-  background-color: var(--accent-blue);
+  background-color: var(--accent-prime);
   color: #ffffff;
   border-color: var(--accent-blue-hover);
   box-shadow: 0 0 0 2px rgba(0, 201, 167, 0.3);
@@ -420,7 +420,7 @@ select.form-input:focus,
   background: none;
   border: none;
   padding: 0;
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   font-size: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -466,7 +466,7 @@ select.form-input:focus,
 }
 
 .status-url a {
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   text-decoration: none;
   word-break: break-all;
 }
@@ -782,7 +782,7 @@ select.form-input:focus,
 }
 
 .finding-view-evidence-hint {
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   font-weight: 500;
 }
 
@@ -1837,7 +1837,7 @@ select.form-input:focus,
 
 .badge-repair-eligible {
   background-color: rgba(0, 201, 167, 0.12);
-  color: #818cf8;
+  color: var(--accent-prime);
   border: 1px solid rgba(0, 201, 167, 0.28);
 }
 
@@ -2081,7 +2081,7 @@ select.form-input:focus,
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
-  color: #818cf8;
+  color: var(--accent-prime);
 }
 
 .repair-best-code {
@@ -2865,7 +2865,7 @@ select.form-input:focus,
 }
 
 .desktop-nav-item.active {
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   background-color: var(--bg-secondary);
   border-color: var(--border-subtle);
   font-weight: 600;
@@ -3031,7 +3031,7 @@ select.form-input:focus,
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--accent-blue);
+  border: 2px solid rgba(0, 201, 167, 0.5);
 }
 
 .drawer-profile-avatar {
@@ -3090,7 +3090,7 @@ select.form-input:focus,
   height: 56px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--accent-blue);
+  border: 2px solid rgba(0, 201, 167, 0.5);
 }
 
 .profile-details-info {
@@ -3253,7 +3253,7 @@ select.form-input:focus,
 
 .active-pill {
   font-size: 0.85rem;
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   font-weight: 700;
 }
 
@@ -3302,8 +3302,8 @@ select.form-input:focus,
 
 .drawer-theme-btn.active {
   background-color: rgba(0, 201, 167, 0.12);
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+  border-color: var(--accent-prime);
+  color: var(--accent-prime);
   font-weight: 600;
 }
 
@@ -3432,8 +3432,8 @@ select.form-input:focus,
 
 .capability-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
+  border-color: rgba(0, 201, 167, 0.35);
+  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 201, 167, 0.1);
 }
 
 .feature-icon-wrapper {
@@ -3611,8 +3611,8 @@ select.form-input:focus,
 
 .theme-pill-btn.active {
   background-color: rgba(0, 201, 167, 0.12);
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+  border-color: var(--accent-prime);
+  color: var(--accent-prime);
   font-weight: 600;
 }
 
@@ -3721,7 +3721,7 @@ select.form-input:focus,
 
 .home-guest-callout {
   background-color: rgba(0, 201, 167, 0.06);
-  border-left: 3px solid var(--accent-blue);
+  border-left: 3px solid var(--accent-prime);
   border-radius: 6px;
   padding: 0.75rem 1rem;
 }
@@ -3782,7 +3782,7 @@ select.form-input:focus,
 
 .overview-ping-btn {
   font-size: 0.725rem;
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   background: none;
   border: none;
   padding: 0;
@@ -3800,7 +3800,7 @@ select.form-input:focus,
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
   background-color: rgba(0, 201, 167, 0.1);
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   border: 1px solid rgba(0, 201, 167, 0.22);
 }
 
@@ -3858,7 +3858,7 @@ select.form-input:focus,
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   font-weight: 700;
 }
 
@@ -4011,7 +4011,7 @@ select.form-input:focus,
 
 [data-theme="light"] .badge-active-run {
   background-color: #eff6ff;
-  color: #1d4ed8;
+  color: #006f5e;
   border-color: var(--accent-prime);
 }
 
@@ -4164,13 +4164,13 @@ select.form-input:focus,
 
 /* Step status states */
 .pipeline-step-active .step-number {
-  background-color: var(--accent-blue);
+  background-color: var(--accent-prime);
   color: #ffffff;
   box-shadow: 0 0 10px rgba(0, 201, 167, 0.5);
 }
 
 .pipeline-step-active .step-label {
-  color: var(--accent-blue);
+  color: var(--accent-prime);
   font-weight: 700;
 }
 
@@ -4278,8 +4278,8 @@ select.form-input:focus,
 }
 
 .btn-filter-pill.pill-low.active {
-  background: linear-gradient(135deg, var(--accent-sky), var(--accent-sky));
-  border-color: var(--accent-sky);
+  background: linear-gradient(135deg, #00C9A7, #008F77);
+  border-color: #00C9A7;
   box-shadow: 0 2px 6px rgba(0, 201, 167, 0.28);
 }
 
@@ -4771,7 +4771,7 @@ select.form-input:focus,
 }
 
 [data-theme="light"] .inspector-id-pill {
-  color: #1d4ed8;
+  color: #006f5e;
   background-color: #dbeafe;
   border-color: #bfdbfe;
 }
@@ -5326,7 +5326,7 @@ select.form-input:focus,
 .finding-pill-btn.active {
   background-color: rgba(0, 201, 167, 0.12);
   border-color: var(--accent-prime);
-  color: #818cf8;
+  color: var(--accent-prime);
   font-weight: 700;
 }
 
@@ -5355,7 +5355,7 @@ select.form-input:focus,
 }
 
 .finding-sev-dot.badge-sev-low {
-  background-color: var(--accent-sky);
+  background-color: var(--accent-prime);
 }
 
 .finding-pill-id {
@@ -5583,9 +5583,9 @@ select.form-input:focus,
 }
 
 .quick-chip-btn:hover {
-  border-color: var(--accent-sky);
+  border-color: var(--accent-prime);
   background-color: rgba(0, 201, 167, 0.08);
-  color: var(--accent-sky);
+  color: var(--accent-prime);
 }
 
 /* Chat Messages Stream */
@@ -5624,8 +5624,8 @@ select.form-input:focus,
 }
 
 .bubble-user .chat-bubble {
-  background-color: var(--accent-sky);
-  color: #ffffff;
+  background-color: var(--accent-prime);
+  color: #09100F;
   border-bottom-right-radius: 2px;
 }
 
@@ -5713,7 +5713,7 @@ select.form-input:focus,
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: var(--accent-sky);
+  background-color: var(--accent-prime);
   animation: thinkingBounce 1.4s infinite ease-in-out both;
 }
 
@@ -6122,7 +6122,7 @@ select.form-input:focus,
 
 .gov-tab-btn.active {
   background-color: rgba(0, 201, 167, 0.12);
-  color: #818cf8;
+  color: var(--accent-prime);
   border-color: rgba(0, 201, 167, 0.35);
 }
 
@@ -6310,7 +6310,7 @@ select.form-input:focus,
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #818cf8;
+  color: var(--accent-prime);
 }
 
 [data-theme="light"] .section-label {
@@ -6397,8 +6397,8 @@ select.form-input:focus,
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-sky) 0%, var(--accent-violet) 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--accent-prime) 0%, var(--accent-violet) 100%);
+  color: #09100F;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6845,7 +6845,7 @@ select.form-input:focus,
 .tour-dot.active {
   width: 18px;
   border-radius: 9999px;
-  background-color: var(--accent-sky);
+  background-color: var(--accent-prime);
 }
 
 .tour-actions-group {
@@ -8126,8 +8126,8 @@ select.form-input:focus,
 }
 
 .segmented-btn.active {
-  background: var(--primary, var(--accent-sky));
-  color: #ffffff;
+  background: var(--primary, var(--accent-prime));
+  color: #09100F;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -8573,7 +8573,7 @@ select.form-input:focus,
 
 .badge-viewport-scanning {
   background: rgba(0, 201, 167, 0.15);
-  color: #818cf8;
+  color: var(--accent-prime);
   border: 1px solid rgba(0, 201, 167, 0.35);
   border-radius: 6px;
   font-size: 0.72rem;
@@ -8602,7 +8602,7 @@ select.form-input:focus,
 
 .scanning-progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-prime) 0%, #818cf8 50%, var(--accent-prime) 100%);
+  background: linear-gradient(90deg, #008F77 0%, #00C9A7 50%, #008F77 100%);
   background-size: 200% 100%;
   animation: scanProgressAnimate 1.8s linear infinite;
   border-radius: 2px;
@@ -8656,7 +8656,7 @@ select.form-input:focus,
 .finding-confidence-bar-fill {
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--accent-prime), #818cf8);
+  background: linear-gradient(90deg, #008F77, #00C9A7);
   transition: width 0.3s ease;
 }
 
@@ -8682,7 +8682,7 @@ select.form-input:focus,
 
 .run-viewport-pill-desktop {
   background: rgba(0, 201, 167, 0.1);
-  color: #818cf8;
+  color: var(--accent-prime);
   border-color: rgba(0, 201, 167, 0.28);
 }
 
@@ -8720,7 +8720,7 @@ select.form-input:focus,
 .active-scan-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #818cf8;
+  color: var(--accent-prime);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -9462,8 +9462,8 @@ select.form-input:focus,
 }
 
 .step-active .step-circle {
-  background: var(--accent-sky);
-  color: #ffffff;
+  background: var(--accent-prime);
+  color: #09100F;
   border-color: var(--accent-prime);
   box-shadow: 0 0 10px rgba(0, 201, 167, 0.35);
 }
