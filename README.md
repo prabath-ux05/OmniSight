@@ -1,447 +1,412 @@
-
 # OmniSight — Multimodal UI Self-Healing & RPA Agent
 
-OmniSight is an intelligent, multimodal Robotic Process Automation (RPA) and automated UI test self-healing project. It aims to combine vision-language models, browser automation, and Git workflows to detect UI changes, diagnose broken selectors and workflows, generate candidate test repairs, and submit changes for human review.
+[![Live Demo on Vercel](https://img.shields.io/badge/Live%20Demo-omnisight--rho.vercel.app-00C9A7?style=for-the-badge&logo=vercel&logoColor=white)](https://omnisight-rho.vercel.app)
+[![Backend Status](https://img.shields.io/badge/API%20Status-Render%20Online-10B981?style=for-the-badge&logo=render&logoColor=white)](https://omnisight-rgqc.onrender.com/health)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Playwright](https://img.shields.io/badge/Playwright-Chromium-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
 
-The project includes a Playwright-based Browser Agent for browser navigation, screenshot capture, DOM snapshot generation, metadata collection, browser error monitoring, and automated testing. The Vision Engine provides validated input and finding models, evidence validation, deterministic mock detection, static HTML DOM heuristics, Gemini-powered vision-language analysis, screenshot cropping, evaluation metrics, and post-repair verification. It can analyze screenshot and DOM evidence, produce structured findings, and compare full-image and cropped-image detection workflows. Other components are under active development.
+**OmniSight** is an enterprise-grade multimodal Robotic Process Automation (RPA) and automated UI test self-healing platform. By unifying vision-language models (VLMs), headless browser automation, and deterministic DOM analysis, OmniSight detects visual layout regressions, broken interactive elements, and dynamic selector shifts. It synthesizes resilient candidate repairs, validates them in an isolated sandbox, and submits governed pull requests for human-in-the-loop review.
 
-## 🚀 Project Objective
+---
 
-UI automation scripts can break when frontend layouts, DOM structures, CSS classes, or dynamic element IDs change. OmniSight aims to address these issues through:
+## 🌐 Live Demo & Deployment
 
-1. **Multimodal Visual Inspection:** Analyze screenshots and DOM evidence together to identify potential UI defects.
-2. **Autonomous Diagnosis:** Identify broken locators, layout drift, and UI regressions.
-3. **Automated Code Self-Healing:** Generate candidate selector repairs and test-script updates for review and verification.
-4. **GitHub Integration:** Support branches, commits, and pull requests for validated changes.
-5. **Human-in-the-Loop Dashboard:** Provide a dashboard for reviewing findings and monitoring automation.
+| Service | Environment | Live URL | Status |
+|---|---|---|---|
+| **Frontend Dashboard** | Vercel (React 18 + Vite) | **[https://omnisight-rho.vercel.app](https://omnisight-rho.vercel.app)** | ![Vercel](https://img.shields.io/badge/Vercel-Active-00C9A7?style=flat-square&logo=vercel) |
+| **Backend API** | Render (FastAPI + Docker) | **[https://omnisight-rgqc.onrender.com](https://omnisight-rgqc.onrender.com)** | ![Render](https://img.shields.io/badge/Render-Active-10B981?style=flat-square&logo=render) |
+| **API Health Probe** | Public JSON Endpoint | **[https://omnisight-rgqc.onrender.com/health](https://omnisight-rgqc.onrender.com/health)** | `HTTP 200 {"status":"ok"}` |
+| **Interactive Docs** | Swagger UI | **[https://omnisight-rgqc.onrender.com/docs](https://omnisight-rgqc.onrender.com/docs)** | OpenAPI Specification |
+| **Database** | Render Managed PostgreSQL | Attached persistent storage | PostgreSQL 18 + Alembic |
 
-## 📁 Repository Structure
+> **Note on Free-Tier Latency:** The backend on Render spins down after periods of inactivity. If visiting the live demo during a cold state, the initial health handshake may take ~30–50 seconds before responding. Subsequent interactions are fast.
+
+---
+
+## 📸 Product Preview & Working Interface
+
+### 1. Main Dashboard & Autonomous Command Center
+*The Meridian-themed command center featuring real-time telemetry, platform health monitoring, multi-viewport status indicators, and an interactive 12-column capability mosaic.*
+
+![OmniSight Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+### 2. Live Inspection Studio
+*The dedicated Live Inspection Studio where operators initiate automated inspections across desktop, tablet, and mobile viewport presets with real-time status and telemetry.*
+
+![Live Inspection Studio](docs/screenshots/live-inspection.png)
+
+---
+
+### 3. Visual Defect Detection & Finding Evidence
+*Multimodal inspection results showing detected visual defects, severity badges, confidence scoring, target DOM selector references, and pixel-level screenshot evidence.*
+
+![Inspection Findings](docs/screenshots/inspection-findings.png)
+
+---
+
+### 4. Self-Healing Repair Proposals & Human-in-the-Loop Governance
+*Automated repair proposal workflow synthesizing resilient locator alternatives, showing review authorization states (`PENDING`, `APPROVED`, `REJECTED`), and pull request submission gates.*
+
+![Repair Proposals](docs/screenshots/repair-proposals.png)
+
+---
+
+### 5. Gemini Contextual AI Repair Assistant Chat
+*Interactive AI diagnostic assistant grounded in live inspection findings, DOM geometries, and locator metadata to guide developers through remediation.*
+
+![Gemini AI Repair Chatbot](docs/screenshots/gemini-chatbot.png)
+
+---
+
+### 6. Visual Evidence & Verification Stage
+*Detailed inspection evidence inspection showing DOM snapshots, captured assets, and side-by-side inspection evidence.*
+
+![Visual Evidence & Verification](docs/screenshots/repair-comparison.png)
+
+---
+
+### 7. Historical Inspection Audit Trail
+*Searchable, filterable audit log of historical inspection runs with multi-viewport indicators, duration metrics, defect counts, and CSV/PDF export capability.*
+
+![Inspection History](docs/screenshots/inspection-history.png)
+
+---
+
+## ⚠️ Problem Statement & Motivation
+
+Modern web applications undergo frequent UI iterations, A/B testing, and framework updates. These changes frequently break automated end-to-end (E2E) testing suites and RPA bots:
+
+1. **Brittle Selectors:** Automated tests fail when CSS classes, dynamic auto-generated IDs, or DOM hierarchies shift—even when visual page functionality is completely intact.
+2. **Silent Visual Regressions:** Traditional assertions miss off-screen layout overflows, overlapping text, missing graphical elements, and responsive viewport clipping.
+3. **High Maintenance Overhead:** QA engineers spend countless hours manually triaging flakiness, diagnosing broken selectors, and authoring patch commits.
+4. **Ungoverned Auto-Fixes:** Naive self-healing tools that mutate live production applications without safety gates create significant operational risks.
+
+**OmniSight solves this** by pairing multimodal vision-language intelligence with deterministic DOM heuristics, strictly separating sandboxed repair synthesis from production code through human-reviewed pull requests.
+
+---
+
+## ✨ Key Features & Capabilities
+
+- **Multimodal Visual Inspection:** Combines Playwright full-page screenshots with structural DOM snapshots to analyze visual appearances and underlying code simultaneously.
+- **VLM Defect Detection:** Leverages Google Gemini vision models alongside deterministic DOM heuristics to detect layout overflows, broken images, and missing interactive controls.
+- **Multi-Viewport Cross-Check:** Simultaneously captures and evaluates pages across Desktop (1280×800), Tablet (768×1024), and Mobile (375×667) resolutions.
+- **Self-Healing Locator Synthesis:** Recommends prioritized, resilient locator alternatives (data-testid, role, ARIA, robust CSS paths) when existing selectors degrade.
+- **Human-in-the-Loop Safety Gate:** Strictly isolates proposed changes into sandboxed candidates. No code is merged or committed without explicit operator authorization.
+- **Automated GitHub PR Integration:** Transforms approved locator repairs into minimal unified diff patches and submits pull requests via the GitHub REST API.
+- **Meridian Visual Identity System:** Modern command-center aesthetic featuring an obsidian-teal palette, layered ambient backgrounds, SVG telemetry graphics, and WCAG AA accessibility.
+- **Complete Auditability:** PostgreSQL-backed audit trail with full lifecycle tracking, historical run comparisons, and CSV/PDF report exports.
+
+---
+
+## 🔄 How the Complete System Works
+
+OmniSight operates through an end-to-end 5-stage automated pipeline:
+
+```
+[ 1. CAPTURE ] ──▶ [ 2. ANALYZE ] ──▶ [ 3. DIAGNOSE ] ──▶ [ 4. REPAIR ] ──▶ [ 5. VERIFY ]
+  Playwright         Gemini VLM +        Deterministic      Candidate         Human Review +
+  Headless           DOM Heuristic       Selector & Layout  Locator Diff      GitHub PR Gate
+  Multi-Viewport     Inference           Drift Mapping      Synthesis         Verification
+```
+
+1. **Capture:** The Browser Agent launches headless Chromium via Playwright, navigates to the target URL, executes required interactions, and captures full-page screenshot buffers, raw DOM trees, and console/network logs.
+2. **Analyze:** The Vision Engine evaluates visual screenshot buffers and DOM snapshots. It combines Gemini vision-language model inference with deterministic DOM heuristic checks (e.g., missing alt text, unlabelled inputs, broken assets).
+3. **Diagnose:** Findings are normalized into validated Pydantic models with categories (`layout_overflow`, `missing_visible_element`, `broken_image`), confidence scores (0.0–1.0), and bounding-box coordinates.
+4. **Repair:** The Self-Healing engine synthesizes candidate locator replacements and formats minimal unified diff patches for the test suite.
+5. **Verify:** The operator inspects the proposed fix in the dashboard. Upon explicit approval, OmniSight can verify the patch in an isolated local sandbox and open a GitHub pull request.
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client ["Client Layer"]
+        User["QA Engineer / Operator"]
+        Vercel["Vercel Edge CDN<br/>(React 18 + Vite SPA)"]
+        User -->|HTTPS| Vercel
+    end
+
+    subgraph Backend ["Backend Orchestration Layer (Render Docker)"]
+        FastAPI["FastAPI Orchestrator<br/>(Uvicorn + Proxy Headers)"]
+        Vercel -->|/api/* Rewrites| FastAPI
+
+        subgraph Core_Services ["Core Engine Services"]
+            BrowserAgent["Browser Agent<br/>(Playwright Chromium)"]
+            VisionEngine["Vision Engine<br/>(Gemini VLM + DOM Heuristics)"]
+            SelfHealing["Self-Healing Pipeline<br/>(Locator Synthesizer)"]
+            GitIntegrator["GitHub Integration<br/>(Branch & PR Manager)"]
+        end
+
+        FastAPI --> BrowserAgent
+        FastAPI --> VisionEngine
+        FastAPI --> SelfHealing
+        FastAPI --> GitIntegrator
+    end
+
+    subgraph Data ["Data & Storage Layer"]
+        PostgreSQL[("Render Managed PostgreSQL<br/>(Runs, Findings, Proposals, Auth)")]
+        Disk[("Persistent Artifact Disk<br/>(Screenshots & DOM Snapshots)")]
+        FastAPI -->|SQLAlchemy 2.0 + Alembic| PostgreSQL
+        BrowserAgent -->|Save Buffers| Disk
+        FastAPI -->|Serve Static Artifacts| Disk
+    end
+
+    subgraph External ["External Services"]
+        TargetWeb["Target Web Application"]
+        GeminiAPI["Google Gemini API<br/>(VLM Inference)"]
+        GitHubAPI["GitHub REST API<br/>(Pull Request Gate)"]
+        BrowserAgent -->|Headless Navigation| TargetWeb
+        VisionEngine -->|Visual Inspection| GeminiAPI
+        GitIntegrator -->|Open Pull Request| GitHubAPI
+    end
+```
+
+---
+
+## 💻 Technology Stack
+
+### Frontend Dashboard
+- **React 18 & Vite:** Fast single-page application with modular component architecture.
+- **Meridian Design Tokens:** Custom obsidian-teal (`#00C9A7`) theme with dark/light mode toggle.
+- **Interactive UI Components:** Split-view comparison slider, live preview scanner, and defect highlight overlays.
+- **Zero Heavy UI Libraries:** Built using standard CSS custom properties, vanilla React hooks, and SVG animation for high performance.
+
+### Backend & Orchestration
+- **FastAPI (Python 3.11 / 3.12):** Asynchronous REST API framework with automatic OpenAPI documentation.
+- **Uvicorn:** ASGI web server configured with proxy header forwarding for cloud deployment.
+- **Pydantic v2:** Rigorous schema validation across all request/response models and evidence payloads.
+- **Argon2-cffi:** Password hashing and secure session management.
+
+### AI & Vision Engine
+- **Google Gemini 2.0 / 1.5 Flash:** Multimodal vision-language model for UI defect detection and element localization.
+- **Deterministic DOM Heuristics:** Fast rule-based fallbacks for missing attributes, labels, and structural violations.
+- **Pillow (PIL):** Screenshot cropping, coordinate translation, and image validation.
+- **Intersection-over-Union (IoU):** Spatial evaluation metrics to benchmark detection accuracy against ground truth.
+
+### Browser Automation & RPA
+- **Playwright (Python):** Native Chromium headless automation for multi-viewport evidence capture.
+- **BeautifulSoup4:** Deterministic DOM snapshot parsing and selector tree traversal.
+
+### Database & Deployment Infrastructure
+- **PostgreSQL 18:** Relational persistence for runs, findings, artifacts, proposals, and user accounts.
+- **SQLAlchemy 2.0 & Alembic:** Async-capable ORM with sequential database migrations (`001` through `004`).
+- **Render:** Cloud container deployment running the official Microsoft Playwright Docker runtime (`mcr.microsoft.com/playwright/python:v1.64.1-noble`).
+- **Vercel:** Global edge deployment for the frontend SPA with `/api/*` reverse proxy rewrites.
+
+---
+
+## 📂 Project Structure
 
 ```text
 OmniSight/
-├── vision_engine/
-│   ├── detection/
-│   │   ├── dom_detector.py
-│   │   ├── gemini_provider.py
-│   │   ├── mock_detector.py
-│   │   ├── providers.py
-│   │   ├── vlm_detector.py
-│   │   ├── vlm_interface.py
-│   │   └── vlm_response_parser.py
-│   ├── prompting/
-│   │   ├── defect_prompts.py
-│   │   └── vlm_prompt.py
-│   ├── tests/
-│   │   ├── test_dom_detector.py
-│   │   ├── test_evaluation.py
-│   │   ├── test_evidence_validator.py
-│   │   ├── test_gemini_provider.py
-│   │   ├── test_image_processing.py
-│   │   ├── test_mock_detector.py
-│   │   ├── test_models.py
-│   │   ├── test_verification.py
-│   │   ├── test_vlm_detector.py
-│   │   ├── test_vlm_interface.py
-│   │   ├── test_vlm_prompt.py
-│   │   └── test_vlm_response_parser.py
-│   ├── demo_tests/
-│   ├── evaluation.py
-│   ├── evidence_validator.py
-│   ├── image_processing.py
-│   ├── models.py
-│   ├── verification.py
-│   └── README.md
-│
-├── browser_agent/
-│   ├── navigation/                # Browser navigation and interactions
-│   ├── screenshots/               # Screenshot capture and artifacts
-│   ├── evidence/                  # DOM snapshots and execution evidence
-│   └── tests/                     # Browser Agent automated tests
-│
-├── backend/                       # FastAPI backend and orchestration API
+├── backend/                        # FastAPI application & REST services
 │   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   └── main.py
-│   └── tests/
+│   │   ├── api/                    # Endpoints (runs, findings, proposals, auth, chat)
+│   │   ├── core/                   # Config, security, database session setup
+│   │   ├── models/                 # SQLAlchemy 2.0 ORM models
+│   │   ├── schemas/                # Pydantic v2 validation contracts
+│   │   └── services/               # Orchestrator, preview, and export services
+│   └── tests/                      # 150+ automated backend and integration tests
 │
-├── self_healing/                  # Failure analysis and repair pipeline
-├── github_integration/            # GitHub and Git workflow automation
-├── frontend/                      # Monitoring dashboard
-├── docs/                          # Project and module documentation
-│   ├── backend_api.md
-│   └── browser_agent_setup.md
-├── tests/                         # Project-level and integration tests
-├── artifacts/                     # Generated browser execution artifacts
-├── pytest.ini
-├── .gitignore
-├── .env.example
-├── requirements.txt
-└── README.md
+├── vision_engine/                  # Multimodal AI & visual defect detection
+│   ├── detection/                  # Gemini VLM, DOM heuristics, and mock providers
+│   ├── prompting/                  # Engineered vision prompts and JSON parsers
+│   ├── image_processing.py         # Screenshot cropping and coordinate mapping
+│   ├── evaluation.py               # Spatial IoU evaluation and precision/recall
+│   └── verification.py             # Post-repair patch verification logic
+│
+├── browser_agent/                  # Playwright headless browser automation
+│   ├── navigation/                 # Chromium navigation, timeout handling, retries
+│   ├── screenshots/                # Multi-viewport full-page image capture
+│   └── evidence/                   # Structural DOM snapshots and metadata
+│
+├── self_healing/                   # Failure analysis & locator repair synthesizer
+├── github_integration/             # Automated Git branch, commit, and PR management
+│
+├── frontend/                       # React 18 / Vite monitoring & review dashboard
+│   ├── src/
+│   │   ├── components/             # Reusable UI cards, tables, overlays, split-view
+│   │   ├── hooks/                  # Custom hooks (useScrollReveal, useCursorGlow)
+│   │   ├── services/api.js         # Centralized HTTP client and API integration
+│   │   └── utils/                  # Router, session, and findings state helpers
+│   ├── vercel.json                 # Vercel reverse proxy rewrites configuration
+│   └── package.json                # Frontend dependencies and test runner
+│
+├── alembic/                        # Database migration scripts (001 -> 004)
+├── docs/                           # Technical guides, architecture docs, screenshots
+│   └── screenshots/                # Genuine application interface preview images
+├── Dockerfile                      # Production Docker container (Playwright base)
+├── render.yaml                     # Render Infrastructure-as-Code Blueprint
+├── requirements.txt                # Pinned Python production dependencies
+└── README.md                       # Repository presentation and documentation
 ```
 
-The tree highlights the main project modules and selected implementation files. Some directories contain additional files and supporting resources not shown here.
+---
 
-## 👥 Team Module Distribution
-
-| Member / Focus Area | Primary Modules | Responsibilities |
-|---|---|---|
-| Member 1: Vision & Intelligence | `vision_engine/` | Visual defect detection, input/output models, evidence validation, model integration, prompt engineering, and element localization |
-| Member 2: RPA & Browser Agent | `browser_agent/` | Playwright navigation, browser interactions, screenshots, DOM snapshots, metadata collection, browser error handling, evidence generation, and automated testing |
-| Member 3: Self-Healing & Verification | `self_healing/` | Failure analysis, candidate selector repairs, repair generation, and patch verification |
-| Member 4: Backend & GitHub Integration | `backend/`, `github_integration/` | API orchestration, backend services, Git workflows, branch management, pull requests, and application state |
-
-## 🛠️ Setup
+## ⚙️ Installation & Local Setup
 
 ### Prerequisites
-
-- Python installed and available in the terminal.
-- Git installed and configured.
-- Access to the OmniSight repository.
-- Playwright and its required browser installed for Browser Agent work.
+- **Python 3.11+** installed and available on PATH
+- **Node.js 18+** and **npm**
+- **Git**
+- Optional: Local PostgreSQL instance (or uses SQLite for testing)
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/prabath-ux05/OmniSight.git
 cd OmniSight
 ```
 
-If you already have the repository locally, open its root directory instead of cloning it again.
-
-### 2. Create and Activate a Virtual Environment
-
-**Windows PowerShell:**
-
-```powershell
+### 2. Set Up Python Backend Virtual Environment
+```bash
+# Create virtual environment
 python -m venv .venv
+
+# Activate virtual environment
+# Windows PowerShell:
 .\.venv\Scripts\Activate.ps1
-```
-
-**macOS/Linux:**
-
-```bash
-python -m venv .venv
+# macOS/Linux:
 source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install Playwright Chromium binaries
+playwright install chromium
 ```
 
-### 3. Install Python Dependencies
-
-Run from the repository root:
-
+### 3. Configure Environment Variables
+Copy the template configuration files:
 ```bash
-python -m pip install -r requirements.txt
-```
-
-### 4. Install the Playwright Chromium Browser
-
-For Browser Agent development, install Chromium:
-
-```bash
-python -m playwright install chromium
-```
-
-### 5. Configure Environment Variables
-
-**Windows PowerShell:**
-
-```powershell
-Copy-Item .env.example .env
-```
-
-**macOS/Linux:**
-
-```bash
+# Backend environment configuration
 cp .env.example .env
+
+# Frontend environment configuration
+cp frontend/.env.example frontend/.env
 ```
 
-Configure only the environment variables required for your assigned work. Never commit `.env` files, API keys, passwords, or access tokens. External model integrations must use team-approved providers and authorized credentials.
+Fill in the required values in `.env` using placeholders as reference:
 
-### 6. Run Tests
+```ini
+# --- Application Environment ---
+APP_ENV=development
+APP_DEBUG=true
 
-Run the full test suite from the repository root:
+# --- Database Connection ---
+# Local SQLite for immediate testing:
+DATABASE_URL=sqlite:///./test_omnisight.db
+# Or local PostgreSQL:
+# DATABASE_URL=postgresql+psycopg2://postgres:password@localhost:5432/omnisight_db
 
+# --- Security & CSRF ---
+CSRF_SECRET_KEY=your-minimum-32-character-high-entropy-secret-key-here
+SESSION_EXPIRE_DAYS=7
+COOKIE_SECURE=false
+
+# --- AI & Vision Engine ---
+VISION_MODEL_PROVIDER=gemini
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# --- GitHub Integration (Optional) ---
+GITHUB_TOKEN=your-github-personal-access-token-here
+GITHUB_REPO=prabath-ux05/OmniSight
+```
+
+### 4. Run Database Migrations
 ```bash
-python -m pytest -v
+alembic upgrade head
 ```
 
-To run only the Vision Engine tests:
-
-```bash
-python -m pytest ./vision_engine/tests -q
-```
-
-To run the Backend tests:
-
-```bash
-pytest backend/tests -v
-```
-
-Review the test output to confirm which tests passed. Some test suites may require additional dependencies or configuration.
-
-### 7. Run the Backend API Server
-
-Start the local FastAPI development server using Uvicorn:
-
+### 5. Start the Backend API Server
 ```bash
 uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
+*Backend Swagger UI will be available at: `http://127.0.0.1:8000/docs`*
 
-Once running, access the interactive API documentation in your browser:
+### 6. Start the Frontend Dashboard
+In a separate terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+*Frontend application will open at: `http://localhost:5173`*
 
-- **Swagger UI (Interactive):** http://127.0.0.1:8000/docs
-- **ReDoc (Specification):** http://127.0.0.1:8000/redoc
+---
 
-## 📌 Development Status
+## 🧪 Running Automated Tests
 
-The following checklist reflects the documented development status. Features should only be marked complete when their implementation and tests have been verified.
+OmniSight includes comprehensive automated test suites covering unit logic, integration flows, and end-to-end schemas:
 
-### Vision Engine — Member 1: Vision & Intelligence
+```bash
+# 1. Run all Python backend & vision engine tests (150+ tests)
+pytest -v
 
-- [x] Implemented Pydantic input, finding, evidence-reference, and bounding-box models.
-- [x] Added input validation and evidence-file validation.
-- [x] Implemented deterministic mock defect detection.
-- [x] Implemented static HTML DOM heuristics for image and form-label issues.
-- [x] Integrated Gemini as a vision-language model provider.
-- [x] Added VLM prompt engineering and structured response parsing.
-- [x] Implemented screenshot cropping with support for single and multiple crop regions.
-- [x] Added coordinate translation from cropped images to original screenshot coordinates.
-- [x] Implemented spatial defect evaluation using Intersection over Union (IoU).
-- [x] Added one-to-one finding matching and configurable IoU thresholds.
-- [x] Added precision, recall, and F1-score evaluation metrics.
-- [x] Implemented post-repair finding verification.
-- [x] Added Gemini demo tests, evidence-capture scripts, and crop-mode benchmarking.
-- [x] Expanded automated tests across Vision Engine components.
+# 2. Run Vision Engine specific tests
+pytest vision_engine/tests -v
 
-### Vision Engine Implementation Details
+# 3. Run Backend API & Database tests
+pytest backend/tests -v
 
-#### Implemented Files
+# 4. Run Frontend unit and router tests (92 tests)
+cd frontend
+npm test
 
-| File | Description |
-|---|---|
-| `vision_engine/models.py` | Defines validated input, finding, evidence-reference, and bounding-box models. |
-| `vision_engine/evidence_validator.py` | Validates evidence-file existence, type, readability, and non-empty content. |
-| `vision_engine/detection/mock_detector.py` | Provides deterministic mock defect and clean-page scenarios. |
-| `vision_engine/detection/dom_detector.py` | Uses static HTML heuristics to identify selected image and form-label issues. |
-| `vision_engine/detection/gemini_provider.py` | Implements Gemini-backed vision-language model detection. |
-| `vision_engine/detection/vlm_detector.py` | Provides VLM detection functionality. |
-| `vision_engine/detection/vlm_interface.py` | Defines the interface for vision-language model providers. |
-| `vision_engine/detection/vlm_response_parser.py` | Parses and validates structured VLM responses. |
-| `vision_engine/detection/providers.py` | Contains provider-related detection functionality. |
-| `vision_engine/prompting/vlm_prompt.py` | Builds prompts and instructions for VLM-based defect detection. |
-| `vision_engine/prompting/defect_prompts.py` | Contains defect-related prompt definitions. |
-| `vision_engine/image_processing.py` | Handles screenshot cropping and coordinate translation. |
-| `vision_engine/evaluation.py` | Evaluates detection results using selector and spatial IoU matching, with precision, recall, and F1 metrics. |
-| `vision_engine/verification.py` | Verifies whether detected issues have been resolved after a repair. |
-| `vision_engine/demo_tests/` | Contains demo pages, evidence-capture scripts, Gemini validation, DOM checks, and crop benchmarking. |
-| `vision_engine/tests/` | Contains automated tests for Vision Engine models, detection, evaluation, prompting, image processing, and verification. |
-| `vision_engine/README.md` | Documents Vision Engine architecture, usage, capabilities, and limitations. |
-
-#### Current Capabilities
-
-- Accepts screenshot and DOM evidence through validated input models.
-- Validates evidence-file accessibility and basic file requirements.
-- Supports deterministic mock detection for controlled testing.
-- Uses static DOM heuristics to identify selected image and form-label issues.
-- Integrates Gemini for screenshot and DOM-based vision-language analysis.
-- Uses structured prompts and response parsing to produce standardized findings.
-- Supports full-image analysis and single or multiple screenshot crop regions.
-- Translates bounding boxes from cropped-image coordinates back to original screenshot coordinates.
-- Evaluates expected and detected findings using category matching, selector matching, and spatial Intersection over Union (IoU).
-- Supports configurable IoU thresholds and one-to-one finding assignment.
-- Calculates true positives, false positives, false negatives, precision, recall, and F1 score.
-- Supports post-repair verification with `resolved`, `partially_resolved`, `unresolved`, and `unverifiable` outcomes.
-- Includes demo scripts for evidence capture, Gemini validation, DOM timeout checks, and crop-mode benchmarking.
-
-#### Current Limitations
-
-The DOM detector performs static HTML analysis and does not execute JavaScript, inspect the fully rendered page layout, or independently verify whether remote images load successfully.
-
-Gemini-based detection depends on external provider availability, API access, and model response quality. VLM predictions may produce false positives or miss defects, so findings require validation.
-
-Screenshot crop benchmarking uses controlled demo fixtures and does not establish general accuracy improvements, production performance, or guaranteed cost savings.
-
-Evidence validation checks basic file accessibility and content requirements but does not establish the semantic correctness of all supplied evidence.
-
-The Vision Engine focuses on defect detection, evaluation, and verification. Complete browser automation, automatic repair execution, and end-to-end RPA workflows are handled by other project components.
-
-#### Testing
-
-- Latest recorded full Vision Engine test suite: **145 passed**.
-- Run the tests using:
-
-```powershell
-python -m pytest vision_engine/tests -v
+# 5. Verify Frontend production build
+npm run build
 ```
 
-### Browser Agent — Member 2: RPA & Browser Agent
+---
 
-- [x] Implemented Playwright-based browser automation using Chromium.
-- [x] Added browser launch, page navigation, page title retrieval, and URL collection.
-- [x] Implemented full-page screenshot capture and run-based artifact storage.
-- [x] Added DOM snapshot generation and evidence storage.
-- [x] Implemented metadata collection, including URL, page title, ISO-8601 timestamp, and viewport dimensions.
-- [x] Added browser console error collection and JavaScript page exception tracking.
-- [x] Implemented invalid URL validation and navigation timeout handling.
-- [x] Added HTTP response status and navigation duration tracking.
-- [x] Added failed network request tracking.
-- [x] Added structured success and failure responses.
-- [x] Implemented safe browser cleanup on success and failure.
-- [x] Added before-and-after screenshot and DOM evidence capture.
-- [x] Added DOM metadata collection, including image details, element counts, form details, and interactive elements.
-- [x] Added backward compatibility for existing DOM artifact filenames.
-- [x] Added Windows Proactor event-loop compatibility.
-- [x] Added automated tests for navigation, screenshots, DOM capture, metadata, and evidence validation.
-- [x] Added tests for invalid URLs, missing run IDs, timeout handling, and artifact creation.
-- [x] Added a local HTML test page and temporary HTTP server for repeatable browser testing.
-- [x] Updated Git ignore rules to exclude generated browser artifacts from version control.
-- [x] Documented Playwright installation, usage, testing, evidence structure, and integration requirements.
-- [x] Merged Browser Agent changes into the main branch through GitHub PR #9.
-- [ ] Complete further cross-module integration validation with the Vision Engine and Backend.
-- [ ] Complete final end-to-end integration review and project handover.
+## ☁️ Deployment Architecture
 
-#### Browser Agent Implementation Details
+OmniSight is deployed using a modern cloud topology separating edge presentation, containerized orchestration, and managed persistence:
 
-The Browser Agent provides a Playwright-based browser automation module that captures browser execution evidence for use by other OmniSight components.
+- **Frontend on Vercel:** Hosted as a static Single-Page Application on Vercel's global CDN. The `frontend/vercel.json` file configures clean rewrite rules that proxy `/api/*` and `/health` requests to the Render backend, preventing Cross-Origin Resource Sharing (CORS) friction and securing cookie transmission.
+- **Backend on Render:** Packaged inside an official `mcr.microsoft.com/playwright/python:v1.64.1-noble` Docker container. All Linux shared graphics libraries (`libasound2`, `libgbm1`, `libnss3`) and Chromium binaries are pre-installed in the container image to prevent runtime binary lookup failures.
+- **Persistent Disk:** Mounted at `/app/artifacts` on Render to preserve screenshot captures and DOM snapshots across service restarts.
+- **Managed PostgreSQL:** Attached Render PostgreSQL database storing relational run histories and repair proposals, managed strictly through versioned Alembic migrations.
 
-**Implemented Capabilities**
+---
 
-- **Browser Navigation:** Launches Chromium and navigates to target URLs.
-- **Screenshot Capture:** Captures full-page screenshots and stores artifacts organized by run.
-- **DOM Snapshot Generation:** Captures before-and-after DOM evidence for further inspection.
-- **Metadata Collection:** Records the current URL, page title, viewport information, and ISO-8601 timestamps.
-- **Error Monitoring:** Collects browser console errors, JavaScript page exceptions, and failed network requests.
-- **HTTP Diagnostics:** Records HTTP response status and navigation duration.
-- **Failure Handling:** Validates URLs, handles navigation timeouts, returns structured failure information, and safely closes browser resources.
-- **DOM Analysis Metadata:** Collects image information, element counts, form details, and interactive element information.
-- **Evidence Management:** Organizes screenshots, DOM snapshots, and metadata using unique run IDs.
-- **Automated Testing:** Covers navigation, screenshots, DOM capture, metadata, artifact creation, evidence validation, invalid URLs, timeout handling, and browser cleanup.
-- **Windows Compatibility:** Includes Windows Proactor event-loop policy handling for Playwright execution.
-- **Documentation:** Includes Playwright installation, test execution, evidence structure, and integration guidelines.
+## 🛡️ Security & Responsible-Use Notes
 
-#### Standardized Evidence Contract
+1. **Human-in-the-Loop Safety:** OmniSight will **never** mutate target production environments directly. All self-healing repairs are formulated as candidate diffs that require explicit operator approval before generating a pull request.
+2. **Sandbox Isolation:** Patch simulation and before-and-after verification execute strictly in temporary local headless sessions.
+3. **Session & Cookie Security:** In production mode (`APP_ENV=production`), OmniSight enforces `HttpOnly`, `SameSite=Lax`, and `Secure` cookie attributes with cryptographic Argon2 password hashing.
+4. **Secret Protection:** API keys (`GEMINI_API_KEY`, `GITHUB_TOKEN`, `CSRF_SECRET_KEY`) are managed via environment variables and never logged or serialized into client responses.
+5. **Path Traversal Guards:** The artifact serving endpoint strictly validates filenames and canonical paths to prevent directory traversal outside the declared storage directory.
 
-The Browser Agent provides structured evidence containing:
+---
 
-| Field | Description |
-|---|---|
-| `run_id` | Unique identifier for the browser execution |
-| `url` | URL of the visited page |
-| `page_title` | Title of the page |
-| `captured_at` | Capture timestamp in ISO-8601 format |
-| `viewport` | Browser viewport width and height |
-| `screenshot_path` | Reference to the captured screenshot |
-| `dom_snapshot_path` | Reference to the generated DOM snapshot |
-| `console_errors` | Collected browser console errors |
-| `page_errors` | Captured JavaScript page exceptions |
-| `response_status` | HTTP response status code |
-| `navigation_duration_ms` | Time taken for navigation |
-| `failed_requests` | Details of failed network requests |
-| `status` | Outcome of browser execution |
-| `error` | Failure details, when applicable |
+## 🔭 Future Scope
 
-This contract allows the Vision Engine and other components to consume browser execution evidence through a consistent structure.
+- **Autonomous Regression Test Generation:** Synthesizing complete Playwright test specifications directly from multimodal user interaction traces.
+- **Expanded Vision Models:** Adding adapter support for Claude 3.5 Sonnet and GPT-4o vision backends alongside Gemini.
+- **Multi-Browser Matrix:** Expanding the Browser Agent from Chromium to include Firefox and WebKit (Safari) cross-engine visual comparison.
+- **Automated CI/CD Webhooks:** Direct integration with GitHub Actions to trigger self-healing diagnostic sweeps on failed test workflows.
 
-#### Browser Agent Testing
+---
 
-Automated tests cover:
+## 👥 Contributors & Team Roles
 
-- Browser launch and navigation.
-- Screenshot capture and artifact creation.
-- Before-and-after DOM snapshot generation.
-- Metadata collection.
-- Evidence contract validation.
-- Console error and JavaScript exception collection.
-- Failed network request tracking.
-- HTTP response status handling.
-- Invalid URL and missing run ID handling.
-- Navigation timeout handling.
-- Successful capture when the page contains a broken image.
-- Artifact existence and structured failure responses.
-- Safe browser cleanup.
-- Windows event-loop compatibility.
+OmniSight was developed as an end-to-end collaborative platform with clear domain ownership:
 
-The complete test suite passed after resolving integration and compatibility issues.
+| Contributor / Domain | Core Modules | Responsibilities |
+|---|---|---|
+| **Vision & AI Intelligence** | `vision_engine/` | Gemini VLM integration, prompt engineering, spatial IoU evaluation, bounding-box parsing, and deterministic DOM heuristics. |
+| **RPA & Browser Automation** | `browser_agent/` | Playwright Chromium automation, full-page screenshot capture, multi-viewport evidence streaming, and browser diagnostics. |
+| **Self-Healing & Verification** | `self_healing/` | Failure pattern analysis, candidate selector synthesis, unified diff patch generation, and post-repair verification. |
+| **Backend & Dashboard Architecture** | `backend/`, `github_integration/`, `frontend/` | FastAPI orchestration, PostgreSQL persistence, Alembic migrations, GitHub PR API integration, and React 18 Meridian dashboard redesign. |
 
-The Browser Agent changes have been merged into the main branch through GitHub PR #9. Further cross-module integration validation and end-to-end testing remain part of the project's ongoing development.
+---
 
-### Backend & API Orchestration — Member 4: Backend Developer
+## 📄 License & Attribution
 
-- [x] Initialized the FastAPI application entry point in `backend/app/main.py`.
-- [x] Implemented `GET /health` endpoint verifying backend server availability.
-- [x] Created `POST /api/v1/runs` endpoint with URL validation, whitespace stripping, and unique `run_id` generation.
-- [x] Implemented `GET /api/v1/runs/{run_id}` endpoint returning run status and metadata.
-- [x] Implemented `GET /api/v1/runs/{run_id}/findings` endpoint returning structured findings or empty lists.
-- [x] Implemented an in-memory `RunStore` repository for managing inspection runs and defect findings.
-- [x] Coordinated finding schemas (`FindingResponse`, `EvidenceReferences`) with the Vision Engine data contract.
-- [x] Added deterministic mock defect findings (`source="mock"`) for early milestone testing.
-- [x] Added centralized safe application logging without exposing secrets.
-- [x] Added standardized error response schemas and HTTP 400/404/422 validation handling.
-- [x] Configured `pytest.ini` with backend testpaths and pythonpath.
-- [x] Created 25 automated backend tests covering health, runs, findings, error handling, and lifecycle status consistency.
-- [x] Connected the backend run lifecycle to the live Browser Agent Playwright runner.
-- [x] Connected the backend findings retrieval to live Vision Engine inference.
-- [x] Replaced temporary in-memory `RunStore` with PostgreSQL 18 database persistence (`runs`, `findings`, `artifacts`, `repair_proposals`) and Alembic migrations.
-- [x] Developed React 18 / Vite dashboard with live inspection, run history audit table, and Human-in-the-Loop repair approval workflow.
-- [x] Verified full integration across all 152 backend tests and 17 frontend tests.
-
-#### Backend & Dashboard Documentation
-
-| Document | Description |
-|---|---|
-| [`docs/backend_api.md`](docs/backend_api.md) | Complete backend architecture, all 17 REST endpoints, request/response examples, and error codes. |
-| [`docs/postgresql_setup.md`](docs/postgresql_setup.md) | PostgreSQL 18 setup guide, SQLAlchemy 2.0 ORM models, Alembic migrations, and persistence verification. |
-| [`docs/artifact_storage.md`](docs/artifact_storage.md) | Screenshot and DOM snapshot storage structure, security path traversal guards, and HTTP retrieval APIs. |
-| [`docs/frontend_dashboard.md`](docs/frontend_dashboard.md) | React dashboard component architecture, auto-polling lifecycle, and Human-in-the-Loop review/approval workflow. |
-| [`docs/browser_agent_setup.md`](docs/browser_agent_setup.md) | Browser Agent Playwright automation, headless Chromium execution, and evidence capture. |
-
-#### Backend & Dashboard Capabilities
-
-- **PostgreSQL 18 Persistence:** Permanent storage for all inspection runs, defect findings, artifact references, and repair proposals. Survives process and server restarts.
-- **Automated Pipeline Coordination:** Orchestrates headless browser navigation via Playwright and defect detection via Vision Engine.
-- **Artifact Serving:** Securely streams screenshots and DOM HTML snapshots over HTTP at `/api/v1/artifacts/{run_id}/{filename}` with path traversal protection.
-- **Human-in-the-Loop Governance:** Tri-stage lifecycle badges separating Review authorization (`PENDING`/`APPROVED`/`REJECTED`), patch execution (`UNAPPLIED`/`APPLIED`/`FAILED`), and visual verification (`UNVERIFIED`/`VERIFIED_SUCCESS`/`VERIFIED_FAILURE`).
-- **Interactive API Documentation:** Full Swagger UI available at `http://127.0.0.1:8000/docs` and ReDoc at `http://127.0.0.1:8000/redoc`.
-- **React Frontend Dashboard:** Running on Vite (`http://localhost:5173`) with live inspection progress, defect findings, DOM/screenshot viewer, PostgreSQL history audit log, and proposal approval controls.
-
-### Other Project Modules
-
-The Self-Healing, GitHub Integration, and Frontend modules are part of the overall project. Their implementation status will be updated by their respective team members based on their actual code and test results.
-
-## 📋 Development Guidelines
-
-- Work on your assigned feature branch.
-- Keep commits focused and descriptive.
-- Add or update tests when changing behavior.
-- Run relevant tests before pushing changes.
-- Review `git diff` before committing.
-- Do not commit secrets, local virtual environments, or generated artifacts.
-- Use approved credentials and providers for external model integrations.
-- Submit changes through pull requests and follow the team's review process.
-
-## 🗺️ Future Roadmap
-
-- Improve visual defect classification and finding validation.
-- Expand evaluation using more defect categories and real-world test scenarios.
-- Improve screenshot preprocessing and crop-selection strategies.
-- Connect screenshot and DOM evidence from the Browser Agent to visual inspection.
-- Develop the self-healing pipeline for candidate selector repairs.
-- Integrate backend APIs and GitHub workflows.
-- Develop the human-in-the-loop dashboard for reviewing findings and proposed repairs.
-- Complete integration testing across the Browser Agent, Vision Engine, and Backend.
-
-## 🤝 Contribution
-
-Contributions should follow the team's assigned module responsibilities and development workflow. Keep changes scoped to your assigned work, test them where possible, and document limitations clearly.
-
-## ⚖️ Current Project Limitations
-
-OmniSight is under active development. The Vision Engine provides validated data models, evidence-file checks, deterministic mock detection, static HTML DOM heuristics, and Gemini-powered vision-language analysis.
-
-Gemini-based detection depends on provider availability, valid API credentials, and model response quality. Its detection accuracy and performance require further evaluation across a wider range of real-world UI defects.
-
-The Browser Agent captures browser evidence and handles common execution failures. However, full integration across the Browser Agent, Vision Engine, Backend, and dashboard still requires verification.
-
-Automated repair generation, complete end-to-end self-healing workflows, and production-level integration remain under development.
+This project is developed for portfolio, demonstration, and research purposes. All trademarks, logos, and brand icons belong to their respective owners.
