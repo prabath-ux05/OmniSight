@@ -3350,6 +3350,7 @@ select.form-input:focus,
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  box-shadow: var(--shadow-teal);
 }
 
 .shell-hero-badge {
@@ -3368,10 +3369,11 @@ select.form-input:focus,
 
 .shell-hero-title {
   font-size: 1.85rem;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.025em;
-  line-height: 1.2;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }
 
 .shell-hero-desc {
@@ -3410,6 +3412,7 @@ select.form-input:focus,
 .shell-feature-card:hover {
   transform: translateY(-2px);
   border-color: var(--border-focus);
+  box-shadow: var(--shadow-teal);
 }
 
 .capabilities-grid {
@@ -3520,17 +3523,23 @@ select.form-input:focus,
 .shell-stat-box {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-prime);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  transition: box-shadow 0.15s ease;
+}
+
+.shell-stat-box:hover {
+  box-shadow: var(--shadow-teal);
 }
 
 .shell-stat-number {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--text-main);
+  color: var(--accent-prime);
   font-family: var(--font-mono);
 }
 
@@ -3764,6 +3773,7 @@ select.form-input:focus,
 .home-overview-card:hover {
   border-color: var(--border-focus);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-teal);
 }
 
 .overview-card-header {
@@ -3907,9 +3917,10 @@ select.form-input:focus,
 
 .section-heading {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .section-hint {
@@ -4433,8 +4444,9 @@ select.form-input:focus,
 .history-hero-title {
   font-size: 1.5rem;
   font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
@@ -5183,8 +5195,9 @@ select.form-input:focus,
 .repair-hero-title {
   font-size: 1.5rem;
   font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
@@ -6270,10 +6283,11 @@ select.form-input:focus,
 .about-hero-title {
   font-size: 1.75rem;
   font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   margin: 0;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .about-hero-desc {
@@ -6320,8 +6334,9 @@ select.form-input:focus,
 .section-title {
   font-size: 1.35rem;
   font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
@@ -6996,8 +7011,9 @@ select.form-input:focus,
 .settings-hero-title {
   font-size: 1.5rem;
   font-weight: 800;
+  font-family: var(--font-display);
   color: var(--text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
