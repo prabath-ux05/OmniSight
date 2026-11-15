@@ -377,17 +377,6 @@ export default function HistoryPage({
             >
               🛡️ Repair Proposals →
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                if (selectedHistoricalRun) onSelectRun(selectedHistoricalRun);
-                onSelectView('repair');
-              }}
-              title="Open locator repair synthesizer and assistant"
-            >
-              🔧 Repair Workspace →
-            </button>
           </div>
         </div>
 
@@ -566,17 +555,6 @@ export default function HistoryPage({
                 title="Open repair proposals review for this run"
               >
                 🛡️ Repair Proposals →
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  onSelectRun(selectedHistoricalRun);
-                  onSelectView('repair');
-                }}
-                title="Open locator repair synthesizer for this run"
-              >
-                🔧 Repair Workspace →
               </button>
             </div>
           </div>

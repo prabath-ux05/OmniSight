@@ -8,7 +8,6 @@ import FindingsSection from './components/FindingsSection';
 import EvidenceSection from './components/EvidenceSection';
 import InspectionHistoryTable from './components/InspectionHistoryTable';
 import HistoryPage from './components/HistoryPage';
-import RepairWorkspacePage from './components/RepairWorkspacePage';
 import RepairProposalPage from './components/RepairProposalPage';
 import RepairProposalWorkflow from './components/RepairProposalWorkflow';
 import AboutPage from './components/AboutPage';
@@ -511,12 +510,13 @@ export default function App() {
     setIsMenuOpen(false);
     let normalized = viewId || 'home';
     if (normalized === 'live') normalized = 'inspection';
+    if (normalized === 'repair') normalized = 'proposals';
 
     setCurrentView(normalized);
 
     const targetRunId = customParams.runId !== undefined ? customParams.runId : (currentRun?.run_id || null);
     const targetProposalId = customParams.proposalId !== undefined ? customParams.proposalId : (normalized === 'proposals' ? selectedProposalId : null);
-    const targetFindingId = customParams.findingId !== undefined ? customParams.findingId : (normalized === 'repair' ? selectedFinding?.finding_id : null);
+    const targetFindingId = customParams.findingId !== undefined ? customParams.findingId : (selectedFinding?.finding_id || null);
 
     if (normalized === 'home') {
       setActiveTab('live');
@@ -527,11 +527,6 @@ export default function App() {
       loadRunsList();
     } else if (normalized === 'proposals') {
       setActiveTab('proposals');
-      if (targetRunId) {
-        loadProposals(targetRunId);
-      }
-    } else if (normalized === 'repair') {
-      setActiveTab('repair');
       if (targetRunId) {
         loadProposals(targetRunId);
       }
@@ -564,7 +559,7 @@ export default function App() {
     if (finding) {
       setSelectedFinding(finding);
     }
-    handleSelectView('repair', {
+    handleSelectView('proposals', {
       runId: currentRun?.run_id,
       findingId: finding?.finding_id,
     });
@@ -944,17 +939,10 @@ export default function App() {
             </button>
             <button
               type="button"
-              className={`nav-tab-btn ${currentView === 'proposals' ? 'nav-tab-active' : ''}`}
+              className={`nav-tab-btn ${currentView === 'proposals' || currentView === 'repair' ? 'nav-tab-active' : ''}`}
               onClick={() => handleSelectView('proposals')}
             >
               🛡️ Repair Proposals ({proposalsList.length})
-            </button>
-            <button
-              type="button"
-              className={`nav-tab-btn ${currentView === 'repair' ? 'nav-tab-active' : ''}`}
-              onClick={() => handleSelectView('repair')}
-            >
-              🔧 Repair Workspace
             </button>
           </nav>
         )}
@@ -1048,32 +1036,12 @@ export default function App() {
           />
         )}
 
-        {/* VIEW 4: Dedicated Repair Proposals Page */}
-        {currentView === 'proposals' && (
+        {/* VIEW 4: Unified Repair Proposals & Workspace */}
+        {(currentView === 'proposals' || currentView === 'repair') && (
           <RepairProposalPage
             run={currentRun}
             runsList={runsList}
             onSelectRun={(targetRun) => handleSelectRun(targetRun, 'proposals')}
-            findings={findings || []}
-            proposals={proposalsList}
-            isLoading={isProposalsLoading}
-            selectedProposalId={selectedProposalId}
-            onSelectProposal={(propId) => setSelectedProposalId(propId)}
-            onRefreshProposals={() => currentRun && loadProposals(currentRun.run_id)}
-            onApproveProposal={handleApproveProposal}
-            onRejectProposal={handleRejectProposal}
-            onCreateProposal={handleCreateProposal}
-            onSelectView={handleSelectView}
-            onNavigateToRepair={handleNavigateToRepair}
-          />
-        )}
-
-        {/* VIEW 5: Dedicated Self-Healing Repair Workspace & Assistant */}
-        {currentView === 'repair' && (
-          <RepairWorkspacePage
-            run={currentRun}
-            runsList={runsList}
-            onSelectRun={(targetRun) => handleSelectRun(targetRun, 'repair')}
             findings={findings || []}
             isFindingsLoading={isFindingsLoading}
             selectedFinding={selectedFinding}
@@ -1084,6 +1052,8 @@ export default function App() {
             onSuggestRepair={handleSuggestRepair}
             proposals={proposalsList}
             isProposalsLoading={isProposalsLoading}
+            selectedProposalId={selectedProposalId}
+            onSelectProposal={(propId) => setSelectedProposalId(propId)}
             onRefreshProposals={() => currentRun && loadProposals(currentRun.run_id)}
             onApproveProposal={handleApproveProposal}
             onRejectProposal={handleRejectProposal}

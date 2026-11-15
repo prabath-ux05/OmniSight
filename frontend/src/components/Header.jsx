@@ -5,8 +5,7 @@ export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: '🏠', desc: 'System overview & quick actions' },
   { id: 'inspection', label: 'Inspection', icon: '🔍', desc: 'Live browser capture & defect detection' },
   { id: 'history', label: 'History', icon: '📋', desc: 'Audit log of past inspection runs' },
-  { id: 'proposals', label: 'Repair Proposals', icon: '🛡️', desc: 'Review proposals & PR governance' },
-  { id: 'repair', label: 'Repair Workspace', icon: '🔧', desc: 'Interactive self-healing locator synthesizer' },
+  { id: 'proposals', label: 'Repair Proposals', icon: '🛡️', desc: 'Self-healing review & PR governance' },
 ];
 
 export const DRAWER_NAV_ITEMS = [
@@ -14,7 +13,6 @@ export const DRAWER_NAV_ITEMS = [
   { id: 'inspection', label: 'Live Studio' },
   { id: 'history', label: 'Run History' },
   { id: 'proposals', label: 'Repair Proposals' },
-  { id: 'repair', label: 'Repair Workspace' },
   { id: 'profile', label: 'Profile' },
   { id: 'about', label: 'About' },
   { id: 'settings', label: 'Settings' },
@@ -43,8 +41,7 @@ export default function Header({
   const isNavActive = (itemId) => {
     if (currentView === itemId) return true;
     if (itemId === 'inspection' && (currentView === 'live' || currentView === 'results')) return true;
-    if (itemId === 'proposals' && currentView === 'proposals') return true;
-    if (itemId === 'repair' && currentView === 'repair') return true;
+    if (itemId === 'proposals' && (currentView === 'proposals' || currentView === 'repair')) return true;
     return false;
   };
 

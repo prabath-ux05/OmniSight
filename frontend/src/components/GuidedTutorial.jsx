@@ -61,8 +61,8 @@ export const TUTORIAL_STEPS = [
     ],
   },
   {
-    stepId: 'repair',
-    viewId: 'repair',
+    stepId: 'proposals',
+    viewId: 'proposals',
     badge: 'Step 5 of 6: Self-Healing & Governance',
     icon: '🛡️',
     title: 'Self-Healing Locator Repair & Approval',

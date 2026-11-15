@@ -74,20 +74,20 @@ describe('OmniSight Client-Side Router', () => {
       assert.equal(res.proposalId, 'prop_555');
     });
 
-    it('parses "/repair" as repair workspace view', () => {
+    it('parses legacy "/repair" as unified proposals view', () => {
       const res = parseRoute('/repair');
-      assert.equal(res.view, ROUTES.REPAIR);
+      assert.equal(res.view, ROUTES.PROPOSALS);
     });
 
-    it('parses "/repair/run_777" as repair view with runId', () => {
+    it('parses legacy "/repair/run_777" as unified proposals view with runId', () => {
       const res = parseRoute('/repair/run_777');
-      assert.equal(res.view, ROUTES.REPAIR);
+      assert.equal(res.view, ROUTES.PROPOSALS);
       assert.equal(res.runId, 'run_777');
     });
 
-    it('parses "/repair/run_777/find_888" as repair view with runId and findingId', () => {
+    it('parses legacy "/repair/run_777/find_888" as unified proposals view with runId and findingId', () => {
       const res = parseRoute('/repair/run_777/find_888');
-      assert.equal(res.view, ROUTES.REPAIR);
+      assert.equal(res.view, ROUTES.PROPOSALS);
       assert.equal(res.runId, 'run_777');
       assert.equal(res.findingId, 'find_888');
     });
@@ -154,10 +154,10 @@ describe('OmniSight Client-Side Router', () => {
       );
     });
 
-    it('formats repair workspace route with runId and findingId', () => {
+    it('formats repair workspace route to unified proposals destination with runId and findingId', () => {
       assert.equal(
         formatRoute({ view: ROUTES.REPAIR, runId: 'run_123', findingId: 'find_001' }),
-        '/repair/run_123/find_001'
+        '/runs/run_123/proposals?findingId=find_001'
       );
     });
 

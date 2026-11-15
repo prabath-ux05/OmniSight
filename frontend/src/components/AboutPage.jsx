@@ -171,7 +171,7 @@ export default function AboutPage({
             <ul className="arch-tier-list">
               <li><strong>Framework:</strong> React 18 + Vite 5 with pure CSS design tokens.</li>
               <li><strong>Themes:</strong> Dark Mode, Light Mode, and Automatic System Matching.</li>
-              <li><strong>Workspaces:</strong> Home, Live Inspection Studio, Run History, Repair Workspace.</li>
+              <li><strong>Workspaces:</strong> Home, Live Inspection Studio, Run History, Repair Proposals.</li>
               <li><strong>Accessibility:</strong> Keyboard shortcuts (Esc, Arrows, Enter) &amp; guided tour.</li>
               <li><strong>Guest Mode:</strong> Full functionality enabled without mandatory auth barriers.</li>
             </ul>

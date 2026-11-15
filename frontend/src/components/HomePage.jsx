@@ -111,13 +111,6 @@ export default function HomePage({
           >
             🛡️ Repair Proposals
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => onSelectView('repair')}
-          >
-            🔧 Repair Workspace
-          </button>
         </div>
       </section>
 
@@ -250,10 +243,10 @@ export default function HomePage({
             className="shell-feature-card capability-card"
             role="button"
             tabIndex={0}
-            onClick={() => onSelectView('repair')}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectView('repair'); }}
+            onClick={() => onSelectView('proposals')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectView('proposals'); }}
             style={{ cursor: 'pointer' }}
-            title="Navigate to Repair Workspace"
+            title="Navigate to Repair Proposals"
           >
             <div className="feature-icon-wrapper icon-emerald">
               <span className="shell-feature-icon" aria-hidden="true">🔒</span>
@@ -266,7 +259,7 @@ export default function HomePage({
             <div className="capability-card-footer">
               <span className="feature-tag">Local Sandbox</span>
               <span className="feature-tag">Live Site Protected</span>
-              <span className="btn-link btn-link-sm" style={{ marginLeft: 'auto' }}>Open Workspace →</span>
+              <span className="btn-link btn-link-sm" style={{ marginLeft: 'auto' }}>Open Proposals →</span>
             </div>
           </div>
 

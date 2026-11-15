@@ -14,7 +14,7 @@ export const ROUTES = {
   RESULTS: 'results',
   HISTORY: 'history',
   PROPOSALS: 'proposals',
-  REPAIR: 'repair',
+  REPAIR: 'proposals', // Unified with proposals
   PROFILE: 'profile',
   ABOUT: 'about',
   SETTINGS: 'settings',
@@ -108,15 +108,14 @@ export function parseRoute(locationInput) {
     if (segments.length >= 2 && segments[1]) {
       runId = runId || decodeURIComponent(segments[1]);
     }
-    if (segments.length >= 3 && segments[2] === 'proposals') {
+    if (segments.length >= 3 && (segments[2] === 'proposals' || segments[2] === 'repair')) {
       view = ROUTES.PROPOSALS;
       if (segments.length >= 4 && segments[3]) {
-        proposalId = proposalId || decodeURIComponent(segments[3]);
-      }
-    } else if (segments.length >= 3 && segments[2] === 'repair') {
-      view = ROUTES.REPAIR;
-      if (segments.length >= 4 && segments[3]) {
-        findingId = findingId || decodeURIComponent(segments[3]);
+        if (segments[2] === 'repair') {
+          findingId = findingId || decodeURIComponent(segments[3]);
+        } else {
+          proposalId = proposalId || decodeURIComponent(segments[3]);
+        }
       }
     } else {
       view = ROUTES.RESULTS;
@@ -136,9 +135,9 @@ export function parseRoute(locationInput) {
       proposalId = proposalId || decodeURIComponent(segments[1]);
     }
   }
-  // 7. Repair: /repair or /repair/:runId or /repair/:runId/:findingId
+  // 7. Repair Legacy Redirect: /repair or /workspace -> Unified to proposals while preserving context
   else if (segments[0] === 'repair' || segments[0] === 'workspace') {
-    view = ROUTES.REPAIR;
+    view = ROUTES.PROPOSALS;
     if (segments.length >= 2 && segments[1]) {
       runId = runId || decodeURIComponent(segments[1]);
     }
@@ -204,6 +203,7 @@ export function formatRoute({ view, runId, proposalId, findingId } = {}) {
     case ROUTES.HISTORY:
       return cleanRunId ? `/history?runId=${cleanRunId}` : '/history';
 
+    case 'repair':
     case ROUTES.PROPOSALS:
       if (cleanRunId && cleanProposalId) {
         return `/runs/${cleanRunId}/proposals/${cleanProposalId}`;
@@ -211,19 +211,13 @@ export function formatRoute({ view, runId, proposalId, findingId } = {}) {
       if (cleanProposalId) {
         return cleanRunId ? `/proposals/${cleanProposalId}?runId=${cleanRunId}` : `/proposals/${cleanProposalId}`;
       }
+      if (cleanRunId && cleanFindingId) {
+        return `/runs/${cleanRunId}/proposals?findingId=${cleanFindingId}`;
+      }
       if (cleanRunId) {
         return `/runs/${cleanRunId}/proposals`;
       }
       return '/proposals';
-
-    case ROUTES.REPAIR:
-      if (cleanRunId && cleanFindingId) {
-        return `/repair/${cleanRunId}/${cleanFindingId}`;
-      }
-      if (cleanRunId) {
-        return `/repair/${cleanRunId}`;
-      }
-      return '/repair';
 
     case ROUTES.PROFILE:
       return '/profile';

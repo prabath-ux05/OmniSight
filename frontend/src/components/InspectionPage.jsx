@@ -140,14 +140,6 @@ export default function InspectionPage({
             >
               🛡️ Repair Proposals ({proposalsCount}) →
             </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => onSelectView('repair')}
-              title="Open locator repair synthesizer & assistant"
-            >
-              🔧 Repair Workspace →
-            </button>
           </div>
         </div>
       </section>
