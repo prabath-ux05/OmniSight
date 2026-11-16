@@ -410,6 +410,22 @@ export default function HomePage({
                 <span className="feature-tag">Local Sandbox</span>
                 <span className="feature-tag">Live Site Protected</span>
               </div>
+              <div className="cap-sandbox-detail" aria-hidden="true">
+                <span className="cap-sandbox-step">
+                  <span className="cap-sandbox-step-dot cap-sandbox-step-dot--amber" />
+                  Propose
+                </span>
+                <span className="cap-sandbox-step-arrow">›</span>
+                <span className="cap-sandbox-step">
+                  <span className="cap-sandbox-step-dot cap-sandbox-step-dot--teal" />
+                  Approve
+                </span>
+                <span className="cap-sandbox-step-arrow">›</span>
+                <span className="cap-sandbox-step">
+                  <span className="cap-sandbox-step-dot cap-sandbox-step-dot--green" />
+                  Apply
+                </span>
+              </div>
             </div>
             <div className="cap-wide-divider" aria-hidden="true" />
             <div className="cap-wide-right">
@@ -422,6 +438,10 @@ export default function HomePage({
               <div className="cap-card-tech-tags">
                 <span className="feature-tag">Split-View</span>
                 <span className="feature-tag">Interactive Slider</span>
+              </div>
+              <div className="cap-verify-split" aria-hidden="true">
+                <span className="cap-verify-before">Before</span>
+                <span className="cap-verify-after">After</span>
               </div>
             </div>
           </div>

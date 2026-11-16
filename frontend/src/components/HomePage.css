@@ -1355,54 +1355,121 @@
 }
 
 /* ==========================================================================
-   9. PLATFORM CAPABILITIES — Compact card layout refinement
-   Removes blank spaces caused by margin-top: auto pushing content down
-   and grid row stretching forcing small cards to match tall-card heights.
+   9. PLATFORM CAPABILITIES — Card layout refinement
    ========================================================================== */
 
-/* Row 2 cards (small × 2 + wide) should not stretch to fill the tall card's
-   row height — allow each to be as tall as its own content. */
+/* Row 2 cards (DOM Analysis, Repair Proposals, Wide) should size to their
+   own content rather than stretching to match the row-1 tall card height. */
 .capabilities-mosaic {
   align-items: start;
 }
 
-/* However, row 1 (featured + tall) should remain stretched so both fill the
-   same height, giving the featured card its visual weight. Override row 1. */
+/* Row 1: Featured + Detect remain equalized in height for visual balance. */
 .capabilities-mosaic > .cap-card:nth-child(1),
 .capabilities-mosaic > .cap-card:nth-child(2) {
   align-self: stretch;
 }
 
-/* Detect card: the visualisation boxes were pushed to the very bottom of the
-   tall card by margin-top: auto. Replace with a fixed separator so they sit
-   directly after the tech-tags with consistent breathing room. */
+/* ── Featured card (card 1) ───────────────────────────────────────────────
+   The content wrapper sits in the left 55% beside the BG graphic.
+   Tighten the gap between its flex children and anchor the action button
+   directly below the description rather than floating it to the bottom. */
+.cap-card--featured .cap-card-content {
+  gap: 0.6rem;
+}
+.cap-card--featured .cap-card-action {
+  margin-top: 0.5rem;
+}
+
+/* ── Detect card (card 2) ─────────────────────────────────────────────────
+   Replace margin-top: auto with a fixed spacing so the detect-visual boxes
+   appear just below the tech tags without a large empty gap. */
 .cap-detect-visual {
   margin-top: 0.75rem;
 }
 
-/* Small cards (DOM Analysis + Repair Proposals): reduce internal gap so the
-   icon → title → desc → tags sequence is compact without large voids. */
+/* ── DOM Analysis + Repair Proposals (cards 3 & 4) ───────────────────────
+   Restore the original gap rhythm (0.75rem base). The mosaic now uses
+   align-items: start, so these cards shrink to their content — restoring
+   their original compact visual character without the old stretching gap. */
 .cap-card--small {
-  gap: 0.55rem;
+  gap: 0.75rem;
 }
 
-/* Wide card sub-columns: tighten to match the small card rhythm. */
+/* ── Wide card sub-columns (cards 5 & 6) ─────────────────────────────────
+   Restore the original sub-column gap; the added detail rows fit naturally. */
 .cap-wide-left,
 .cap-wide-right {
+  gap: 0.6rem;
+}
+
+/* Sandbox / Verification detail rows */
+.cap-sandbox-detail,
+.cap-verify-detail {
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  margin-top: 0.25rem;
+  flex-wrap: wrap;
 }
 
-/* Tech tags on small and wide cards: no extra top margin needed — the card
-   gap already provides sufficient separation from the description. */
-.cap-card--small .cap-card-tech-tags,
-.cap-wide-left .cap-card-tech-tags,
-.cap-wide-right .cap-card-tech-tags {
-  margin-top: 0;
+.cap-sandbox-step {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.cap-sandbox-step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cap-sandbox-step-dot--green  { background: rgba(52, 211, 153, 0.8); }
+.cap-sandbox-step-dot--amber  { background: rgba(245, 166, 35, 0.75); }
+.cap-sandbox-step-dot--teal   { background: rgba(0, 201, 167, 0.8); }
+.cap-sandbox-step-arrow {
+  font-size: 0.6rem;
+  color: var(--text-disabled, rgba(255,255,255,0.25));
 }
 
-/* Responsive: on tablet (2-col) and mobile (1-col), the featured card spans
-   full width in its own row, so row-equalisation is irrelevant — reset all
-   cards to auto height so they all size to their content. */
+.cap-verify-split {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.cap-verify-before {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  background: rgba(248, 113, 113, 0.07);
+  color: rgba(248, 113, 113, 0.75);
+  border-right: 1px solid var(--border-subtle);
+  text-align: center;
+}
+.cap-verify-after {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  background: rgba(52, 211, 153, 0.07);
+  color: rgba(52, 211, 153, 0.8);
+  text-align: center;
+}
+
+/* Responsive: on tablet/mobile, all cards auto-size to content. */
 @media (max-width: 1100px) {
   .capabilities-mosaic {
     align-items: start;
