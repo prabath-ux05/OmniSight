@@ -1353,3 +1353,62 @@
     animation: none;
   }
 }
+
+/* ==========================================================================
+   9. PLATFORM CAPABILITIES — Compact card layout refinement
+   Removes blank spaces caused by margin-top: auto pushing content down
+   and grid row stretching forcing small cards to match tall-card heights.
+   ========================================================================== */
+
+/* Row 2 cards (small × 2 + wide) should not stretch to fill the tall card's
+   row height — allow each to be as tall as its own content. */
+.capabilities-mosaic {
+  align-items: start;
+}
+
+/* However, row 1 (featured + tall) should remain stretched so both fill the
+   same height, giving the featured card its visual weight. Override row 1. */
+.capabilities-mosaic > .cap-card:nth-child(1),
+.capabilities-mosaic > .cap-card:nth-child(2) {
+  align-self: stretch;
+}
+
+/* Detect card: the visualisation boxes were pushed to the very bottom of the
+   tall card by margin-top: auto. Replace with a fixed separator so they sit
+   directly after the tech-tags with consistent breathing room. */
+.cap-detect-visual {
+  margin-top: 0.75rem;
+}
+
+/* Small cards (DOM Analysis + Repair Proposals): reduce internal gap so the
+   icon → title → desc → tags sequence is compact without large voids. */
+.cap-card--small {
+  gap: 0.55rem;
+}
+
+/* Wide card sub-columns: tighten to match the small card rhythm. */
+.cap-wide-left,
+.cap-wide-right {
+  gap: 0.5rem;
+}
+
+/* Tech tags on small and wide cards: no extra top margin needed — the card
+   gap already provides sufficient separation from the description. */
+.cap-card--small .cap-card-tech-tags,
+.cap-wide-left .cap-card-tech-tags,
+.cap-wide-right .cap-card-tech-tags {
+  margin-top: 0;
+}
+
+/* Responsive: on tablet (2-col) and mobile (1-col), the featured card spans
+   full width in its own row, so row-equalisation is irrelevant — reset all
+   cards to auto height so they all size to their content. */
+@media (max-width: 1100px) {
+  .capabilities-mosaic {
+    align-items: start;
+  }
+  .capabilities-mosaic > .cap-card:nth-child(1),
+  .capabilities-mosaic > .cap-card:nth-child(2) {
+    align-self: auto;
+  }
+}
