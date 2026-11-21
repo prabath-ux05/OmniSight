@@ -33,6 +33,16 @@ from playwright.sync_api import (
 )
 
 
+DEFAULT_CHROMIUM_ARGS = [
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--no-zygote",
+]
+
+
 VIEWPORT_PRESETS = {
     "desktop": {
         "width": 1280,
@@ -86,9 +96,59 @@ class BrowserNavigator:
         self,
         timeout_ms: int = 30000,
         headless: bool = True,
+        launch_args: Optional[list[str]] = None,
     ):
         self.timeout_ms = timeout_ms
         self.headless = headless
+        self.launch_args = list(launch_args if launch_args is not None else DEFAULT_CHROMIUM_ARGS)
+        self._playwright = None
+        self._browser = None
+        self._managed_session = False
+
+    def start_session(self):
+        """Start a persistent Playwright and Browser session to be reused across viewports."""
+        if sys.platform == "win32":
+            if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        if self._playwright is None:
+            self._playwright = sync_playwright().start()
+        if self._browser is None or not self._browser.is_connected():
+            self._browser = self._playwright.chromium.launch(
+                headless=self.headless,
+                args=self.launch_args,
+            )
+        self._managed_session = True
+        return self._browser
+
+    def close(self):
+        """Safely close active browser and stop playwright if running."""
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        if hasattr(self, "_playwright_cm") and self._playwright_cm is not None and hasattr(self._playwright_cm, "__exit__"):
+            try:
+                self._playwright_cm.__exit__(None, None, None)
+            except Exception:
+                pass
+            self._playwright_cm = None
+        if self._playwright is not None:
+            if hasattr(self._playwright, "stop"):
+                try:
+                    self._playwright.stop()
+                except Exception:
+                    pass
+            self._playwright = None
+        self._managed_session = False
+
+    def __enter__(self):
+        self._managed_session = True
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     @staticmethod
     def _execute_live_scroll_preview(page, run_id: str, viewport_name: str, preset: dict) -> list[dict]:
@@ -282,13 +342,45 @@ class BrowserNavigator:
                 error="run_id is required",
             )
 
+        browser = None
+        own_browser = False
+        context = None
+        page = None
+        own_playwright = None
+        own_playwright_cm = None
+
         try:
             if sys.platform == "win32":
                 if not isinstance(asyncio.get_event_loop_policy(), asyncio.WindowsProactorEventLoopPolicy):
                     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=self.headless)
+            if self._browser is not None and self._browser.is_connected():
+                browser = self._browser
+            elif self._managed_session:
+                self._playwright_cm = sync_playwright()
+                if hasattr(self._playwright_cm, "__enter__"):
+                    self._playwright = self._playwright_cm.__enter__()
+                else:
+                    self._playwright = self._playwright_cm.start()
+                self._browser = self._playwright.chromium.launch(
+                    headless=self.headless,
+                    args=self.launch_args,
+                )
+                browser = self._browser
+                own_browser = False
+            else:
+                own_playwright_cm = sync_playwright()
+                if hasattr(own_playwright_cm, "__enter__"):
+                    own_playwright = own_playwright_cm.__enter__()
+                else:
+                    own_playwright = own_playwright_cm.start()
+                browser = own_playwright.chromium.launch(
+                    headless=self.headless,
+                    args=self.launch_args,
+                )
+                own_browser = True
+
+            try:
                 context_kwargs = {
                     "viewport": {
                         "width": preset["width"],
@@ -378,6 +470,18 @@ class BrowserNavigator:
                     page_errors=page_errors,
                 )
 
+            finally:
+                if page is not None:
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
+                if context is not None:
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
+
         except PlaywrightTimeoutError:
             return NavigationResult(
                 status="failed",
@@ -406,8 +510,19 @@ class BrowserNavigator:
             )
 
         finally:
-            try:
-                if browser:
-                    browser.close()
-            except Exception:
-                pass
+            if own_browser:
+                try:
+                    if browser:
+                        browser.close()
+                except Exception:
+                    pass
+                if own_playwright_cm is not None and hasattr(own_playwright_cm, "__exit__"):
+                    try:
+                        own_playwright_cm.__exit__(None, None, None)
+                    except Exception:
+                        pass
+                elif own_playwright is not None and hasattr(own_playwright, "stop"):
+                    try:
+                        own_playwright.stop()
+                    except Exception:
+                        pass

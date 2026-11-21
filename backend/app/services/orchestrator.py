@@ -1,7 +1,9 @@
 """Orchestration service coordinating Browser Agent capture and Vision Engine analysis via the integration pipeline."""
 
 import os
+from contextlib import nullcontext
 from pathlib import Path
+import threading
 from typing import Any, Callable, Optional, Union
 from backend.app.core.logging import logger
 from backend.app.schemas.findings import EvidenceReferences, FindingResponse
@@ -144,13 +146,42 @@ def map_inspection_finding_to_response(
 class RunOrchestrator:
     """Manages the full automated lifecycle of an OmniSight inspection run via integration pipeline."""
 
+    _process_concurrency_lock = threading.Lock()
+
     def __init__(
         self,
         navigator_factory: Optional[Callable[..., Any]] = None,
         detector: Optional[Callable[[Any], list[Any]]] = None,
+        lock_timeout_seconds: Optional[float] = None,
     ) -> None:
         self.navigator_factory = navigator_factory
         self.detector = detector
+        self._concurrency_lock = self._process_concurrency_lock
+        self._active_run_id: Optional[str] = None
+        if lock_timeout_seconds is not None:
+            self._lock_timeout_seconds = lock_timeout_seconds
+        else:
+            try:
+                self._lock_timeout_seconds = float(os.getenv("INSPECTION_QUEUE_TIMEOUT_SECONDS", "300.0"))
+            except ValueError:
+                self._lock_timeout_seconds = 300.0
+
+    def is_busy(self) -> bool:
+        """Check whether an inspection is currently executing."""
+        return self._concurrency_lock.locked()
+
+    def is_run_active(self, run_id: str) -> bool:
+        """Check whether a specific run is currently executing."""
+        return self._active_run_id == run_id
+
+    def reset(self) -> None:
+        """Reset concurrency lock state (primarily for test cleanup)."""
+        if self._concurrency_lock.locked():
+            try:
+                self._concurrency_lock.release()
+            except RuntimeError:
+                pass
+        self._active_run_id = None
 
     def execute_run(
         self,
@@ -171,6 +202,11 @@ class RunOrchestrator:
         existing_run = run_store.get(run_id)
         if not existing_run:
             logger.error("Orchestrator cannot execute: run '%s' not found in store.", run_id)
+            return
+
+        # Concurrency & duplicate guard: check if this exact run is already running
+        if self.is_run_active(run_id):
+            logger.warning("Run %s is already actively executing.", run_id)
             return
 
         # Pre-flight URL sanity check
@@ -198,7 +234,43 @@ class RunOrchestrator:
         # Initialize live preview service telemetry
         preview_service.init_run(run_id, url=clean_url, viewports=target_viewports)
 
+        # Process-wide concurrency limiter: inspect whether another run is active
+        if self._concurrency_lock.locked():
+            logger.info("Inspection lock busy. Queuing run %s...", run_id)
+            run_store.update_run(
+                run_id,
+                status="queued",
+                message="Inspection queued — waiting for active inspection to complete...",
+                error=None,
+            )
+            preview_service.update_status(
+                run_id,
+                stage="queued",
+                message="Inspection queued — waiting for active inspection to complete...",
+            )
+
+        acquired = self._concurrency_lock.acquire(blocking=True, timeout=self._lock_timeout_seconds)
+        if not acquired:
+            msg = f"Inspection queue timeout: another inspection is currently in progress after {self._lock_timeout_seconds}s."
+            err = "Inspection timed out waiting in concurrency queue."
+            logger.error("Run %s failed: %s", run_id, msg)
+            run_store.update_run(
+                run_id,
+                status="failed",
+                error=err,
+                message=msg,
+            )
+            preview_service.update_status(
+                run_id,
+                stage="failed",
+                error=err,
+                message=msg,
+            )
+            preview_service.close_run(run_id, release_frames=True)
+            return
+
         try:
+            self._active_run_id = run_id
             import sys
             import asyncio
             if sys.platform == "win32":
@@ -296,132 +368,140 @@ class RunOrchestrator:
             all_mapped_findings: list[FindingResponse] = []
             finding_counter = 1
 
-            for vp in target_viewports:
-                run_store.update_run(
-                    run_id,
-                    status="capturing",
-                    message=f"Browser Agent capturing evidence for {vp} viewport...",
-                    error=None,
-                )
+            # If navigator supports context manager (e.g. BrowserNavigator), enter session to reuse browser
+            nav_session = (
+                navigator
+                if hasattr(navigator, "__enter__") and hasattr(navigator, "__exit__")
+                else nullcontext(navigator)
+            )
 
-                try:
-                    pipeline_result = execute_inspection_flow(
-                        request=url,
-                        navigator=NavigatorProxy(navigator, default_viewport=vp),
-                        detector=wrapped_detector,
-                        run_id=run_id,
-                        viewport=vp,
-                    )
-                except Exception as exc:
-                    error_msg = str(exc).strip() or f"{exc.__class__.__name__}: execution failed"
-                    logger.exception("Run %s failed during pipeline execution (%s): %s", run_id, vp, error_msg)
+            with nav_session:
+                for vp in target_viewports:
                     run_store.update_run(
                         run_id,
-                        status="failed",
-                        error=error_msg,
-                        message=f"Vision Engine failed during evidence analysis." if "Corrupt DOM" in error_msg else f"Inspection pipeline error: {error_msg}",
+                        status="capturing",
+                        message=f"Browser Agent capturing evidence for {vp} viewport...",
+                        error=None,
                     )
-                    preview_service.update_status(
-                        run_id,
-                        stage="failed",
-                        error=error_msg,
-                        message=f"Inspection pipeline error: {error_msg}",
-                    )
-                    return
 
-                if not pipeline_result.success:
-                    raw_err = pipeline_result.metadata.get("error")
-                    error_msg = (str(raw_err).strip() if raw_err else "") or f"Inspection pipeline failed for {vp} viewport."
-                    logger.warning("Pipeline reported failure for run %s (%s): %s", run_id, vp, error_msg)
-                    run_store.update_run(
-                        run_id,
-                        status="failed",
-                        error=error_msg,
-                        message=error_msg,
-                    )
-                    preview_service.update_status(
-                        run_id,
-                        stage="failed",
-                        error=error_msg,
-                        message=error_msg,
-                    )
-                    return
-
-                # Record generated evidence artifacts in database
-                screenshot_file = pipeline_result.metadata.get("screenshot_path")
-                dom_file = pipeline_result.metadata.get("dom_snapshot_path")
-                if screenshot_file and Path(screenshot_file).is_file():
                     try:
-                        run_store.record_artifact(
+                        pipeline_result = execute_inspection_flow(
+                            request=url,
+                            navigator=NavigatorProxy(navigator, default_viewport=vp),
+                            detector=wrapped_detector,
                             run_id=run_id,
-                            artifact_type=f"screenshot_{vp}",
-                            storage_path=screenshot_file,
-                            content_type="image/png",
+                            viewport=vp,
                         )
-                        if vp == target_viewports[0] or vp == "desktop":
+                    except Exception as exc:
+                        error_msg = str(exc).strip() or f"{exc.__class__.__name__}: execution failed"
+                        logger.exception("Run %s failed during pipeline execution (%s): %s", run_id, vp, error_msg)
+                        run_store.update_run(
+                            run_id,
+                            status="failed",
+                            error=error_msg,
+                            message=f"Vision Engine failed during evidence analysis." if "Corrupt DOM" in error_msg else f"Inspection pipeline error: {error_msg}",
+                        )
+                        preview_service.update_status(
+                            run_id,
+                            stage="failed",
+                            error=error_msg,
+                            message=f"Inspection pipeline error: {error_msg}",
+                        )
+                        return
+
+                    if not pipeline_result.success:
+                        raw_err = pipeline_result.metadata.get("error")
+                        error_msg = (str(raw_err).strip() if raw_err else "") or f"Inspection pipeline failed for {vp} viewport."
+                        logger.warning("Pipeline reported failure for run %s (%s): %s", run_id, vp, error_msg)
+                        run_store.update_run(
+                            run_id,
+                            status="failed",
+                            error=error_msg,
+                            message=error_msg,
+                        )
+                        preview_service.update_status(
+                            run_id,
+                            stage="failed",
+                            error=error_msg,
+                            message=error_msg,
+                        )
+                        return
+
+                    # Record generated evidence artifacts in database
+                    screenshot_file = pipeline_result.metadata.get("screenshot_path")
+                    dom_file = pipeline_result.metadata.get("dom_snapshot_path")
+                    if screenshot_file and Path(screenshot_file).is_file():
+                        try:
                             run_store.record_artifact(
                                 run_id=run_id,
-                                artifact_type="screenshot",
+                                artifact_type=f"screenshot_{vp}",
                                 storage_path=screenshot_file,
                                 content_type="image/png",
                             )
-                    except Exception as art_err:
-                        logger.warning("Could not persist screenshot artifact record: %s", str(art_err))
+                            if vp == target_viewports[0] or vp == "desktop":
+                                run_store.record_artifact(
+                                    run_id=run_id,
+                                    artifact_type="screenshot",
+                                    storage_path=screenshot_file,
+                                    content_type="image/png",
+                                )
+                        except Exception as art_err:
+                            logger.warning("Could not persist screenshot artifact record: %s", str(art_err))
 
-                if dom_file and Path(dom_file).is_file():
-                    try:
-                        run_store.record_artifact(
-                            run_id=run_id,
-                            artifact_type=f"dom_snapshot_{vp}",
-                            storage_path=dom_file,
-                            content_type="text/html",
-                        )
-                        if vp == target_viewports[0] or vp == "desktop":
+                    if dom_file and Path(dom_file).is_file():
+                        try:
                             run_store.record_artifact(
                                 run_id=run_id,
-                                artifact_type="dom_snapshot",
+                                artifact_type=f"dom_snapshot_{vp}",
                                 storage_path=dom_file,
                                 content_type="text/html",
                             )
-                    except Exception as art_err:
-                        logger.warning("Could not persist DOM snapshot artifact record: %s", str(art_err))
+                            if vp == target_viewports[0] or vp == "desktop":
+                                run_store.record_artifact(
+                                    run_id=run_id,
+                                    artifact_type="dom_snapshot",
+                                    storage_path=dom_file,
+                                    content_type="text/html",
+                                )
+                        except Exception as art_err:
+                            logger.warning("Could not persist DOM snapshot artifact record: %s", str(art_err))
 
-                default_evidence = EvidenceReferences(
-                    screenshot_path=screenshot_file,
-                    dom_snapshot_path=dom_file,
-                )
+                    default_evidence = EvidenceReferences(
+                        screenshot_path=screenshot_file,
+                        dom_snapshot_path=dom_file,
+                    )
 
-                try:
-                    for f in pipeline_result.findings:
-                        if len(target_viewports) > 1 and f.metadata.get("finding_id"):
-                            raw_id = f.metadata["finding_id"]
-                            if f"_{vp}" not in raw_id:
-                                f.metadata["finding_id"] = f"{raw_id}_{vp}"
-                        mapped_finding = map_inspection_finding_to_response(
-                            finding=f,
-                            run_id=run_id,
-                            index=finding_counter,
-                            default_evidence=default_evidence,
-                            default_viewport=vp,
+                    try:
+                        for f in pipeline_result.findings:
+                            if len(target_viewports) > 1 and f.metadata.get("finding_id"):
+                                raw_id = f.metadata["finding_id"]
+                                if f"_{vp}" not in raw_id:
+                                    f.metadata["finding_id"] = f"{raw_id}_{vp}"
+                            mapped_finding = map_inspection_finding_to_response(
+                                finding=f,
+                                run_id=run_id,
+                                index=finding_counter,
+                                default_evidence=default_evidence,
+                                default_viewport=vp,
+                            )
+                            all_mapped_findings.append(mapped_finding)
+                            finding_counter += 1
+                    except Exception as exc:
+                        error_msg = f"Finding mapping error: {str(exc)}"
+                        logger.error("Run %s failed during finding mapping: %s", run_id, error_msg)
+                        run_store.update_run(
+                            run_id,
+                            status="failed",
+                            error=error_msg,
+                            message="Failed to validate finding schema.",
                         )
-                        all_mapped_findings.append(mapped_finding)
-                        finding_counter += 1
-                except Exception as exc:
-                    error_msg = f"Finding mapping error: {str(exc)}"
-                    logger.error("Run %s failed during finding mapping: %s", run_id, error_msg)
-                    run_store.update_run(
-                        run_id,
-                        status="failed",
-                        error=error_msg,
-                        message="Failed to validate finding schema.",
-                    )
-                    preview_service.update_status(
-                        run_id,
-                        stage="failed",
-                        error=error_msg,
-                        message=f"Finding mapping error: {error_msg}",
-                    )
-                    return
+                        preview_service.update_status(
+                            run_id,
+                            stage="failed",
+                            error=error_msg,
+                            message=f"Finding mapping error: {error_msg}",
+                        )
+                        return
 
             # ---------------------------------------------------------------------
             # Complete Run with All Viewport Findings
@@ -475,5 +555,12 @@ class RunOrchestrator:
                 error=error_msg,
                 message=f"Orchestration error: {error_msg}",
             )
+        finally:
+            self._active_run_id = None
+            try:
+                self._concurrency_lock.release()
+            except RuntimeError:
+                pass
+            preview_service.close_run(run_id, release_frames=True)
 
 run_orchestrator = RunOrchestrator()

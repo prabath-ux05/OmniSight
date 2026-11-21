@@ -24,7 +24,7 @@ def _utc_now_iso() -> str:
 class LivePreviewService:
     """Thread-safe in-memory buffer and streaming hub for live website scanning preview."""
 
-    def __init__(self, max_cached_runs: int = 50) -> None:
+    def __init__(self, max_cached_runs: int = 10) -> None:
         self._lock = threading.Lock()
         self._states: dict[str, dict[str, Any]] = {}
         self._raw_frames: dict[str, bytes] = {}
@@ -270,10 +270,21 @@ class LivePreviewService:
                 if not sub_list:
                     self._subscribers.pop(run_id, None)
 
-    def close_run(self, run_id: str) -> None:
-        """Evict or finalize subscribers for a run."""
+    def close_run(self, run_id: str, release_frames: bool = True) -> None:
+        """Evict subscribers and release raw frames and heavy base64 payloads for a run."""
         with self._lock:
             self._subscribers.pop(run_id, None)
+            if release_frames:
+                self._raw_frames.pop(run_id, None)
+                if run_id in self._states:
+                    self._states[run_id]["frame_base64"] = None
+
+    def release_run_frames(self, run_id: str) -> None:
+        """Explicitly release raw and base64 frame buffers for a run while keeping status metadata."""
+        with self._lock:
+            self._raw_frames.pop(run_id, None)
+            if run_id in self._states:
+                self._states[run_id]["frame_base64"] = None
 
     def clear(self) -> None:
         """Clear all in-memory preview states (primarily for testing)."""

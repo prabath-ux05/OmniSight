@@ -17,6 +17,16 @@ from screenshots.screenshot_manager import ScreenshotManager
 from navigation.url_validator import validate_url, validate_run_id
 
 
+DEFAULT_CHROMIUM_ARGS = [
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--no-zygote",
+]
+
+
 VIEWPORT_PRESETS = {
     "desktop": {
         "width": 1280,
@@ -77,6 +87,7 @@ class BrowserNavigator:
         viewport_width=1280,
         viewport_height=720,
         render_wait_ms=500,
+        launch_args: Optional[list[str]] = None,
     ):
         if timeout_ms <= 0:
             raise ValueError("timeout_ms must be greater than zero")
@@ -92,6 +103,53 @@ class BrowserNavigator:
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
         self.render_wait_ms = render_wait_ms
+        self.launch_args = list(launch_args if launch_args is not None else DEFAULT_CHROMIUM_ARGS)
+        self._playwright = None
+        self._browser = None
+        self._managed_session = False
+
+    def start_session(self):
+        """Start a persistent Playwright and Browser session to be reused across viewports."""
+        self._ensure_windows_proactor_policy()
+        if self._playwright is None:
+            self._playwright = sync_playwright().start()
+        if self._browser is None or not self._browser.is_connected():
+            self._browser = self._playwright.chromium.launch(
+                headless=self.headless,
+                args=self.launch_args,
+            )
+        self._managed_session = True
+        return self._browser
+
+    def close(self):
+        """Safely close active browser and stop playwright if running."""
+        if self._browser is not None:
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        if hasattr(self, "_playwright_cm") and self._playwright_cm is not None and hasattr(self._playwright_cm, "__exit__"):
+            try:
+                self._playwright_cm.__exit__(None, None, None)
+            except Exception:
+                pass
+            self._playwright_cm = None
+        if self._playwright is not None:
+            if hasattr(self._playwright, "stop"):
+                try:
+                    self._playwright.stop()
+                except Exception:
+                    pass
+            self._playwright = None
+        self._managed_session = False
+
+    def __enter__(self):
+        self._managed_session = True
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     @staticmethod
     def _current_timestamp():
@@ -321,213 +379,249 @@ class BrowserNavigator:
         response_status = None
         start_time = perf_counter()
 
+        browser = None
+        own_browser = False
+        context = None
+        page = None
+        own_playwright = None
+        own_playwright_cm = None
+
         try:
             # Set the Windows event-loop policy before Playwright starts.
             self._ensure_windows_proactor_policy()
 
-            with sync_playwright() as playwright:
+            if self._browser is not None and self._browser.is_connected():
+                browser = self._browser
+            elif self._managed_session:
+                self._playwright_cm = sync_playwright()
+                if hasattr(self._playwright_cm, "__enter__"):
+                    self._playwright = self._playwright_cm.__enter__()
+                else:
+                    self._playwright = self._playwright_cm.start()
+                self._browser = self._playwright.chromium.launch(
+                    headless=self.headless,
+                    args=self.launch_args,
+                )
+                browser = self._browser
+                own_browser = False
+            else:
+                own_playwright_cm = sync_playwright()
+                if hasattr(own_playwright_cm, "__enter__"):
+                    own_playwright = own_playwright_cm.__enter__()
+                else:
+                    own_playwright = own_playwright_cm.start()
+                browser = own_playwright.chromium.launch(
+                    headless=self.headless,
+                    args=self.launch_args,
+                )
+                own_browser = True
 
-                browser = playwright.chromium.launch(
-                    headless=self.headless
+            try:
+                context_kwargs = {
+                    "viewport": {
+                        "width": preset["width"],
+                        "height": preset["height"],
+                    },
+                    "is_mobile": preset.get("is_mobile", False),
+                    "has_touch": preset.get("has_touch", False),
+                    "device_scale_factor": preset.get("device_scale_factor", 1.0),
+                }
+                if preset.get("user_agent"):
+                    context_kwargs["user_agent"] = preset["user_agent"]
+
+                try:
+                    context = browser.new_context(**context_kwargs)
+                    page = context.new_page()
+                except (TypeError, AttributeError):
+                    page = browser.new_page(
+                        viewport={
+                            "width": preset["width"],
+                            "height": preset["height"],
+                        }
+                    )
+
+                # Capture browser console errors
+                page.on(
+                    "console",
+                    lambda message: console_errors.append(
+                        message.text
+                    ) if message.type == "error" else None,
+                )
+
+                # Capture JavaScript errors
+                page.on(
+                    "pageerror",
+                    lambda error: page_errors.append(str(error)),
+                )
+
+                # Capture failed network requests
+                def capture_failed_request(request):
+                    failure = request.failure
+
+                    failed_requests.append({
+                        "url": request.url,
+                        "method": request.method,
+                        "failure": str(failure)
+                        if failure else "Request failed",
+                    })
+
+                page.on(
+                    "requestfailed",
+                    capture_failed_request,
                 )
 
                 try:
-                    context_kwargs = {
-                        "viewport": {
-                            "width": preset["width"],
-                            "height": preset["height"],
-                        },
-                        "is_mobile": preset.get("is_mobile", False),
-                        "has_touch": preset.get("has_touch", False),
-                        "device_scale_factor": preset.get("device_scale_factor", 1.0),
-                    }
-                    if preset.get("user_agent"):
-                        context_kwargs["user_agent"] = preset["user_agent"]
+                    # Navigate to the website
+                    response = page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=self.timeout_ms,
+                    )
 
+                    # Capture HTTP response status
+                    if response is not None:
+                        response_status = response.status
+
+                    # Allow dynamic content to render
+                    if self.render_wait_ms > 0:
+                        page.wait_for_timeout(self.render_wait_ms)
+
+                    # Real-time Live Preview: Progressive Top-to-Bottom Scrolling & Frame Streaming
                     try:
-                        context = browser.new_context(**context_kwargs)
-                        page = context.new_page()
-                    except (TypeError, AttributeError):
-                        page = browser.new_page(
-                            viewport={
-                                "width": preset["width"],
-                                "height": preset["height"],
-                            }
-                        )
-
-                    # Capture browser console errors
-                    page.on(
-                        "console",
-                        lambda message: console_errors.append(
-                            message.text
-                        ) if message.type == "error" else None,
-                    )
-
-                    # Capture JavaScript errors
-                    page.on(
-                        "pageerror",
-                        lambda error: page_errors.append(str(error)),
-                    )
-
-                    # Capture failed network requests
-                    def capture_failed_request(request):
-                        failure = request.failure
-
-                        failed_requests.append({
-                            "url": request.url,
-                            "method": request.method,
-                            "failure": str(failure)
-                            if failure else "Request failed",
-                        })
-
-                    page.on(
-                        "requestfailed",
-                        capture_failed_request,
-                    )
-
-                    try:
-                        # Navigate to the website
-                        response = page.goto(
-                            url,
-                            wait_until="domcontentloaded",
-                            timeout=self.timeout_ms,
-                        )
-
-                        # Capture HTTP response status
-                        if response is not None:
-                            response_status = response.status
-
-                        # Allow dynamic content to render
-                        if self.render_wait_ms > 0:
-                            page.wait_for_timeout(self.render_wait_ms)
-
-                        # Real-time Live Preview: Progressive Top-to-Bottom Scrolling & Frame Streaming
-                        try:
-                            self._execute_live_scroll_preview(
-                                page=page,
-                                run_id=run_id,
-                                viewport_name=vp_name,
-                                preset=preset,
-                            )
-                        except Exception:
-                            pass
-
-                        # Capture page metadata
-                        page_title = page.title()
-                        viewport = page.viewport_size
-                        timestamp = self._current_timestamp()
-
-                        # Capture screenshot
-                        screenshot_path = (
-                            ScreenshotManager.save_screenshot(
-                                page,
-                                run_id,
-                                stage="before",
-                                viewport=vp_name,
-                            )
-                        )
-
-                        # Capture DOM snapshot
-                        dom_snapshot_path = (
-                            DOMCapture.save_dom_snapshot(
-                                page,
-                                run_id,
-                                stage="before",
-                                viewport=vp_name,
-                            )
-                        )
-
-                        # Verify evidence files
-                        if (
-                            not screenshot_path
-                            or not Path(screenshot_path).is_file()
-                        ):
-                            raise FileNotFoundError(
-                                "Screenshot file was not created"
-                            )
-
-                        if (
-                            not dom_snapshot_path
-                            or not Path(dom_snapshot_path).is_file()
-                        ):
-                            raise FileNotFoundError(
-                                "DOM snapshot file was not created"
-                            )
-
-                        # Calculate navigation duration
-                        duration = round(
-                            (perf_counter() - start_time) * 1000,
-                            2,
-                        )
-
-                        # Identify HTTP errors
-                        http_error = (
-                            response_status is not None
-                            and response_status >= 400
-                        )
-
-                        error_message = (
-                            f"HTTP error: {response_status}"
-                            if http_error
-                            else None
-                        )
-
-                        # Return structured result
-                        return NavigationResult(
-                            status="failed" if http_error else "success",
-                            url=page.url,
+                        self._execute_live_scroll_preview(
+                            page=page,
                             run_id=run_id,
-                            page_title=page_title,
-                            captured_at=timestamp,
-                            timestamp=timestamp,
-                            viewport=viewport,
                             viewport_name=vp_name,
-                            screenshot_path=screenshot_path,
-                            dom_snapshot_path=dom_snapshot_path,
-                            console_errors=list(console_errors),
-                            page_errors=list(page_errors),
-                            response_status=response_status,
-                            navigation_duration_ms=duration,
-                            failed_requests=list(failed_requests),
-                            error=error_message,
+                            preset=preset,
                         )
+                    except Exception:
+                        pass
 
-                    except PlaywrightTimeoutError:
-                        duration = round(
-                            (perf_counter() - start_time) * 1000,
-                            2,
-                        )
+                    # Capture page metadata
+                    page_title = page.title()
+                    viewport = page.viewport_size
+                    timestamp = self._current_timestamp()
 
-                        return self._failed_result(
-                            url,
+                    # Capture screenshot
+                    screenshot_path = (
+                        ScreenshotManager.save_screenshot(
+                            page,
                             run_id,
-                            "Navigation timeout",
-                            navigation_duration_ms=duration,
-                            failed_requests=failed_requests,
-                            response_status=response_status,
-                            console_errors=console_errors,
-                            page_errors=page_errors,
+                            stage="before",
+                            viewport=vp_name,
                         )
+                    )
 
-                    except Exception as error:
-                        duration = round(
-                            (perf_counter() - start_time) * 1000,
-                            2,
-                        )
-
-                        return self._failed_result(
-                            url,
+                    # Capture DOM snapshot
+                    dom_snapshot_path = (
+                        DOMCapture.save_dom_snapshot(
+                            page,
                             run_id,
-                            str(error) or type(error).__name__,
-                            navigation_duration_ms=duration,
-                            failed_requests=failed_requests,
-                            response_status=response_status,
-                            console_errors=console_errors,
-                            page_errors=page_errors,
+                            stage="before",
+                            viewport=vp_name,
+                        )
+                    )
+
+                    # Verify evidence files
+                    if (
+                        not screenshot_path
+                        or not Path(screenshot_path).is_file()
+                    ):
+                        raise FileNotFoundError(
+                            "Screenshot file was not created"
                         )
 
-                finally:
-                    browser.close()
+                    if (
+                        not dom_snapshot_path
+                        or not Path(dom_snapshot_path).is_file()
+                    ):
+                        raise FileNotFoundError(
+                            "DOM snapshot file was not created"
+                        )
+
+                    # Calculate navigation duration
+                    duration = round(
+                        (perf_counter() - start_time) * 1000,
+                        2,
+                    )
+
+                    # Identify HTTP errors
+                    http_error = (
+                        response_status is not None
+                        and response_status >= 400
+                    )
+
+                    error_message = (
+                        f"HTTP error: {response_status}"
+                        if http_error
+                        else None
+                    )
+
+                    # Return structured result
+                    return NavigationResult(
+                        status="failed" if http_error else "success",
+                        url=page.url,
+                        run_id=run_id,
+                        page_title=page_title,
+                        captured_at=timestamp,
+                        timestamp=timestamp,
+                        viewport=viewport,
+                        viewport_name=vp_name,
+                        screenshot_path=screenshot_path,
+                        dom_snapshot_path=dom_snapshot_path,
+                        console_errors=list(console_errors),
+                        page_errors=list(page_errors),
+                        response_status=response_status,
+                        navigation_duration_ms=duration,
+                        failed_requests=list(failed_requests),
+                        error=error_message,
+                    )
+
+                except PlaywrightTimeoutError:
+                    duration = round(
+                        (perf_counter() - start_time) * 1000,
+                        2,
+                    )
+
+                    return self._failed_result(
+                        url,
+                        run_id,
+                        "Navigation timeout",
+                        navigation_duration_ms=duration,
+                        failed_requests=failed_requests,
+                        response_status=response_status,
+                        console_errors=console_errors,
+                        page_errors=page_errors,
+                    )
+
+                except Exception as error:
+                    duration = round(
+                        (perf_counter() - start_time) * 1000,
+                        2,
+                    )
+
+                    return self._failed_result(
+                        url,
+                        run_id,
+                        str(error) or type(error).__name__,
+                        navigation_duration_ms=duration,
+                        failed_requests=failed_requests,
+                        response_status=response_status,
+                        console_errors=console_errors,
+                        page_errors=page_errors,
+                    )
+
+            finally:
+                if page is not None:
+                    try:
+                        page.close()
+                    except Exception:
+                        pass
+                if context is not None:
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
 
         except Exception as error:
             duration = round(
@@ -545,3 +639,20 @@ class BrowserNavigator:
                 console_errors=console_errors,
                 page_errors=page_errors,
             )
+        finally:
+            if own_browser:
+                if browser is not None:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+                if own_playwright_cm is not None and hasattr(own_playwright_cm, "__exit__"):
+                    try:
+                        own_playwright_cm.__exit__(None, None, None)
+                    except Exception:
+                        pass
+                elif own_playwright is not None and hasattr(own_playwright, "stop"):
+                    try:
+                        own_playwright.stop()
+                    except Exception:
+                        pass

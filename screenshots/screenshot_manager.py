@@ -14,9 +14,25 @@ Features:
 from pathlib import Path
 from datetime import datetime, timezone
 import json
+import os
 import struct
 
 from navigation.url_validator import validate_run_id
+
+DEFAULT_MAX_SCREENSHOT_HEIGHT = 4000
+
+
+def get_max_screenshot_height() -> int:
+    """Retrieve maximum allowed screenshot height from environment or default (4000px).
+
+    A value of 0 disables height capping (unlimited).
+    """
+    env_val = os.getenv("MAX_SCREENSHOT_HEIGHT", str(DEFAULT_MAX_SCREENSHOT_HEIGHT)).strip()
+    try:
+        val = int(env_val)
+        return max(0, val)
+    except ValueError:
+        return DEFAULT_MAX_SCREENSHOT_HEIGHT
 
 
 class ScreenshotManager:
@@ -81,6 +97,7 @@ class ScreenshotManager:
         artifact_root: str = "artifacts",
         stage: str = "before",
         viewport: str | None = None,
+        max_height: int | None = None,
     ) -> str:
 
         if stage not in ("before", "after") and not any(stage.startswith(s) for s in ("before", "after")):
@@ -97,11 +114,40 @@ class ScreenshotManager:
         filename = f"{stage}_{viewport}.png" if viewport else f"{stage}.png"
         screenshot_path = run_dir / filename
 
-        # Capture full-page screenshot
-        page.screenshot(
-            path=str(screenshot_path),
-            full_page=True
+        effective_max_height = (
+            get_max_screenshot_height() if max_height is None else max(0, int(max_height))
         )
+
+        # Determine document scroll height to avoid allocating massive Skia bitmaps on tall pages
+        doc_height = 0
+        try:
+            doc_height = int(page.evaluate(
+                "() => Math.max(document.body ? document.body.scrollHeight : 0, "
+                "document.documentElement ? document.documentElement.scrollHeight : 0, "
+                "window.innerHeight || 0)"
+            ))
+        except Exception:
+            doc_height = 0
+
+        is_clipped = False
+        if effective_max_height > 0 and doc_height > effective_max_height:
+            vp_size = None
+            try:
+                vp_size = page.viewport_size
+            except Exception:
+                vp_size = None
+            vp_width = (vp_size or {}).get("width", 1280)
+            page.screenshot(
+                path=str(screenshot_path),
+                clip={"x": 0, "y": 0, "width": vp_width, "height": effective_max_height},
+            )
+            is_clipped = True
+        else:
+            # Capture full-page screenshot for normal-sized pages
+            page.screenshot(
+                path=str(screenshot_path),
+                full_page=True,
+            )
 
         # Verify screenshot file
         if not screenshot_path.is_file():
@@ -138,7 +184,10 @@ class ScreenshotManager:
             "screenshot_path": str(screenshot_path),
             "screenshot_width": dimensions["width"],
             "screenshot_height": dimensions["height"],
-            "full_page": True,
+            "full_page": not is_clipped,
+            "clipped": is_clipped,
+            "max_height": effective_max_height,
+            "document_height": doc_height,
             "viewport": page.viewport_size
         }
 

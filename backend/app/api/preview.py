@@ -170,13 +170,14 @@ def get_preview_frame(
 
     # Fallback to saved screenshot artifact file on disk if exists
     for artifact_name in ("before.png", "before_desktop.png", "screenshot.png"):
-        candidate = Path("evidence") / clean_id / artifact_name
-        if candidate.is_file():
-            return Response(
-                content=candidate.read_bytes(),
-                media_type="image/png",
-                headers={"Cache-Control": "no-cache"},
-            )
+        for base_dir in ("evidence", "artifacts"):
+            candidate = Path(base_dir) / clean_id / artifact_name
+            if candidate.is_file():
+                return Response(
+                    content=candidate.read_bytes(),
+                    media_type="image/png",
+                    headers={"Cache-Control": "no-cache"},
+                )
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

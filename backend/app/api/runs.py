@@ -168,14 +168,14 @@ def execute_run_pipeline(
     check_run_access(run, current_user)
 
     # Concurrency guard: prevent duplicate simultaneous pipeline runs
-    if run.status in ("capturing", "analyzing"):
+    from backend.app.services.orchestrator import run_orchestrator
+
+    if run.status in ("capturing", "analyzing") or run_orchestrator.is_run_active(run.run_id):
         logger.warning("Pipeline execution rejected: run '%s' is already in state '%s'", clean_id, run.status)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Run '{clean_id}' is already executing (status: {run.status}).",
         )
-
-    from backend.app.services.orchestrator import run_orchestrator
 
     viewports = run_store._run_viewports.get(run.run_id, ["desktop"])
     if background_tasks is not None:
